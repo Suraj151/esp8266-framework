@@ -1,0 +1,29 @@
+#ifndef _EW_SERVER_LOGIN_PAGE_H_
+#define _EW_SERVER_LOGIN_PAGE_H_
+
+#include <Arduino.h>
+
+static const char EW_SERVER_LOGIN_PAGE[] PROGMEM = "\
+<h2>Login to Continue !</h2>\
+<form action='/login' method='POST'>\
+<table>\
+<tr>\
+<td>Username:</td>\
+<td><input type='text' name='username' maxlength='20'/></td>\
+</tr>\
+<tr>\
+<td>Password:</td>\
+<td><input type='password' name='password' maxlength='20'/></td>\
+</tr>\
+<tr>\
+<td></td>\
+<td>\
+<button class='btn' type='submit'>\
+Login\
+</button>\
+</td>\
+</tr>\
+</table>\
+</form>";
+
+#endif

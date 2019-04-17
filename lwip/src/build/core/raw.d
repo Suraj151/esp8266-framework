@@ -1,0 +1,25 @@
+build/core/raw.o: core/raw.c \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/opt.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwipopts.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/debug.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/arch.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/arch/cc.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/include/c_types.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/include/ets_sys.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/include/c_types.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/include/eagle_soc.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/include/osapi.h \
+ build/user_config.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/def.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/memp.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/memp_std.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/mem.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/ip_addr.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/netif.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/err.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/pbuf.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/raw.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/ip.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/stats.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/lwip/mem.h \
+ /home/suraj/Arduino/hardware/esp8266com/esp8266/tools/sdk/lwip/include/arch/perf.h
