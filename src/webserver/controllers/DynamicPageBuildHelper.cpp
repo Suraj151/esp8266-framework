@@ -1,8 +1,11 @@
 #include "DynamicPageBuildHelper.h"
 
-void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _value, char* _maxlength, char* _type, bool _checked ){
+void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _value, int _maxlength, char* _type, bool _checked ){
 
   bool _is_checkbox = false;
+  char _maxlen[7]; memset(_maxlen, 0, 7);
+  itoa( _maxlength, _maxlen, 10 );
+
   if( 0 <= __strstr( _type, HTML_INPUT_CHECKBOX_TAG_TYPE, 10 ) )
     _is_checkbox = true;
 
@@ -20,7 +23,7 @@ void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _v
   if( !_is_checkbox ){
     strcat_P( _page, HTML_MAXLEN_ATTR );
     strcat( _page, "'" );
-    strcat( _page, _maxlength );
+    strcat( _page, _maxlen );
     strcat( _page, "'" );
   }
 
@@ -40,9 +43,12 @@ void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _v
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
 
-void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _value, char* _maxlength, char* _type, bool _checked ){
+void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _value, int _maxlength, char* _type, bool _checked ){
 
   bool _is_checkbox = false;
+  char _maxlen[7]; memset(_maxlen, 0, 7);
+  itoa( _maxlength, _maxlen, 10 );
+
   if( 0 <= __strstr( _type, HTML_INPUT_CHECKBOX_TAG_TYPE, 10 ) )
     _is_checkbox = true;
 
@@ -60,7 +66,7 @@ void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _v
   if( !_is_checkbox ){
     strcat_P( _page, HTML_MAXLEN_ATTR );
     strcat( _page, "'" );
-    strcat( _page, _maxlength );
+    strcat( _page, _maxlen );
     strcat( _page, "'" );
   }
 

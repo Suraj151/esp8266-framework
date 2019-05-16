@@ -38,9 +38,9 @@ enum FLASH_MSG_TYPE {
   ALERT_WARNING
 };
 
-void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _value, char* _maxlength="20", char* _type=HTML_INPUT_TEXT_TAG_TYPE, bool _checked=false );
+void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _value, int _maxlength=20, char* _type=HTML_INPUT_TEXT_TAG_TYPE, bool _checked=false );
 
-void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _value, char* _maxlength="20", char* _type=HTML_INPUT_TEXT_TAG_TYPE, bool _checked=false );
+void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _value, int _maxlength=20, char* _type=HTML_INPUT_TEXT_TAG_TYPE, bool _checked=false );
 
 void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** _options, int _size, int _selected, int _exception=0 );
 

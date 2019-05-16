@@ -4,7 +4,6 @@
 #define EW_SERVER_HOME_ROUTE "/"
 #define EW_SERVER_LOGIN_ROUTE "/login"
 #define EW_SERVER_LOGOUT_ROUTE "/logout"
-#define EW_SERVER_SL_CONFIG_ROUTE "/smart-loo-config"
 #define EW_SERVER_WIFI_CONFIG_ROUTE "/wifi-config"
 #define EW_SERVER_LOGIN_CONFIG_ROUTE "/login-config"
 #define EW_SERVER_OTA_CONFIG_ROUTE "/ota-config"

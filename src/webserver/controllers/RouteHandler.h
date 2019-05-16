@@ -208,8 +208,8 @@ class EwRouteHandler : public EwSessionHandler{
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_TOP );
 
-      concat_tr_input_html_tags( _page, PSTR("WiFi Name:"), PSTR("sta_ssid"), this->wifi_configs.sta_ssid );
-      concat_tr_input_html_tags( _page, PSTR("WiFi Password:"), PSTR("sta_pswd"), this->wifi_configs.sta_password );
+      concat_tr_input_html_tags( _page, PSTR("WiFi Name:"), PSTR("sta_ssid"), this->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("WiFi Password:"), PSTR("sta_pswd"), this->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE-1 );
 
       __int_ip_to_str( _ip_address, this->wifi_configs.sta_local_ip, 20 );
       concat_tr_input_html_tags( _page, PSTR("WiFi Local Ip:"), PSTR("sta_lip"), _ip_address );
@@ -218,8 +218,8 @@ class EwRouteHandler : public EwSessionHandler{
       __int_ip_to_str( _ip_address, this->wifi_configs.sta_subnet, 20 );
       concat_tr_input_html_tags( _page, PSTR("WiFi Subnet:"), PSTR("sta_sip"), _ip_address );
 
-      concat_tr_input_html_tags( _page, PSTR("Access Name:"), PSTR("ap_ssid"), this->wifi_configs.ap_ssid );
-      concat_tr_input_html_tags( _page, PSTR("Access Password:"), PSTR("ap_pswd"), this->wifi_configs.ap_password );
+      concat_tr_input_html_tags( _page, PSTR("Access Name:"), PSTR("ap_ssid"), this->wifi_configs.ap_ssid, WIFI_CONFIGS_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("Access Password:"), PSTR("ap_pswd"), this->wifi_configs.ap_password, WIFI_CONFIGS_BUF_SIZE-1 );
 
       __int_ip_to_str( _ip_address, this->wifi_configs.ap_local_ip, 20 );
       concat_tr_input_html_tags( _page, PSTR("Access Local Ip:"), PSTR("ap_lip"), _ip_address );
@@ -333,7 +333,7 @@ class EwRouteHandler : public EwSessionHandler{
       char _port[10];memset( _port, 0, 10 );
       __appendUintToBuff( _port, "%d", _ota_configs.ota_port, 8 );
 
-      concat_tr_input_html_tags( _page, PSTR("OTA Host:"), PSTR("hst"), _ota_configs.ota_host, "49" );
+      concat_tr_input_html_tags( _page, PSTR("OTA Host:"), PSTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("OTA Port:"), PSTR("prt"), _port );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
@@ -395,8 +395,8 @@ class EwRouteHandler : public EwSessionHandler{
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_LOGIN_CONFIG_PAGE_TOP );
 
-      concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrnm"), this->login_credentials.username );
-      concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), this->login_credentials.password );
+      concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrnm"), this->login_credentials.username, LOGIN_CONFIGS_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), this->login_credentials.password, LOGIN_CONFIGS_BUF_SIZE-1 );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
       if( _enable_flash )
@@ -496,13 +496,13 @@ class EwRouteHandler : public EwSessionHandler{
       __appendUintToBuff( _port, "%d", _mqtt_general_configs.port, 8 );
       __appendUintToBuff( _keepalive, "%d", _mqtt_general_configs.keepalive, 8 );
 
-      concat_tr_input_html_tags( _page, PSTR("Host Address:"), PSTR("hst"), _mqtt_general_configs.host, "50" );
+      concat_tr_input_html_tags( _page, PSTR("Host Address:"), PSTR("hst"), _mqtt_general_configs.host, MQTT_HOST_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("Host Port:"), PSTR("prt"), _port );
-      concat_tr_input_html_tags( _page, PSTR("Client Id:"), PSTR("clid"), _mqtt_general_configs.client_id, "100" );
-      concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrn"), _mqtt_general_configs.username, "25" );
-      concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), _mqtt_general_configs.password, "350" );
+      concat_tr_input_html_tags( _page, PSTR("Client Id:"), PSTR("clid"), _mqtt_general_configs.client_id, MQTT_CLIENT_ID_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrn"), _mqtt_general_configs.username, MQTT_USERNAME_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("Keep Alive:"), PSTR("kpalv"), _keepalive );
-      concat_tr_input_html_tags( _page, PSTR("Clean Session:"), PSTR("cln"), "clean", "", HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_general_configs.clean_session != 0 );
+      concat_tr_input_html_tags( _page, PSTR("Clean Session:"), PSTR("cln"), "clean", 20, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_general_configs.clean_session != 0 );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
       if( _enable_flash )
@@ -588,10 +588,10 @@ class EwRouteHandler : public EwSessionHandler{
 
       char* _qos_options[] = {"0", "1", "2"};
 
-      concat_tr_input_html_tags( _page, PSTR("Will Topic:"), PSTR("wtpc"), _mqtt_lwt_configs.will_topic, "50" );
-      concat_tr_input_html_tags( _page, PSTR("Will Message:"), PSTR("wmsg"), _mqtt_lwt_configs.will_message, "50"  );
+      concat_tr_input_html_tags( _page, PSTR("Will Topic:"), PSTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("Will Message:"), PSTR("wmsg"), _mqtt_lwt_configs.will_message, MQTT_TOPIC_BUF_SIZE-1 );
       concat_tr_select_html_tags( _page, PSTR("Will QoS:"), PSTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos+1 );
-      concat_tr_input_html_tags( _page, PSTR("Will Retain:"), PSTR("wrtn"), "retain", "", HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_lwt_configs.will_retain != 0 );
+      concat_tr_input_html_tags( _page, PSTR("Will Retain:"), PSTR("wrtn"), "retain", 20, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_lwt_configs.will_retain != 0 );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
       if( _enable_flash )
@@ -681,9 +681,9 @@ class EwRouteHandler : public EwSessionHandler{
         _qos_label[3] = (0x30 + i );_qos_name[4] = (0x30 + i );
         _retain_label[6] = (0x30 + i );_retain_name[4] = (0x30 + i );
 
-        concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.publish_topics[i].topic, "50"  );
+        concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.publish_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1 );
         concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.publish_topics[i].qos+1 );
-        concat_tr_input_html_tags( _page, _retain_label, _retain_name, "retain", "", HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0 );
+        concat_tr_input_html_tags( _page, _retain_label, _retain_name, "retain", 20, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0 );
       }
       concat_tr_input_html_tags( _page, PSTR("Publish Frequency:"), PSTR("pfrq"), _publish_freq );
 
@@ -694,7 +694,7 @@ class EwRouteHandler : public EwSessionHandler{
         _topic_label[5] = (0x30 + i );_topic_name[4] = (0x30 + i );
         _qos_label[3] = (0x30 + i );_qos_name[4] = (0x30 + i );
 
-        concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.subscribe_topics[i].topic, "50"  );
+        concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.subscribe_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1 );
         concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.subscribe_topics[i].qos+1 );
       }
 
@@ -900,7 +900,7 @@ class EwRouteHandler : public EwSessionHandler{
       __appendUintToBuff( _port, "%d", this->gpio_configs.gpio_port, 8 );
       __appendUintToBuff( _freq, "%d", this->gpio_configs.gpio_post_frequency, 8 );
 
-      concat_tr_input_html_tags( _page, PSTR("Host Address:"), PSTR("hst"), this->gpio_configs.gpio_host, (char*)"40" );
+      concat_tr_input_html_tags( _page, PSTR("Host Address:"), PSTR("hst"), this->gpio_configs.gpio_host, GPIO_HOST_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("Host Port:"), PSTR("prt"), _port );
       concat_tr_input_html_tags( _page, PSTR("Post Frequency:"), PSTR("frq"), _freq );
 
