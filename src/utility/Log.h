@@ -9,9 +9,9 @@
 #ifdef EW_SERIAL_LOG
 
 #define LogBegin(x)	Serial.begin(x)
-#define Log(x)			Serial.print(x)
+#define Log(x)			{delay(0);Serial.print(x);}
 #define Log_format(x,t)		Serial.print(x,t)
-#define Logln(x)		Serial.println(x)
+#define Logln(x)		{delay(0);Serial.println(x);}
 #define Logln_format(x,t)	Serial.println(x,t)
 
 #else

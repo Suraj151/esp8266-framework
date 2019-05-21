@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-#define ENABLE_GPIO_CONFIG
+// #define ENABLE_GPIO_CONFIG
 #define ENABLE_MQTT_CONFIG
 
 #define CONFIG_START      5
@@ -43,8 +43,8 @@ enum eeprom_db_table_address {
   #endif
   #ifdef ENABLE_MQTT_CONFIG
   MQTT_GENERAL_CONFIG_TABLE_ADDRESS = 700,
-  MQTT_LWT_CONFIG_TABLE_ADDRESS = 1250,
-  MQTT_PUBSUB_CONFIG_TABLE_ADDRESS = 1400,
+  MQTT_LWT_CONFIG_TABLE_ADDRESS = 1400,
+  MQTT_PUBSUB_CONFIG_TABLE_ADDRESS = 1600,
   #endif
 };
 
@@ -163,8 +163,9 @@ using gpio_config_table = gpio_configs;
 #define MQTT_HOST_CONNECT_TIMEOUT  5    /*second*/
 #define MQTT_DEFAULT_PORT       1883
 #define MQTT_USERNAME_BUF_SIZE  25
-#define MQTT_PASSWORD_BUF_SIZE  350
+#define MQTT_PASSWORD_BUF_SIZE  500
 #define MQTT_TOPIC_BUF_SIZE     50
+#define MQTT_WILL_MSG_BUF_SIZE  80
 
 #define MQTT_MAX_QOS_LEVEL      2
 #define MQTT_MAX_PUBLISH_TOPIC  2
@@ -206,7 +207,7 @@ struct mqtt_general_configs {
 struct mqtt_lwt_configs {
 
   char will_topic[MQTT_TOPIC_BUF_SIZE];
-  char will_message[MQTT_TOPIC_BUF_SIZE];
+  char will_message[MQTT_WILL_MSG_BUF_SIZE];
   int will_qos;
   int will_retain;
 };
@@ -227,7 +228,7 @@ const mqtt_pub_topics_t PROGMEM _mqtt_pub_topic_defaults = {
 };
 
 const mqtt_general_configs PROGMEM _mqtt_general_config_defaults = {
-  "", MQTT_DEFAULT_PORT, 0, "", "", "", 0, 0
+  "", MQTT_DEFAULT_PORT, 0, "", "", "", MQTT_DEFAULT_KEEPALIVE, 1
 };
 
 const mqtt_lwt_configs PROGMEM _mqtt_lwt_config_defaults = {

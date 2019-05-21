@@ -4,7 +4,7 @@
 #define MQTT_READ_TIMEOUT           10
 
 #ifndef QUEUE_BUFFER_SIZE
-#define QUEUE_BUFFER_SIZE           1536
+#define QUEUE_BUFFER_SIZE           2048
 #endif
 
 void mqttConnectedCb( uint32_t *args ){
@@ -494,14 +494,15 @@ void MQTTClient::MQTT_Task(){
           }
           if ( QUEUE_Gets(&this->mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == 0 ) {
 
-              // #ifdef EW_SERIAL_LOG
-              // Log(F("MQTT: getting qued packets :"));
-              // for (int i = 0; i < dataLen; i++) {
-              //   Log_format( dataBuffer[i], HEX ); Log(" ");
-              //   delay(0);
-              // }
-              // Logln();
-              // #endif
+              #ifdef EW_SERIAL_LOG
+              Log(F("MQTT: getting qued packets :"));
+              for (int i = 0; i < dataLen; i++) {
+                // Log_format( dataBuffer[i], HEX ); Log(" ");
+                Log( (char)dataBuffer[i] ); Log(" ");
+                delay(0);
+              }
+              Logln();
+              #endif
 
               uint8_t msg_qos = mqtt_get_qos(dataBuffer);
               uint8_t msg_type = mqtt_get_type(dataBuffer);
@@ -1038,6 +1039,12 @@ bool MQTTClient::sendPacket( uint8_t *buffer, uint16_t len ) {
       //Serial.print("Sending: "); Serial.println(sendlen);
       ret = this->wifi_client->write( buffer, sendlen);
       #ifdef EW_SERIAL_LOG
+      // Log(F("MQTT: sending packets : "));
+      // for (int i = 0; i < len; i++) {
+      //   Log((char)buffer[i]);
+      //   Log(F(" "));
+      // }
+      // Logln();
       Log(F("MQTT: send packet return ")); Logln(ret);
       #endif
       len -= ret;

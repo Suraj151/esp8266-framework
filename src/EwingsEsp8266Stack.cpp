@@ -412,10 +412,12 @@ void EwingsEsp8266Stack::handleMqttPublish(){
       _payload += ESP.getChipId();
       #endif
 
-      int _size = _payload.length() + 1;
+      int _size = _payload.length() + 20;
       char* _pload = new char[ _size ];
       memset( _pload, 0, _size );
       _payload.toCharArray( _pload, _size );
+      __find_and_replace( _pload, "[mac]", macStr, 2 );
+      _size = strlen( _pload );
 
       this->mqtt_client.Publish(
 
@@ -474,6 +476,7 @@ void EwingsEsp8266Stack::handleMqttConfigChange( int _mqtt_config_type ){
       sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
       __find_and_replace( _mqtt_general_configs.username, "[mac]", macStr, 2 );
+      __find_and_replace( _mqtt_general_configs.client_id, "[mac]", macStr, 2 );
       __find_and_replace( _mqtt_lwt_configs.will_message, "[mac]", macStr, 2 );
 
       if( this->mqtt_client.begin( this->wifi, &_mqtt_general_configs, &_mqtt_lwt_configs ) ){

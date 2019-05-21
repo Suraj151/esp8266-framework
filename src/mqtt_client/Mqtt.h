@@ -48,7 +48,7 @@ typedef enum {
 #define MQTT_MAX_QOS_LEVEL      2
 #endif
 
-#define MQTT_BUF_SIZE           384
+#define MQTT_BUF_SIZE           640
 #define MQTT_CLIENT_READINTERVAL_MS	10
 
 typedef struct {
@@ -149,6 +149,9 @@ class MQTTClient{
 			}
 			#ifdef EW_SERIAL_LOG
 	    Logln( F("MQTT: Connecting") );
+			// Log( F("client_id: ") );	Logln( _mqtt_general_configs->client_id );
+			// Log( F("password: ") );	Logln( _mqtt_general_configs->password );
+			// Log( F("username: ") );	Logln( _mqtt_general_configs->username );
 	    #endif
 	    this->OnConnected( mqttConnectedCb );
 	    this->OnDisconnected( mqttDisconnectedCb );
