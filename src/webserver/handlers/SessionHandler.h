@@ -1,8 +1,21 @@
+/***************************** Session Handler ********************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #ifndef _EW_SERVER_SESSION_HANDLER_
 #define _EW_SERVER_SESSION_HANDLER_
 
+/**
+ * @define	max buf size for client cookies.
+ */
+EwWebResourceProvider* web_resource;
 #define EW_SERIAL_LOG
-
 #define EW_COOKIE_BUFF_MAX_SIZE 60
 
 #include <Arduino.h>
@@ -11,29 +24,56 @@
 #include <utility/Log.h>
 #include <database/EwingsDefaultDB.h>
 
+/**
+ * EwSessionHandler class
+ */
 class EwSessionHandler{
 
   public:
 
+    /**
+		 * EwSessionHandler constructor
+		 */
     EwSessionHandler( void ){
     }
 
+    /**
+		 * EwSessionHandler constructor
+     *
+     * @param ESP8266WebServer* server
+		 */
     EwSessionHandler( ESP8266WebServer* server ){
       this->begin(server );
     }
 
+    /**
+		 * EwSessionHandler destructor
+		 */
     ~EwSessionHandler(){
       this->EwServer = NULL;
     }
 
+    /**
+		 * begin with web server
+     *
+     * @param ESP8266WebServer* server
+		 */
     void begin( ESP8266WebServer* server ){
       this->EwServer = server;
     }
 
+    /**
+		 * assign login credential table to session handler
+     *
+     * @param login_credential_table _login_credentials
+		 */
     void use_login_credential( login_credential_table _login_credentials ){
       this->login_credentials = _login_credentials;
     }
 
+    /**
+		 * send inactive session to client. this will remove any login cache from client side.
+		 */
     void send_inactive_session_headers(){
 
       char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
@@ -42,6 +82,15 @@ class EwSessionHandler{
       this->EwServer->sendHeader("Set-Cookie", _session_cookie);
     }
 
+    /**
+		 * build session cookies for login user with defined max age.
+		 *
+		 * @param	char*	_str
+		 * @param	bool  _stat
+     * @param	int   _max_size
+		 * @param	bool|false	_enable_max_age
+		 * @param	uint32_t|EW_COOKIE_MAX_AGE  _max_age
+		 */
     void build_session_cookie( char* _str, bool _stat, int _max_size, bool _enable_max_age=false, uint32_t _max_age=EW_COOKIE_MAX_AGE ){
 
       // login_credential_table _login_credentials = this->get_login_credential_table();
@@ -54,6 +103,11 @@ class EwSessionHandler{
       }
     }
 
+    /**
+		 * check whether client has active valid session
+     *
+     * @return  bool
+		 */
     bool has_active_session( void ){
 
       #ifdef EW_SERIAL_LOG
@@ -84,6 +138,11 @@ class EwSessionHandler{
       return false;
     }
 
+    /**
+		 * check whether client has inactive session
+     *
+     * @return  bool
+		 */
     bool has_inactive_session( void ){
 
       #ifdef EW_SERIAL_LOG
@@ -115,7 +174,14 @@ class EwSessionHandler{
 
   protected:
 
+    /**
+		 * @var	ESP8266WebServer*	EwServer
+		 */
     ESP8266WebServer* EwServer;
+
+    /**
+		 * @var	login_credential_table	login_credentials
+		 */
     login_credential_table login_credentials;
 
 };

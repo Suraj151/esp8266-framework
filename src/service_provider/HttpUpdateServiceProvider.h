@@ -1,3 +1,13 @@
+/************** Over The Air firmware update service **************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #ifndef _HTTP_OTA_SERVICE_PROVIDER_H_
 #define _HTTP_OTA_SERVICE_PROVIDER_H_
 
@@ -7,6 +17,9 @@
 #include <ESP8266httpUpdate.h>
 #include <database/EwingsDefaultDB.h>
 
+/**
+ * ota status enum
+ */
 enum http_ota_status{
 
   BEGIN_FAILED,
@@ -19,20 +32,47 @@ enum http_ota_status{
   UNKNOWN
 };
 
+/**
+ * HTTPUpdateServiceProvider class
+ */
 class HTTPUpdateServiceProvider{
 
   public:
 
+    /**
+     * @var	WiFiClient*|NULL	wifi_client
+     */
     WiFiClient* wifi_client=NULL;
+
+    /**
+     * @var	HTTPClient*|NULL	http_client
+     */
     HTTPClient* http_client=NULL;
+
+    /**
+     * @var	EwingsDefaultDB*|NULL	ew_db
+     */
     EwingsDefaultDB* ew_db=NULL;
 
+    /**
+     * HTTPUpdateServiceProvider constructor.
+     */
     HTTPUpdateServiceProvider(){
     }
 
+    /**
+     * HTTPUpdateServiceProvider destructor.
+     */
     ~HTTPUpdateServiceProvider(){
     }
 
+    /**
+     * begin ota with client and database configs
+     *
+     * @param WiFiClient*	      _wifi_client
+     * @param HTTPClient*	      _http_client
+     * @param EwingsDefaultDB*	_database
+     */
     void begin_ota( WiFiClient* _wifi_client, HTTPClient* _http_client, EwingsDefaultDB* _database ){
 
       this->wifi_client = _wifi_client;
@@ -40,6 +80,12 @@ class HTTPUpdateServiceProvider{
       this->ew_db = _database;
     }
 
+    /**
+     * handle ota by cheching firmware version first and update firmware if
+     * latest version is available
+     *
+     * @return  http_ota_status
+     */
     http_ota_status handle_ota(){
 
       if( !this->wifi_client || !this->http_client || !this->ew_db ) return BEGIN_FAILED;

@@ -1,3 +1,13 @@
+/************************** Ewings Esp8266 Stack ******************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #ifndef _EWINGS_ESP8266_STACK_H_
 #define _EWINGS_ESP8266_STACK_H_
 
@@ -15,21 +25,36 @@
 #include <mqtt_client/Mqtt.h>
 #endif
 
+/**
+ * @define flash key parameters
+ */
 #define FLASH_KEY_PIN             D3
 #define FLASH_KEY_PRESS_DURATION  1000
-#define FLASH_KEY_PRESS_COUNT_THR 10
+#define FLASH_KEY_PRESS_COUNT_THR 5
 
+/**
+ * @define general http parameters
+ */
 #define HTTP_HOST_ADDR_MAX_SIZE 100
 #define HTTP_REQUEST_DURATION   10000
 #define HTTP_REQUEST_RETRY      1
 
 #ifdef ENABLE_GPIO_CONFIG
+/**
+ * @define gpio parameters
+ */
 #define GPIO_OPERATION_DURATION 1000
 #define GPIO_TABLE_UPDATE_DURATION 300000
 #endif
 
+/**
+ * @define wifi cycle check parameters
+ */
 #define WIFI_CONNECTIVITY_CHECK_DURATION 30000
 
+/**
+ * @define network address & port translation feature
+ */
 #define ENABLE_NAPT_FEATURE
 
 #ifdef ENABLE_NAPT_FEATURE
@@ -37,9 +62,14 @@
 #include "lwip/app/dhcpserver.h"
 #endif
 
-
-class EwingsDefaultDB;
-
+/**
+ * EwingsEsp8266Stack class
+ * @parent  PeriodicCallBack|public
+ * @parent  DeviceFactoryReset|public
+ * @parent  EwingsDefaultDB|public
+ * @parent  NTPServiceProvider|public
+ * @parent  HTTPUpdateServiceProvider|public
+ */
 class EwingsEsp8266Stack :
 public PeriodicCallBack,
 public DeviceFactoryReset,
@@ -54,26 +84,62 @@ public HTTPUpdateServiceProvider{
 
   protected:
 
+    /**
+		 * @var	uint8_t|18  wifi_connection_timeout
+		 */
     uint8_t wifi_connection_timeout=18;
+    /**
+		 * @var	uint8_t|0 flash_key_pressed
+		 */
     uint8_t flash_key_pressed=0;
 
-    ESP8266WiFiClass* wifi = &WiFi;
+    #ifdef ENABLE_EWING_HTTP_SERVER
+    /**
+		 * @var	ESP8266WebServer  EwServer
+		 */
     ESP8266WebServer EwServer;
+    /**
+		 * @var	EwRouteHandler  RouteHandler
+		 */
     EwRouteHandler RouteHandler;
+    void start_http_server( void );
+    #endif
+
+    /**
+		 * @var	ESP8266WiFiClass*|&WiFi wifi
+		 */
+    ESP8266WiFiClass* wifi = &WiFi;
+    /**
+		 * @var	HTTPClient  http_request
+		 */
     HTTPClient http_request;
+    /**
+		 * @var	WiFiClient  wifi_client
+		 */
     WiFiClient wifi_client;
     #ifdef ENABLE_MQTT_CONFIG
+    /**
+		 * @var	MQTTClient  mqtt_client
+		 */
     MQTTClient mqtt_client;
     #endif
 
+    /**
+		 * @var	char array http_host
+		 */
     char http_host[HTTP_HOST_ADDR_MAX_SIZE];
+    /**
+		 * @var	int|80  http_port
+		 */
     int http_port=80;
+    /**
+		 * @var	int|HTTP_REQUEST_RETRY  http_retry
+		 */
     int http_retry=HTTP_REQUEST_RETRY;
 
     bool configure_wifi_access_point( wifi_config_table* _wifi_credentials );
     bool configure_wifi_station( wifi_config_table* _wifi_credentials );
     void start_wifi(void);
-    void start_http_server( void );
 
     void handleFlashKeyPress( void );
 
@@ -92,8 +158,17 @@ public HTTPUpdateServiceProvider{
     #endif
 
     #ifdef ENABLE_GPIO_CONFIG
+    /**
+		 * @var gpio_config_table virtual_gpio_configs
+		 */
     gpio_config_table virtual_gpio_configs;
+    /**
+		 * @var	int|0 _gpio_http_request_cb_id
+		 */
     int _gpio_http_request_cb_id=0;
+    /**
+		 * @var	bool|true update_gpio_table_from_virtual
+		 */
     bool update_gpio_table_from_virtual=true;
     void enable_update_gpio_table_from_virtual( void );
     void handleGpioOperations( void );
@@ -105,11 +180,17 @@ public HTTPUpdateServiceProvider{
     #endif
 
     #ifdef ENABLE_MQTT_CONFIG
-    // mqtt_general_config_table _mqtt_general_configs;
-    // mqtt_lwt_config_table _mqtt_lwt_configs;
-    // mqtt_pubsub_config_table _mqtt_pubsub_configs;
+    /**
+		 * @var	int|0 _mqtt_timer_cb_id
+		 */
     int _mqtt_timer_cb_id=0;
+    /**
+		 * @var	int|0 _mqtt_publish_cb_id
+		 */
     int _mqtt_publish_cb_id=0;
+    /**
+		 * @var	int|0 _mqtt_subscribe_cb_id
+		 */
     int _mqtt_subscribe_cb_id=0;
     void start_mqtt_service( void );
     void handleMqttPublish( void );

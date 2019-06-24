@@ -1,3 +1,13 @@
+/****************************** server routes *********************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #ifndef _EW_SERVER_ROUTES_
 #define _EW_SERVER_ROUTES_
 
@@ -7,14 +17,15 @@
 #define EW_SERVER_WIFI_CONFIG_ROUTE "/wifi-config"
 #define EW_SERVER_LOGIN_CONFIG_ROUTE "/login-config"
 #define EW_SERVER_OTA_CONFIG_ROUTE "/ota-config"
-#define EW_SERVER_LISTEN_TO_CLIENT_ROUTE "/listen-client"
+#define EW_SERVER_DASHBOARD_ROUTE "/dashboard"
+#define EW_SERVER_DASHBOARD_MONITOR_ROUTE "/listen-dashboard"
 
 #define EW_SERVER_GPIO_MANAGE_CONFIG_ROUTE "/gpio-manage"
 #define EW_SERVER_GPIO_SERVER_CONFIG_ROUTE "/gpio-server"
 #define EW_SERVER_GPIO_MODE_CONFIG_ROUTE "/gpio-config"
 #define EW_SERVER_GPIO_WRITE_CONFIG_ROUTE "/gpio-write"
 #define EW_SERVER_GPIO_MONITOR_ROUTE "/gpio-monitor"
-#define EW_SERVER_LISTEN_TO_MONITOR_ROUTE "/listen-monitor"
+#define EW_SERVER_GPIO_ANALOG_MONITOR_ROUTE "/listen-monitor"
 
 #define EW_SERVER_MQTT_MANAGE_CONFIG_ROUTE "/mqtt-manage"
 #define EW_SERVER_MQTT_GENERAL_CONFIG_ROUTE "/mqtt-general-config"

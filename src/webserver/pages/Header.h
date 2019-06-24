@@ -1,3 +1,13 @@
+/***************************** header html page ********************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #ifndef _EW_SERVER_HEADER_HTML_H_
 #define _EW_SERVER_HEADER_HTML_H_
 
@@ -41,6 +51,9 @@ color:#0062af;\
 }\
 table{\
 margin:auto;\
+}\
+.mnwdth125{\
+min-width:125px;\
 }\
 .btn{\
 padding:6px;\

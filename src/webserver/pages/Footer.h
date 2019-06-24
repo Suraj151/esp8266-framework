@@ -1,3 +1,13 @@
+/**************************** footer html page ********************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #ifndef _EW_SERVER_FOOTER_HTML_H_
 #define _EW_SERVER_FOOTER_HTML_H_
 
@@ -14,7 +24,7 @@ document.getElementsByClassName('msg')[0].style.display='none';\
 </body>\
 </html>";
 
-static const char EW_SERVER_FOOTER_WITH_MONITOR_LISTEN_HTML[] PROGMEM = "\
+static const char EW_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML[] PROGMEM = "\
 </div>\
 <script>\
 var rq=new XMLHttpRequest();\
@@ -44,6 +54,28 @@ setInterval(function(){\
 rq.open('GET','/listen-monitor');\
 rq.send();\
 },1000);\
+</script>\
+</body>\
+</html>\
+";
+
+static const char EW_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML[] PROGMEM = "\
+</div>\
+<script>\
+var rq=new XMLHttpRequest();\
+function rql(){\
+var r=JSON.parse(this.responseText);\
+document.getElementById('stnm').innerHTML=r.nm;\
+document.getElementById('strs').innerHTML=r.rs;\
+document.getElementById('stst').innerHTML=r.st;\
+document.getElementById('stmc').innerHTML=r.mc;\
+if(r.r)location.href='/';\
+}\
+rq.addEventListener('load',rql);\
+setInterval(function(){\
+rq.open('GET','/listen-dashboard');\
+rq.send();\
+},2000);\
 </script>\
 </body>\
 </html>\

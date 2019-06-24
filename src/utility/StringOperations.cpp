@@ -1,6 +1,25 @@
+/********************** String Operations Utility *****************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #include "DataTypeConversions.h"
 #include "StringOperations.h"
 
+/**
+ * This function finds and returns substring index from given string if present
+ * or returns null if not found.
+ *
+ * @param   char* str
+ * @param   char* substr
+ * @param   int|300	_len
+ * @return  int
+ */
 int __strstr(char *str, char *substr, int _len){
 	int n = 0;
 	if( strlen(str) ==0 || strlen(substr) ==0 ) return -1;
@@ -22,6 +41,13 @@ int __strstr(char *str, char *substr, int _len){
 	return -1;
 }
 
+/**
+ * This function remove/trim blank spaces from both ends of given string if present.
+ *
+ * @param   char* str
+ * @param   uint16_t|300	_overflow_limit
+ * @return  char*
+ */
 char* __strtrim(char *str, uint16_t _overflow_limit){
 	uint16_t n = 0;
 	uint16_t len = strlen(str);
@@ -44,6 +70,14 @@ char* __strtrim(char *str, uint16_t _overflow_limit){
 	return NULL;
 }
 
+/**
+ * This function remove/trim given char from both ends of given string if present.
+ *
+ * @param   char* str
+ * @param   char	_val
+ * @param   uint16_t|300	_overflow_limit
+ * @return  char*
+ */
 char* __strtrim_val(char *str, char _val, uint16_t _overflow_limit){
   uint16_t n = 0;
   uint16_t len = strlen(str);
@@ -66,6 +100,14 @@ char* __strtrim_val(char *str, char _val, uint16_t _overflow_limit){
   return NULL;
 }
 
+/**
+ * This function checks whether given strings are equals or not.
+ *
+ * @param   char* str1
+ * @param   char* str2
+ * @param   uint16_t|300	_overflow_limit
+ * @return  bool
+ */
 bool __are_str_equals(char *str1, char *str2, uint16_t _overflow_limit ){
 
 	int len = strlen( str1 );
@@ -77,6 +119,14 @@ bool __are_str_equals(char *str1, char *str2, uint16_t _overflow_limit ){
 	} return true;
 }
 
+/**
+ * This function appends uint data to char buffer in given format.
+ *
+ * @param	char* _str
+ * @param const char* _format
+ * @param uint32_t	_value
+ * @param int	_len
+ */
 void __appendUintToBuff( char* _str, const char* _format, uint32_t _value, int _len){
 
 	char value[20];
@@ -85,12 +135,27 @@ void __appendUintToBuff( char* _str, const char* _format, uint32_t _value, int _
 	strncat(_str, value, _len);
 }
 
+/**
+ * This function convert int ip address to char string.
+ *
+ * @param	char* _str
+ * @param uint8_t*	_ip
+ * @param int|15	_len
+ */
 void __int_ip_to_str( char* _str, uint8_t* _ip, int _len ){
 
 	memset( _str, 0, _len );
 	sprintf( _str, "%d.%d.%d.%d", _ip[0], _ip[1], _ip[2], _ip[3] );
 }
 
+/**
+ * This function convert char string ip address to int.
+ *
+ * @param	char* _str
+ * @param uint8_t*	_ip
+ * @param int|15	_len
+ * @param bool|true	_clear_str_after_done
+ */
 void __str_ip_to_int( char* _str, uint8_t* _ip, int _len, bool _clear_str_after_done ){
 
 	// char _buf[4];
@@ -107,6 +172,14 @@ void __str_ip_to_int( char* _str, uint8_t* _ip, int _len, bool _clear_str_after_
 	if( _clear_str_after_done ) memset( _str, 0, _len );
 }
 
+/**
+ * This function finds substring from main string and replace it with given string.
+ *
+ * @param	char* _str
+ * @param	char* _find_str
+ * @param	char* _replace_with
+ * @param int	_occurence
+ */
 void __find_and_replace( char* _str, char* _find_str, char* _replace_with, int _occurence ){
 
   int _str_len = strlen( _str );
@@ -142,6 +215,15 @@ void __find_and_replace( char* _str, char* _find_str, char* _replace_with, int _
   delete[] _buf;
 }
 
+/**
+ * This function parse and find the value of given key from main json string.
+ *
+ * @param		char* _str
+ * @param		char* _key
+ * @param		char* _value
+ * @param 	int	_max_value_len
+ * @return	bool
+ */
 bool __get_from_json( char* _str, char* _key, char* _value, int _max_value_len ){
 
   int _str_len = strlen( _str );

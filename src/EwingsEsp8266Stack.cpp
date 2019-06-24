@@ -1,5 +1,8 @@
 #include "EwingsEsp8266Stack.h"
 
+/**
+ * initialize all required features and actions.
+ */
 void EwingsEsp8266Stack::initialize(){
 
   #ifdef EW_SERIAL_LOG
@@ -8,7 +11,9 @@ void EwingsEsp8266Stack::initialize(){
   #endif
   this->init_default_database();
   this->start_wifi();
+  #ifdef ENABLE_EWING_HTTP_SERVER
   this->start_http_server();
+  #endif
   this->begin_ota( &this->wifi_client, &this->http_request, this->EwingsDefaultDatabase() );
   #ifdef ENABLE_GPIO_CONFIG
   this->start_gpio_service();
@@ -27,6 +32,9 @@ void EwingsEsp8266Stack::initialize(){
   #endif
 }
 
+/**
+ * start wifi functionality
+ */
 void EwingsEsp8266Stack::start_wifi(){
 
   wifi_config_table _wifi_credentials = this->get_wifi_config_table();
@@ -40,6 +48,12 @@ void EwingsEsp8266Stack::start_wifi(){
   _ClearObject(&_wifi_credentials);
 }
 
+/**
+ * configure and start wifi access point functionality
+ *
+ * @param   wifi_config_table* _wifi_credentials
+ * @return  bool
+ */
 bool EwingsEsp8266Stack::configure_wifi_access_point( wifi_config_table* _wifi_credentials ){
 
   #ifdef EW_SERIAL_LOG
@@ -74,6 +88,12 @@ bool EwingsEsp8266Stack::configure_wifi_access_point( wifi_config_table* _wifi_c
   }
 }
 
+/**
+ * configure and start wifi station functionality
+ *
+ * @param   wifi_config_table* _wifi_credentials
+ * @return  bool
+ */
 bool EwingsEsp8266Stack::configure_wifi_station( wifi_config_table* _wifi_credentials ){
 
   #ifdef EW_SERIAL_LOG
@@ -143,6 +163,9 @@ bool EwingsEsp8266Stack::configure_wifi_station( wifi_config_table* _wifi_creden
 }
 
 #ifdef ENABLE_NAPT_FEATURE
+/**
+ * enable napt feature
+ */
 void EwingsEsp8266Stack::enable_napt_service(){
   // Initialize the NAT feature
   ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
@@ -153,30 +176,46 @@ void EwingsEsp8266Stack::enable_napt_service(){
 }
 #endif
 
+#ifdef ENABLE_EWING_HTTP_SERVER
+/**
+ * start http server functionality. this requires wifi should work as access point
+ */
 void EwingsEsp8266Stack::start_http_server(){
 
-  this->RouteHandler.handle( &this->EwServer, this->EwingsDefaultDatabase() );
+  this->RouteHandler.handle( &this->EwServer, this->EwingsDefaultDatabase(), this->wifi );
   // this->RouteHandler.handle( &this->EwServer );
-  this->RouteHandler.set_ewstack_callback( [&](int _t) { this->restart_device(_t); } );
+  this->RouteHandler._wificonfig_controller.set_ewstack_callback( [&](int _t) { this->restart_device(_t); } );
   #ifdef ENABLE_GPIO_CONFIG
-  this->RouteHandler.set_ewstack_gpio_config_callback( [&](int _t) { this->handleGpioModes(_t); } );
-  this->RouteHandler.set_ewstack_virtual_gpio_configs( &this->virtual_gpio_configs );
+  this->RouteHandler._gpio_controller.set_ewstack_gpio_config_callback( [&](int _t) { this->handleGpioModes(_t); } );
+  this->RouteHandler._gpio_controller.set_ewstack_virtual_gpio_configs( &this->virtual_gpio_configs );
   #endif
   #ifdef ENABLE_MQTT_CONFIG
-  this->RouteHandler.set_ewstack_mqtt_config_callback( [&](int _t) { this->handleMqttConfigChange(_t); } );
+  this->RouteHandler._mqtt_controller.set_ewstack_mqtt_config_callback( [&](int _t) { this->handleMqttConfigChange(_t); } );
   #endif
   this->EwServer.begin();
   #ifdef EW_SERIAL_LOG
     Logln(F("HTTP server started"));
   #endif
 }
+#endif
 
+/**
+ * serve each internal action, client request, auto operations
+ */
 void EwingsEsp8266Stack::serve(){
 
+  #ifdef ENABLE_EWING_HTTP_SERVER
   this->EwServer.handleClient();
+  #endif
   this->handle_periodic_callbacks(millis());
 }
 
+/**
+ * check http response and give it retry if it not ok
+ *
+ * @param   int _httpCode
+ * @return  bool
+ */
 bool EwingsEsp8266Stack::followHttpRequest( int _httpCode ){
 
   #ifdef EW_SERIAL_LOG
@@ -201,6 +240,9 @@ bool EwingsEsp8266Stack::followHttpRequest( int _httpCode ){
   return false;
 }
 
+/**
+ * check wifi connectivity after each wifi activity cycle. try to reconnect if failed
+ */
 void EwingsEsp8266Stack::handleWiFiConnectivity(){
 
   #ifdef EW_SERIAL_LOG
@@ -219,6 +261,9 @@ void EwingsEsp8266Stack::handleWiFiConnectivity(){
   }
 }
 
+/**
+ * check for ota updates and restart device on successful updates
+ */
 void EwingsEsp8266Stack::handleOta(){
 
   #ifdef EW_SERIAL_LOG
@@ -236,6 +281,9 @@ void EwingsEsp8266Stack::handleOta(){
   }
 }
 
+/**
+ * prints log as per defined duration
+ */
 void EwingsEsp8266Stack::handleLogPrints(){
 
   #ifdef EW_SERIAL_LOG
@@ -254,6 +302,9 @@ void EwingsEsp8266Stack::handleLogPrints(){
   #endif
 }
 
+/**
+ * reset device to default configs on flash key pressed for defined time
+ */
 void EwingsEsp8266Stack::handleFlashKeyPress(){
 
   if( digitalRead(FLASH_KEY_PIN) == LOW ){
@@ -275,6 +326,9 @@ void EwingsEsp8266Stack::handleFlashKeyPress(){
   }
 }
 
+/**
+ * print wifi configs
+ */
 void EwingsEsp8266Stack::printWiFiConfigLogs(){
 
   #ifdef EW_SERIAL_LOG
@@ -301,6 +355,9 @@ void EwingsEsp8266Stack::printWiFiConfigLogs(){
   #endif
 }
 
+/**
+ * print ota configs
+ */
 void EwingsEsp8266Stack::printOtaConfigLogs(){
 
   #ifdef EW_SERIAL_LOG
@@ -315,6 +372,9 @@ void EwingsEsp8266Stack::printOtaConfigLogs(){
   #endif
 }
 
+/**
+ * check list of connected clients to device
+ */
 void EwingsEsp8266Stack::connected_softap_client_info(){
 
   unsigned char number_client;
@@ -356,11 +416,17 @@ void EwingsEsp8266Stack::connected_softap_client_info(){
 
 #ifdef ENABLE_MQTT_CONFIG
 
+/**
+ * start mqtt service. initialize it with mqtt configs at database
+ */
 void EwingsEsp8266Stack::start_mqtt_service(){
 
   this->handleMqttConfigChange();
 }
 
+/**
+ * check and do mqtt publish on given configs.
+ */
 void EwingsEsp8266Stack::handleMqttPublish(){
 
   #ifdef EW_SERIAL_LOG
@@ -433,6 +499,9 @@ void EwingsEsp8266Stack::handleMqttPublish(){
   }
 }
 
+/**
+ * handle mqtt subscribe cycle. suscribe to topics in pubsub configs
+ */
 void EwingsEsp8266Stack::handleMqttSubScribe(){
 
   #ifdef EW_SERIAL_LOG
@@ -456,6 +525,11 @@ void EwingsEsp8266Stack::handleMqttSubScribe(){
   }
 }
 
+/**
+ * handle restart of mqtt services on config change from autherised client
+ *
+ * @param   int _mqtt_config_type
+ */
 void EwingsEsp8266Stack::handleMqttConfigChange( int _mqtt_config_type ){
 
 
@@ -536,6 +610,9 @@ void EwingsEsp8266Stack::handleMqttConfigChange( int _mqtt_config_type ){
 
 }
 
+/**
+ * print mqtt configs
+ */
 void EwingsEsp8266Stack::printMqttConfigLogs(){
 
   #ifdef EW_SERIAL_LOG
@@ -588,6 +665,9 @@ void EwingsEsp8266Stack::printMqttConfigLogs(){
 
 #ifdef ENABLE_GPIO_CONFIG
 
+/**
+ * start gpio services if enabled
+ */
 void EwingsEsp8266Stack::start_gpio_service(){
 
   this->handleGpioModes();
@@ -597,6 +677,9 @@ void EwingsEsp8266Stack::start_gpio_service(){
   this->setInterval( [&]() { this->enable_update_gpio_table_from_virtual(); }, GPIO_TABLE_UPDATE_DURATION );
 }
 
+/**
+ * post gpio data to server specified in gpio configs
+ */
 void EwingsEsp8266Stack::handleGpioHttpRequest( ){
 
   memset( this->http_host, 0, HTTP_HOST_ADDR_MAX_SIZE);
@@ -649,6 +732,9 @@ void EwingsEsp8266Stack::handleGpioHttpRequest( ){
   }
 }
 
+/**
+ * handle gpio operations as per gpio configs
+ */
 void EwingsEsp8266Stack::handleGpioOperations(){
 
   // gpio_config_table _gpio_configs = this->get_gpio_config_table();
@@ -691,10 +777,16 @@ void EwingsEsp8266Stack::handleGpioOperations(){
 
 }
 
+/**
+ * enable gpio data update to database from virtual table in heap
+ */
 void EwingsEsp8266Stack::enable_update_gpio_table_from_virtual(){
   this->update_gpio_table_from_virtual = true;
 }
 
+/**
+ * handle gpio modes for their operations.
+ */
 void EwingsEsp8266Stack::handleGpioModes( int _gpio_config_type ){
 
   gpio_config_table _gpio_configs = this->get_gpio_config_table();
@@ -734,6 +826,9 @@ void EwingsEsp8266Stack::handleGpioModes( int _gpio_config_type ){
 
 }
 
+/**
+ * print gpio configs
+ */
 void EwingsEsp8266Stack::printGpioConfigLogs(){
 
   #ifdef EW_SERIAL_LOG
@@ -756,6 +851,9 @@ void EwingsEsp8266Stack::printGpioConfigLogs(){
   #endif
 }
 
+/**
+ * get gpio mapped pin from its no.
+ */
 uint8_t EwingsEsp8266Stack::getGpioFromPinMap( uint8_t _pin ){
 
   uint8_t mapped_pin;

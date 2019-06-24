@@ -1,9 +1,22 @@
+/************************ Dynamic html tag builder ****************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #ifndef _EW_HTML_PAGE_HELPER_H_
 #define _EW_HTML_PAGE_HELPER_H_
 
 #include <Arduino.h>
 #include <utility/Utility.h>
 
+/**
+ * @var html open close tags
+ */
 static const char HTML_TR_OPEN_TAG   []PROGMEM = "<tr>";
 static const char HTML_TR_CLOSE_TAG  []PROGMEM = "</tr>";
 static const char HTML_TD_OPEN_TAG   []PROGMEM = "<td>";
@@ -18,6 +31,9 @@ static const char HTML_DIV_CLOSE_TAG []PROGMEM =  "</div>";
 static const char HTML_H2_OPEN_TAG   []PROGMEM = "<h2>";
 static const char HTML_H2_CLOSE_TAG  []PROGMEM = "</h2>";
 
+/**
+ * @var html attributes
+ */
 static const char HTML_MAXLEN_ATTR   []PROGMEM = " maxlength=";
 static const char HTML_TYPE_ATTR     []PROGMEM = " type=";
 static const char HTML_NAME_ATTR     []PROGMEM = " name=";
@@ -29,9 +45,15 @@ static const char HTML_CHECKED_ATTR  []PROGMEM =  " checked='checked' ";
 
 static const char HTML_SUCCESS_FLASH []PROGMEM =  "Config saved Successfully";
 
+/**
+ * @var html tag types
+ */
 #define HTML_INPUT_TEXT_TAG_TYPE "text"
 #define HTML_INPUT_CHECKBOX_TAG_TYPE "checkbox"
 
+/**
+ * @var flash message enum
+ */
 enum FLASH_MSG_TYPE {
   ALERT_DANGER,
   ALERT_SUCCESS,

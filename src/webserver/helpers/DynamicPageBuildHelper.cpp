@@ -1,5 +1,28 @@
+/************************ Dynamic html tag builder ****************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #include "DynamicPageBuildHelper.h"
 
+/**
+ * build and append tr input html tag to html page. It build html tr/input tag with
+ * given type, name, value, label etc. attributes.
+ * this function uses program memory arguments to optimise ram
+ *
+ * @param	char*	_page
+ * @param	PGM_P _label
+ * @param	PGM_P _name
+ * @param	char*	_value
+ * @param	int   _maxlength
+ * @param	char*	_type
+ * @param	bool  _checked
+ */
 void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _value, int _maxlength, char* _type, bool _checked ){
 
   bool _is_checkbox = false;
@@ -43,6 +66,18 @@ void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _v
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
 
+/**
+ * build and append tr input html tag to html page. It build html tr/input tag with
+ * given type, name, value, label etc. attributes
+ *
+ * @param	char*	_page
+ * @param	char* _label
+ * @param	char* _name
+ * @param	char*	_value
+ * @param	int   _maxlength
+ * @param	char*	_type
+ * @param	bool  _checked
+ */
 void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _value, int _maxlength, char* _type, bool _checked ){
 
   bool _is_checkbox = false;
@@ -86,6 +121,18 @@ void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _v
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
 
+/**
+ * build and append tr select html tag to html page. It build html tr/select tag with
+ * given name, options, label etc. attributes
+ *
+ * @param	char*	_page
+ * @param	char* _label
+ * @param	char* _name
+ * @param	char**	_options
+ * @param	int   _size
+ * @param	int   _selected
+ * @param	int   _exception
+ */
 void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** _options, int _size, int _selected, int _exception ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
@@ -122,6 +169,19 @@ void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** 
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
 
+/**
+ * build and append tr select html tag to html page. It build html tr/select tag with
+ * given name, options, label etc. attributes
+ * this function uses program memory arguments to optimise ram
+ *
+ * @param	char*	_page
+ * @param	PGM_P _label
+ * @param	PGM_P _name
+ * @param	char**	_options
+ * @param	int   _size
+ * @param	int   _selected
+ * @param	int   _exception
+ */
 void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** _options, int _size, int _selected, int _exception ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
@@ -158,6 +218,14 @@ void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** 
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
 
+/**
+ * build and append tr header html tag to html page. It build html tr/header tag with
+ * inner html attributes
+ * this function uses program memory arguments to optimise ram
+ *
+ * @param	char*	_page
+ * @param	PGM_P _header
+ */
 void concat_tr_header_html_tags( char* _page, PGM_P _header ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
@@ -171,6 +239,14 @@ void concat_tr_header_html_tags( char* _page, PGM_P _header ){
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
 
+/**
+ * build and append div html tag to html page. It build html div tag with inner html
+ * this function uses program memory arguments to optimise ram
+ *
+ * @param	char*	_page
+ * @param	PGM_P _message
+ * @param	int   _status
+ */
 void concat_flash_message_div( char* _page, PGM_P _message, int _status ){
 
   strcat_P( _page, HTML_DIV_OPEN_TAG );
@@ -184,6 +260,13 @@ void concat_flash_message_div( char* _page, PGM_P _message, int _status ){
   strcat_P( _page, HTML_DIV_CLOSE_TAG );
 }
 
+/**
+ * build and append div html tag to html page. It build html div tag with inner html
+ *
+ * @param	char*	_page
+ * @param	char* _message
+ * @param	int   _status
+ */
 void concat_flash_message_div( char* _page, char* _message, int _status ){
 
   strcat_P( _page, HTML_DIV_OPEN_TAG );
@@ -197,6 +280,13 @@ void concat_flash_message_div( char* _page, char* _message, int _status ){
   strcat_P( _page, HTML_DIV_CLOSE_TAG );
 }
 
+/**
+ * build and append div html tag for graph axis title.
+ *
+ * @param	char*	_page
+ * @param	char* _title
+ * @param	char* _style
+ */
 void concat_graph_axis_title_div( char* _page, char* _title, char* _style ){
 
   strcat_P( _page, HTML_DIV_OPEN_TAG );

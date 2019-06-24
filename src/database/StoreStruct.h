@@ -1,11 +1,30 @@
+/***************** Ewings Structures Store and configs ************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+this file contains all default configurations of ewings stack.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #ifndef EW_STORE_STRUCT_H
 #define EW_STORE_STRUCT_H
 
 #include <Arduino.h>
 
-// #define ENABLE_GPIO_CONFIG
-#define ENABLE_MQTT_CONFIG
 
+/**
+ * enable/disable gpio, http server and mqtt feature here
+ */
+#define ENABLE_GPIO_CONFIG
+#define ENABLE_MQTT_CONFIG
+#define ENABLE_EWING_HTTP_SERVER
+
+/**
+ * common default configurations for all ewings stack
+ */
 #define CONFIG_START      5
 #define CONFIG_VERSION    "1.0"
 #define FIRMWARE_VERSION  2019041100
@@ -33,6 +52,9 @@
 #define LOGIN_CONFIGS_BUF_SIZE WIFI_CONFIGS_BUF_SIZE
 #define OTA_HOST_BUF_SIZE 50
 
+/**
+ * table addresses in ewings database.
+ */
 enum eeprom_db_table_address {
   GLOBAL_CONFIG_TABLE_ADDRESS = CONFIG_START,
   LOGIN_CREDENTIAL_TABLE_ADDRESS = 50,

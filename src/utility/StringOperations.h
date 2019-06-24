@@ -1,3 +1,13 @@
+/********************** String Operations Utility *****************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #ifndef __STRINGOPERATIONS_H__
 #define __STRINGOPERATIONS_H__
 

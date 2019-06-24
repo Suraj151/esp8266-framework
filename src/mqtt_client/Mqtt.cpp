@@ -70,7 +70,11 @@ void mqttDataCb( uint32_t *args, const char* topic, uint32_t topic_len, const ch
 
 bool MQTTClient::is_mqtt_connected(){
 
-    if( this->mqttClient.connState == MQTT_DELETING ) return false;
+    if(
+      this->mqttClient.connState == WIFI_CONNECTING_ERROR ||
+      this->mqttClient.connState == MQTT_DELETING ||
+      this->mqttClient.connState == MQTT_DISCONNECTED
+    ) return false;
     return ( this->connected() && this->mqttClient.mqtt_connected );
 }
 
@@ -126,8 +130,9 @@ void MQTTClient::deliver_publish(  uint8_t* message, int length ){
     event_data.data = (char*)mqtt_get_publish_data(message, &event_data.data_length);
 
     if (this->dataCb)
-        this->dataCb( (uint32_t*)this, event_data.topic, event_data.topic_length, event_data.data, event_data.data_length);
-
+        this->dataCb( this->mqttDataCallbackArgs, event_data.topic, event_data.topic_length, event_data.data, event_data.data_length);
+    else
+        mqttDataCb( this->mqttDataCallbackArgs, event_data.topic, event_data.topic_length, event_data.data, event_data.data_length);
 }
 
 // void mqtt_wificlient_delete( MQTT_Client *mqttClient ){

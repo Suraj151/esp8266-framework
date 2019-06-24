@@ -158,7 +158,7 @@ class MQTTClient{
 	    this->OnPublished( mqttPublishedCb );
 			this->OnSubscribed( mqttSubscribedCb );
 			this->OnUnsubscribed( mqttUnsubscribedCb );
-	    this->OnData( mqttDataCb );
+	    // this->OnData( mqttDataCb );
 
 			this->Connect();
 			return true;
@@ -187,6 +187,7 @@ class MQTTClient{
 		void MQTT_Task( void );
 
 		MQTT_Client mqttClient;
+		uint32_t *mqttDataCallbackArgs = (uint32_t*)this;
 
 		bool is_mqtt_connected( void );
 		bool is_topic_subscribed( char* _topic );

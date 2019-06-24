@@ -1,13 +1,42 @@
+/************************* Data Type Convertors *******************************
+This file is part of the Ewings Esp8266 Stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
+
 #include "DataTypeConversions.h"
 
+/**
+ * This function convert bcd to uint8_t.
+ *
+ * @param   uint8_t val
+ * @return  uint8_t
+ */
 uint8_t BcdToUint8(uint8_t val){
     return val - 6 * (val >> 4);
 }
 
+/**
+ * This function convert uint8_t to bcd.
+ *
+ * @param   uint8_t val
+ * @return  uint8_t
+ */
 uint8_t Uint8ToBcd(uint8_t val){
     return val + 6 * (val / 10);
 }
 
+/**
+ * This function convert string to uint16_t.
+ *
+ * @param   char* pString
+ * @param   uint8_t _len|32
+ * @return  uint16_t
+ */
 uint16_t StringToUint16(char* pString, uint8_t _len){
     uint16_t value = 0;
 	uint8_t n = 0;
@@ -28,6 +57,13 @@ uint16_t StringToUint16(char* pString, uint8_t _len){
     return value;
 }
 
+/**
+ * This function convert string to uint8_t.
+ *
+ * @param   char* pString
+ * @param   uint8_t _len|32
+ * @return  uint8_t
+ */
 uint8_t StringToUint8(char* pString, uint8_t _len){
 	uint8_t value = 0, n = 0;
 
@@ -47,6 +83,13 @@ uint8_t StringToUint8(char* pString, uint8_t _len){
 	return value;
 }
 
+/**
+ * This function convert string to hex16.
+ *
+ * @param   char* pString
+ * @param   uint8_t _strlen
+ * @return  uint16_t
+ */
 uint16_t StringToHex16(char* pString, uint8_t _strlen){
 	uint16_t value = 0;
 	uint16_t hexValue = 0;
