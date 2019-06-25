@@ -14,7 +14,6 @@ created Date    : 1st June 2019
 /**
  * @define	max buf size for client cookies.
  */
-EwWebResourceProvider* web_resource;
 #define EW_SERIAL_LOG
 #define EW_COOKIE_BUFF_MAX_SIZE 60
 

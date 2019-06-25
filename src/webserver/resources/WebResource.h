@@ -17,7 +17,6 @@ created Date    : 1st June 2019
 #include <webserver/pages/Header.h>
 #include <webserver/pages/Footer.h>
 #include <webserver/pages/NotFound.h>
-#include <webserver/pages/UnauthorizedPage.h>
 
 #include <webserver/handlers/RouteHandler.h>
 #include <webserver/handlers/SessionHandler.h>
