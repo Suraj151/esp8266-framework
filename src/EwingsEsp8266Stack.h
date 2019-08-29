@@ -55,7 +55,7 @@ created Date    : 1st June 2019
 /**
  * @define network address & port translation feature
  */
-#define ENABLE_NAPT_FEATURE
+//#define ENABLE_NAPT_FEATURE
 
 #ifdef ENABLE_NAPT_FEATURE
 #include "lwip/lwip_napt.h"

@@ -936,7 +936,7 @@ bool MQTTClient::connectServer( ) {
 bool MQTTClient::disconnectServer() {
 
   if( this->disconnectedCb ) this->disconnectedCb( (uint32_t*)this );
-  return this->wifi_client ? this->connected() ? this->wifi_client->stop() : true : true;
+  return this->connected() ? this->wifi_client->stop(500) : true;
 }
 
 bool MQTTClient::connected() {

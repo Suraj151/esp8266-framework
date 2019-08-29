@@ -380,7 +380,12 @@ void EwingsEsp8266Stack::connected_softap_client_info(){
   unsigned char number_client;
   struct station_info *stat_info;
 
-  struct ip_addr *IPaddress;
+#ifdef ENABLE_NAPT_FEATURE
+struct ip_addr *IPaddress;
+#else
+struct ip4_addr *IPaddress;
+#endif
+  
   IPAddress address;
   int i=1;
 
