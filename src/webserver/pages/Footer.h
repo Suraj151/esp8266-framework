@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _EW_SERVER_FOOTER_HTML_H_
 
 #include <Arduino.h>
-#include <database/StoreStruct.h>
+#include <config/Config.h>
 
 static const char EW_SERVER_FOOTER_HTML[] PROGMEM = "\
 </div>\

@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _NTP_SERVICE_PROVIDER_H_
 
 #include <ESP8266WiFi.h>
-#include <database/StoreStruct.h>
+#include <config/Config.h>
 
 #define TZ              5       // (utc+) TZ in hours
 #define DST_MN          30      // use 60mn for summer time in some countries

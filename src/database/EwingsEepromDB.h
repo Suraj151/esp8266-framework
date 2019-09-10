@@ -14,12 +14,12 @@ created Date    : 1st June 2019
 /**
  * define eeprom max size available here
  */
-#define EEPROM_MAX      4096
+#define EEPROM_MAX      SPI_FLASH_SEC_SIZE
 
-#include <EEPROM.h>
+#include <database/eeprom/EW_EEPROM.h>
 #include <utility/Utility.h>
 #include <utility/Log.h>
-#include "StoreStruct.h"
+#include <config/Config.h>
 
 /**
  * define table structure here

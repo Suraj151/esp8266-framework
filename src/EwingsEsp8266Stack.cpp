@@ -24,7 +24,7 @@ void EwingsEsp8266Stack::initialize(){
 
   this->setInterval( [&]() { this->handleLogPrints(); }, EW_DEFAULT_LOG_DURATION );
   this->setInterval( [&]() { this->handleFlashKeyPress(); }, FLASH_KEY_PRESS_DURATION );
-  this->setInterval( [&]() { this->handleOta(); }, HTTP_REQUEST_DURATION );
+  this->setInterval( [&]() { this->handleOta(); }, OTA_API_CHECK_DURATION );
   this->run_while_factory_reset( [&]() { this->clear_default_tables(); } );
 
   #ifdef ENABLE_NAPT_FEATURE
@@ -365,7 +365,6 @@ void EwingsEsp8266Stack::printOtaConfigLogs(){
   ota_config_table _ota_configs = this->get_ota_config_table();
 
   Logln(F("\nOTA Configs :"));
-  Log(_ota_configs.firmware_version); Log("\t");
   Log(_ota_configs.ota_host); Log("\t");
   Log(_ota_configs.ota_port); Logln("\n");
 
@@ -380,12 +379,12 @@ void EwingsEsp8266Stack::connected_softap_client_info(){
   unsigned char number_client;
   struct station_info *stat_info;
 
-#ifdef ENABLE_NAPT_FEATURE
-struct ip_addr *IPaddress;
-#else
-struct ip4_addr *IPaddress;
-#endif
-  
+  #ifdef ENABLE_NAPT_FEATURE
+  struct ip_addr *IPaddress;
+  #else
+  struct ip4_addr *IPaddress;
+  #endif
+
   IPAddress address;
   int i=1;
 

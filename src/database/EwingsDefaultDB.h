@@ -11,7 +11,7 @@ created Date    : 1st June 2019
 #ifndef _EWINGS_DEFAULT_DATABASE_H_
 #define _EWINGS_DEFAULT_DATABASE_H_
 
-#include "StoreStruct.h"
+#include <config/Config.h>
 #include "EwingsEepromDB.h"
 
 /**

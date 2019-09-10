@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _EW_SERVER_HOME_PAGE_H_
 
 #include <Arduino.h>
-#include <database/StoreStruct.h>
+#include <config/Config.h>
 
 static const char EW_SERVER_HOME_PAGE[] PROGMEM = "\
 <h4>Please login to change settings</h4>\

@@ -18,7 +18,7 @@ created Date    : 1st June 2019
 #define MAX_FACTORY_RESET_CALLBACKS	MAX_PERIODIC_CALLBACKS
 
 #include <Esp.h>
-#include <database/StoreStruct.h>
+#include <config/Config.h>
 #include "DataTypeConversions.h"
 #include "StringOperations.h"
 #include "queue/queue.h"
