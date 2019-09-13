@@ -16,7 +16,7 @@ created Date    : 1st June 2019
 static const char EW_SERVER_HEADER_HTML[] PROGMEM = "\
 <html>\
 <head>\
-<title>Smart Loo</title>\
+<title>Device Manager</title>\
 <meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=yes'>\
 <style>\
 .cntnr{\
