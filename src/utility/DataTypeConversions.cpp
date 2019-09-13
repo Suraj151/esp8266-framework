@@ -31,6 +31,33 @@ uint8_t Uint8ToBcd(uint8_t val){
 }
 
 /**
+ * This function convert string to uint32_t.
+ *
+ * @param   char* pString
+ * @param   uint8_t _len|32
+ * @return  uint32_t
+ */
+uint32_t StringToUint32(char* pString, uint8_t _len){
+    uint32_t value = 0;
+	  uint8_t n = 0;
+
+    while ('0' == *pString || *pString == ' ' || *pString == '"' && n < _len)
+    {
+    		pString++;
+    		n++;
+    }
+
+    while ('0' <= *pString && *pString <= '9' && n < _len)
+    {
+        value *= 10;
+        value += *pString - '0';
+    		pString++;
+    		n++;
+    }
+    return value;
+}
+
+/**
  * This function convert string to uint16_t.
  *
  * @param   char* pString
@@ -43,16 +70,16 @@ uint16_t StringToUint16(char* pString, uint8_t _len){
 
     while ('0' == *pString || *pString == ' ' || *pString == '"' && n < _len)
     {
-		pString++;
-		n++;
+    		pString++;
+    		n++;
     }
 
     while ('0' <= *pString && *pString <= '9' && n < _len)
     {
         value *= 10;
         value += *pString - '0';
-		pString++;
-		n++;
+    		pString++;
+    		n++;
     }
     return value;
 }
