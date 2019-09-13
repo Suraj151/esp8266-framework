@@ -23,7 +23,7 @@ created Date    : 1st June 2019
  * @param	char*	_type
  * @param	bool  _checked
  */
-void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _value, int _maxlength, char* _type, bool _checked ){
+void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _value, int _maxlength, char* _type, bool _checked, bool _disabled ){
 
   bool _is_checkbox = false;
   char _maxlen[7]; memset(_maxlen, 0, 7);
@@ -58,6 +58,7 @@ void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _v
   strcat( _page, "'" );
   strcat_P( _page, _name );
   strcat( _page, "'" );
+  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
   strcat_P( _page, HTML_VALUE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _value );
@@ -78,7 +79,7 @@ void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _v
  * @param	char*	_type
  * @param	bool  _checked
  */
-void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _value, int _maxlength, char* _type, bool _checked ){
+void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _value, int _maxlength, char* _type, bool _checked, bool _disabled ){
 
   bool _is_checkbox = false;
   char _maxlen[7]; memset(_maxlen, 0, 7);
@@ -113,6 +114,7 @@ void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _v
   strcat( _page, "'" );
   strcat( _page, _name );
   strcat( _page, "'" );
+  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
   strcat_P( _page, HTML_VALUE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _value );
@@ -133,7 +135,7 @@ void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _v
  * @param	int   _selected
  * @param	int   _exception
  */
-void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** _options, int _size, int _selected, int _exception ){
+void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
   strcat_P( _page, HTML_TD_OPEN_TAG );
@@ -141,6 +143,7 @@ void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** 
   strcat_P( _page, HTML_TD_CLOSE_TAG );
   strcat_P( _page, HTML_TD_OPEN_TAG );
   strcat_P( _page, HTML_SELECT_OPEN );
+  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
   strcat_P( _page, HTML_NAME_ATTR );
   strcat( _page, "'" );
   strcat( _page, _name );
@@ -182,7 +185,7 @@ void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** 
  * @param	int   _selected
  * @param	int   _exception
  */
-void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** _options, int _size, int _selected, int _exception ){
+void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
   strcat_P( _page, HTML_TD_OPEN_TAG );
@@ -190,6 +193,7 @@ void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** 
   strcat_P( _page, HTML_TD_CLOSE_TAG );
   strcat_P( _page, HTML_TD_OPEN_TAG );
   strcat_P( _page, HTML_SELECT_OPEN );
+  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
   strcat_P( _page, HTML_NAME_ATTR );
   strcat( _page, "'" );
   strcat_P( _page, _name );

@@ -1,25 +1,29 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-#include <Arduino.h>
-
-/**
- * enable/disable mqtt feature here
- */
-
-#define ENABLE_MQTT_CONFIG
-#define ENABLE_GPIO_CONFIG
-
+#include "Common.h"
 #include "GlobalConfig.h"
-#ifdef ENABLE_MQTT_CONFIG
-#include "MqttConfig.h"
-#endif
-#ifdef ENABLE_GPIO_CONFIG
-#include "GpioConfig.h"
-#endif
 #include "WifiConfig.h"
 #include "ServerConfig.h"
 #include "OtaConfig.h"
+
+#ifdef ENABLE_MQTT_CONFIG
+#include "MqttConfig.h"
+#endif
+
+#ifdef ENABLE_GPIO_CONFIG
+#include "GpioConfig.h"
+/**
+ * @define gpio parameters
+ */
+#define GPIO_OPERATION_DURATION 1000
+#define GPIO_TABLE_UPDATE_DURATION 300000
+#endif
+
+#ifdef ENABLE_NAPT_FEATURE
+#include "lwip/lwip_napt.h"
+#include "lwip/app/dhcpserver.h"
+#endif
 
 // #define GLOBAL_CONFIG_TABLE_ADDRESS CONFIG_START
 // #define LOGIN_CREDENTIAL_TABLE_ADDRESS GLOBAL_CONFIG_TABLE_ADDRESS +  global_config_size

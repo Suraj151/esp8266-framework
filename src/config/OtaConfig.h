@@ -1,13 +1,18 @@
 #ifndef _OTA_CONFIG_H_
 #define _OTA_CONFIG_H_
 
-#include <Arduino.h>
+#include "Common.h"
 
-#define OTA_HOST_BUF_SIZE 50
-#define OTA_VERSION_KEY "latest"
-#define OTA_VERSION_LENGTH 15
+#define OTA_HOST_BUF_SIZE           50
+#define OTA_VERSION_KEY             "latest"
+#define OTA_VERSION_LENGTH          15
 #define OTA_VERSION_API_RESP_LENGTH OTA_HOST_BUF_SIZE
-#define OTA_API_CHECK_DURATION 15000
+#define OTA_API_CHECK_DURATION      15000
+
+/**
+ * enable/disable ota config modification here
+ */
+#define ALLOW_OTA_CONFIG_MODIFICATION
 
 struct ota_configs {
   char ota_host[OTA_HOST_BUF_SIZE];

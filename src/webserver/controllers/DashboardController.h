@@ -63,6 +63,8 @@ class DashboardController {
 
       String _response = "{\"nm\":\"";
       _response += this->web_resource->wifi->SSID();
+			_response += "\",\"ip\":\"";
+      _response += this->web_resource->wifi->localIP().toString();
       _response += "\",\"rs\":\"";
       _response += this->web_resource->wifi->RSSI();
       _response += "\",\"mc\":\"";

@@ -1,7 +1,7 @@
 #ifndef _GLOBAL_CONFIG_H_
 #define _GLOBAL_CONFIG_H_
 
-#include <Arduino.h>
+#include "Common.h"
 
 /**
  * common default configurations for all ewings stack

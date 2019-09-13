@@ -1,21 +1,15 @@
 #ifndef _SERVER_CONFIG_H_
 #define _SERVER_CONFIG_H_
 
-#include <Arduino.h>
-#include "WifiConfig.h"
+#include "Common.h"
 
-/**
- * enable/disable http server feature here
- */
-#define ENABLE_EWING_HTTP_SERVER
-
-#define DEFAULT_LOGIN_USERNAME     "Ewings"
-#define DEFAULT_LOGIN_PASSWORD     "Ewings@123"
+#define DEFAULT_LOGIN_USERNAME     USER
+#define DEFAULT_LOGIN_PASSWORD     PASSPHRASE
 
 #define EW_SESSION_NAME      "ew_session"
 #define EW_COOKIE_MAX_AGE    300
 
-#define LOGIN_CONFIGS_BUF_SIZE WIFI_CONFIGS_BUF_SIZE
+#define LOGIN_CONFIGS_BUF_SIZE 25
 
 struct login_credential {
   char username[LOGIN_CONFIGS_BUF_SIZE];

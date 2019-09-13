@@ -6,7 +6,7 @@
 void EwingsEsp8266Stack::initialize(){
 
   #ifdef EW_SERIAL_LOG
-  LogBegin(9600);
+  LogBegin(115200);
   Logln(F("Initializing..."));
   #endif
   this->init_default_database();

@@ -26,41 +26,11 @@ created Date    : 1st June 2019
 #endif
 
 /**
- * @define flash key parameters
- */
-#define FLASH_KEY_PIN             D3
-#define FLASH_KEY_PRESS_DURATION  1000
-#define FLASH_KEY_PRESS_COUNT_THR 5
-
-/**
  * @define general http parameters
  */
 #define HTTP_HOST_ADDR_MAX_SIZE 100
 #define HTTP_REQUEST_DURATION   10000
 #define HTTP_REQUEST_RETRY      1
-
-#ifdef ENABLE_GPIO_CONFIG
-/**
- * @define gpio parameters
- */
-#define GPIO_OPERATION_DURATION 1000
-#define GPIO_TABLE_UPDATE_DURATION 300000
-#endif
-
-/**
- * @define wifi cycle check parameters
- */
-#define WIFI_CONNECTIVITY_CHECK_DURATION 30000
-
-/**
- * @define network address & port translation feature
- */
-//#define ENABLE_NAPT_FEATURE
-
-#ifdef ENABLE_NAPT_FEATURE
-#include "lwip/lwip_napt.h"
-#include "lwip/app/dhcpserver.h"
-#endif
 
 /**
  * EwingsEsp8266Stack class

@@ -1,11 +1,6 @@
 #ifndef MQTT_MSG_H
 #define	MQTT_MSG_H
 
-// #ifdef	__cplusplus
-// extern "C" {
-// #endif
-
-#include <Arduino.h>
 #include <config/Config.h>
 
 #define PROTOCOL_NAMEv311
@@ -83,9 +78,5 @@ mqtt_message_t* mqtt_msg_pingreq(mqtt_connection_t* connection);
 mqtt_message_t* mqtt_msg_pingresp(mqtt_connection_t* connection);
 mqtt_message_t* mqtt_msg_disconnect(mqtt_connection_t* connection);
 
-
-// #ifdef	__cplusplus
-// }
-// #endif
 
 #endif	/* MQTT_MSG_H */

@@ -1,12 +1,12 @@
 #ifndef _WIFI_CONFIG_H_
 #define _WIFI_CONFIG_H_
 
-#include <Arduino.h>
+#include "Common.h"
 
 #define WIFI_CONFIGS_BUF_SIZE 25
 
-#define DEFAULT_USERNAME     "Ewings"
-#define DEFAULT_PASSWORD     "Ewings@123"
+#define DEFAULT_USERNAME     USER
+#define DEFAULT_PASSWORD     PASSPHRASE
 
 #define DEFAULT_SSID         "Cohive Power Backup"
 #define DEFAULT_PASSPHRASE   "cohive@backup"
@@ -18,6 +18,12 @@
 #define DEFAULT_AP_LOCAL_IP  {192, 168, 0, 1}
 #define DEFAULT_AP_GATEWAY   {192, 168, 0, 1}
 #define DEFAULT_AP_SUBNET    {255, 255, 255, 0}
+
+/**
+ * enable/disable wifi config modification here
+ */
+#define ALLOW_WIFI_CONFIG_MODIFICATION
+#define ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
 
 struct wifi_configs {
   char sta_ssid[WIFI_CONFIGS_BUF_SIZE];

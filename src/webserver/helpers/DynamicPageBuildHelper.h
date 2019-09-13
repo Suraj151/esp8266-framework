@@ -42,6 +42,7 @@ static const char HTML_STYLE_ATTR    []PROGMEM = " style=";
 static const char HTML_CLASS_ATTR    []PROGMEM = " class=";
 static const char HTML_SELECTED_ATTR []PROGMEM =  " selected='selected' ";
 static const char HTML_CHECKED_ATTR  []PROGMEM =  " checked='checked' ";
+static const char HTML_DISABLED_ATTR  []PROGMEM =  " disabled ";
 
 static const char HTML_SUCCESS_FLASH []PROGMEM =  "Config saved Successfully";
 
@@ -50,6 +51,7 @@ static const char HTML_SUCCESS_FLASH []PROGMEM =  "Config saved Successfully";
  */
 #define HTML_INPUT_TEXT_TAG_TYPE "text"
 #define HTML_INPUT_CHECKBOX_TAG_TYPE "checkbox"
+#define HTML_INPUT_TAG_DEFAULT_MAXLENGTH  20
 
 /**
  * @var flash message enum
@@ -60,13 +62,13 @@ enum FLASH_MSG_TYPE {
   ALERT_WARNING
 };
 
-void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _value, int _maxlength=20, char* _type=HTML_INPUT_TEXT_TAG_TYPE, bool _checked=false );
+void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _value, int _maxlength=HTML_INPUT_TAG_DEFAULT_MAXLENGTH, char* _type=HTML_INPUT_TEXT_TAG_TYPE, bool _checked=false, bool _disabled=false );
 
-void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _value, int _maxlength=20, char* _type=HTML_INPUT_TEXT_TAG_TYPE, bool _checked=false );
+void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _value, int _maxlength=HTML_INPUT_TAG_DEFAULT_MAXLENGTH, char* _type=HTML_INPUT_TEXT_TAG_TYPE, bool _checked=false, bool _disabled=false );
 
-void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** _options, int _size, int _selected, int _exception=0 );
+void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** _options, int _size, int _selected, int _exception=0, bool _disabled=false );
 
-void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** _options, int _size, int _selected, int _exception=0 );
+void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** _options, int _size, int _selected, int _exception=0, bool _disabled=false );
 
 void concat_tr_header_html_tags( char* _page, PGM_P _header );
 

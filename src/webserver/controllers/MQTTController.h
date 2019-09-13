@@ -133,6 +133,8 @@ class MqttController {
       __appendUintToBuff( _port, "%d", _mqtt_general_configs.port, 8 );
       __appendUintToBuff( _keepalive, "%d", _mqtt_general_configs.keepalive, 8 );
 
+			#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
+
       concat_tr_input_html_tags( _page, PSTR("Host Address:"), PSTR("hst"), _mqtt_general_configs.host, MQTT_HOST_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("Host Port:"), PSTR("prt"), _port );
       concat_tr_input_html_tags( _page, PSTR("Client Id:"), PSTR("clid"), _mqtt_general_configs.client_id, MQTT_CLIENT_ID_BUF_SIZE-1 );
@@ -142,6 +144,19 @@ class MqttController {
       concat_tr_input_html_tags( _page, PSTR("Clean Session:"), PSTR("cln"), "clean", 20, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_general_configs.clean_session != 0 );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
+
+			#else
+
+			concat_tr_input_html_tags( _page, PSTR("Host Address:"), PSTR("hst"), _mqtt_general_configs.host, MQTT_HOST_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      concat_tr_input_html_tags( _page, PSTR("Host Port:"), PSTR("prt"), _port, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      concat_tr_input_html_tags( _page, PSTR("Client Id:"), PSTR("clid"), _mqtt_general_configs.client_id, MQTT_CLIENT_ID_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrn"), _mqtt_general_configs.username, MQTT_USERNAME_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      concat_tr_input_html_tags( _page, PSTR("Keep Alive:"), PSTR("kpalv"), _keepalive, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      concat_tr_input_html_tags( _page, PSTR("Clean Session:"), PSTR("cln"), "clean", 20, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_general_configs.clean_session != 0, true );
+
+			#endif
+
       if( _enable_flash )
       concat_flash_message_div( _page, HTML_SUCCESS_FLASH, ALERT_SUCCESS );
       strcat_P( _page, EW_SERVER_FOOTER_HTML );
@@ -157,6 +172,7 @@ class MqttController {
       #endif
       bool _is_posted = false;
 
+			#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
       if ( this->web_resource->EwServer->hasArg("hst") && this->web_resource->EwServer->hasArg("prt") ) {
 
         String _mqtt_host = this->web_resource->EwServer->arg("hst");
@@ -196,6 +212,7 @@ class MqttController {
 
         _is_posted = true;
       }
+			#endif
 
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_mqtt_general_config_html( _page, _is_posted );
@@ -225,12 +242,24 @@ class MqttController {
 
       char* _qos_options[] = {"0", "1", "2"};
 
-      concat_tr_input_html_tags( _page, PSTR("Will Topic:"), PSTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE-1 );
+			#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
+
+			concat_tr_input_html_tags( _page, PSTR("Will Topic:"), PSTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("Will Message:"), PSTR("wmsg"), _mqtt_lwt_configs.will_message, MQTT_TOPIC_BUF_SIZE-1 );
       concat_tr_select_html_tags( _page, PSTR("Will QoS:"), PSTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos+1 );
       concat_tr_input_html_tags( _page, PSTR("Will Retain:"), PSTR("wrtn"), "retain", 20, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_lwt_configs.will_retain != 0 );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
+
+			#else
+
+			concat_tr_input_html_tags( _page, PSTR("Will Topic:"), PSTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      concat_tr_input_html_tags( _page, PSTR("Will Message:"), PSTR("wmsg"), _mqtt_lwt_configs.will_message, MQTT_TOPIC_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      concat_tr_select_html_tags( _page, PSTR("Will QoS:"), PSTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos+1, 0, true );
+      concat_tr_input_html_tags( _page, PSTR("Will Retain:"), PSTR("wrtn"), "retain", 20, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_lwt_configs.will_retain != 0, true );
+
+			#endif
+
       if( _enable_flash )
       concat_flash_message_div( _page, HTML_SUCCESS_FLASH, ALERT_SUCCESS );
       strcat_P( _page, EW_SERVER_FOOTER_HTML );
@@ -246,6 +275,7 @@ class MqttController {
       #endif
       bool _is_posted = false;
 
+			#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
       if ( this->web_resource->EwServer->hasArg("wtpc") && this->web_resource->EwServer->hasArg("wmsg") ) {
 
         String _will_topic = this->web_resource->EwServer->arg("wtpc");
@@ -275,6 +305,7 @@ class MqttController {
         delete _mqtt_lwt_configs;
         _is_posted = true;
       }
+			#endif
 
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_mqtt_lwt_config_html( _page, _is_posted );
@@ -318,11 +349,30 @@ class MqttController {
         _qos_label[3] = (0x30 + i );_qos_name[4] = (0x30 + i );
         _retain_label[6] = (0x30 + i );_retain_name[4] = (0x30 + i );
 
-        concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.publish_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1 );
+				#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
+
+				concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.publish_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1 );
         concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.publish_topics[i].qos+1 );
-        concat_tr_input_html_tags( _page, _retain_label, _retain_name, "retain", 20, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0 );
+        concat_tr_input_html_tags( _page, _retain_label, _retain_name, "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0 );
+
+				#else
+
+				concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.publish_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+        concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.publish_topics[i].qos+1, 0, true );
+        concat_tr_input_html_tags( _page, _retain_label, _retain_name, "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0, true );
+
+				#endif
+
       }
-      concat_tr_input_html_tags( _page, PSTR("Publish Frequency:"), PSTR("pfrq"), _publish_freq );
+			#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
+
+			concat_tr_input_html_tags( _page, PSTR("Publish Frequency:"), PSTR("pfrq"), _publish_freq );
+
+			#else
+
+			concat_tr_input_html_tags( _page, PSTR("Publish Frequency:"), PSTR("pfrq"), _publish_freq, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+
+			#endif
 
       _topic_name[0] = 's'; _qos_name[0] = 's';
       concat_tr_header_html_tags( _page, PSTR("Subscribe Topics") );
@@ -331,16 +381,26 @@ class MqttController {
         _topic_label[5] = (0x30 + i );_topic_name[4] = (0x30 + i );
         _qos_label[3] = (0x30 + i );_qos_name[4] = (0x30 + i );
 
-        concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.subscribe_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1 );
+				#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
+
+				concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.subscribe_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1 );
         concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.subscribe_topics[i].qos+1 );
+
+				#else
+
+				concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.subscribe_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+        concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.subscribe_topics[i].qos+1, 0, true );
+
+				#endif
       }
 
+			#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
+			#endif
+
       if( _enable_flash )
       concat_flash_message_div( _page, HTML_SUCCESS_FLASH, ALERT_SUCCESS );
       strcat_P( _page, EW_SERVER_FOOTER_HTML );
-      // Log(F("free stack :"));Logln(ESP.getFreeContStack());
-      // Log(F("free heap :"));Logln(ESP.getFreeHeap());
     }
 
 		/**
@@ -353,6 +413,7 @@ class MqttController {
       #endif
       bool _is_posted = false;
 
+			#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
       if ( this->web_resource->EwServer->hasArg("ptpc0") && this->web_resource->EwServer->hasArg("pqos0") ) {
 
         mqtt_pubsub_config_table* _mqtt_pubsub_configs = new mqtt_pubsub_config_table;
@@ -413,6 +474,7 @@ class MqttController {
         delete _mqtt_pubsub_configs;
         _is_posted = true;
       }
+			#endif
 
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_mqtt_pubsub_config_html( _page, _is_posted );

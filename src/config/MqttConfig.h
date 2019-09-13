@@ -1,7 +1,7 @@
 #ifndef _MQTT_CONFIG_H_
 #define _MQTT_CONFIG_H_
 
-#include <Arduino.h>
+#include "Common.h"
 
 #define MQTT_HOST_BUF_SIZE      50
 #define MQTT_CLIENT_ID_BUF_SIZE 100
@@ -18,6 +18,11 @@
 #define MQTT_MAX_SUBSCRIBE_TOPIC  MQTT_MAX_PUBLISH_TOPIC
 
 #define MQTT_INITIALIZE_DURATION   10000
+
+/**
+ * enable/disable mqtt config modification here
+ */
+#define ALLOW_MQTT_CONFIG_MODIFICATION
 
 enum MQTT_CONFIG_TYPE {
   MQTT_GENERAL_CONFIG,

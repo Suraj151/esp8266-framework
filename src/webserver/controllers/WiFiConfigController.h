@@ -80,6 +80,8 @@ class WiFiConfigController {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_TOP );
 
+			#ifdef ALLOW_WIFI_CONFIG_MODIFICATION
+
       concat_tr_input_html_tags( _page, PSTR("WiFi Name:"), PSTR("sta_ssid"), this->web_resource->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("WiFi Password:"), PSTR("sta_pswd"), this->web_resource->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE-1 );
 
@@ -101,6 +103,47 @@ class WiFiConfigController {
       concat_tr_input_html_tags( _page, PSTR("Access Subnet:"), PSTR("ap_sip"), _ip_address );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
+
+			#else
+
+			#ifdef ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
+
+			concat_tr_input_html_tags( _page, PSTR("WiFi Name:"), PSTR("sta_ssid"), this->web_resource->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("WiFi Password:"), PSTR("sta_pswd"), this->web_resource->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE-1 );
+
+			#else
+
+			concat_tr_input_html_tags( _page, PSTR("WiFi Name:"), PSTR("sta_ssid"), this->web_resource->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      concat_tr_input_html_tags( _page, PSTR("WiFi Password:"), PSTR("sta_pswd"), this->web_resource->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+
+			#endif
+
+      __int_ip_to_str( _ip_address, this->web_resource->wifi_configs.sta_local_ip, 20 );
+      concat_tr_input_html_tags( _page, PSTR("WiFi Local Ip:"), PSTR("sta_lip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      __int_ip_to_str( _ip_address, this->web_resource->wifi_configs.sta_gateway, 20 );
+      concat_tr_input_html_tags( _page, PSTR("WiFi Gateway:"), PSTR("sta_gip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      __int_ip_to_str( _ip_address, this->web_resource->wifi_configs.sta_subnet, 20 );
+      concat_tr_input_html_tags( _page, PSTR("WiFi Subnet:"), PSTR("sta_sip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+
+      concat_tr_input_html_tags( _page, PSTR("Access Name:"), PSTR("ap_ssid"), this->web_resource->wifi_configs.ap_ssid, WIFI_CONFIGS_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      concat_tr_input_html_tags( _page, PSTR("Access Password:"), PSTR("ap_pswd"), this->web_resource->wifi_configs.ap_password, WIFI_CONFIGS_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+
+      __int_ip_to_str( _ip_address, this->web_resource->wifi_configs.ap_local_ip, 20 );
+      concat_tr_input_html_tags( _page, PSTR("Access Local Ip:"), PSTR("ap_lip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      __int_ip_to_str( _ip_address, this->web_resource->wifi_configs.ap_gateway, 20 );
+      concat_tr_input_html_tags( _page, PSTR("Access Gateway:"), PSTR("ap_gip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+      __int_ip_to_str( _ip_address, this->web_resource->wifi_configs.ap_subnet, 20 );
+      concat_tr_input_html_tags( _page, PSTR("Access Subnet:"), PSTR("ap_sip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true );
+
+			#ifdef ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
+
+			strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
+
+			#endif
+
+			#endif
+
+
       if( _enable_flash )
       concat_flash_message_div( _page, _is_error ? PSTR("Invalid length error(3-20)"): PSTR("Config saved Successfully..applying new configs."), _is_error ? ALERT_DANGER:ALERT_SUCCESS );
       strcat_P( _page, EW_SERVER_FOOTER_HTML );
@@ -117,6 +160,7 @@ class WiFiConfigController {
       bool _is_posted = false;
       bool _is_error = true;
 
+			#if defined( ALLOW_WIFI_CONFIG_MODIFICATION ) || defined( ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY )
       if ( this->web_resource->EwServer->hasArg("sta_ssid") && this->web_resource->EwServer->hasArg("sta_pswd") ) {
 
         String _sta_ssid = this->web_resource->EwServer->arg("sta_ssid");
@@ -146,13 +190,20 @@ class WiFiConfigController {
           Logln();
         #endif
 
-        if( _sta_ssid.length() <= WIFI_CONFIGS_BUF_SIZE && _sta_pswd.length() <= WIFI_CONFIGS_BUF_SIZE &&
-          _ap_ssid.length() <= WIFI_CONFIGS_BUF_SIZE && _ap_pswd.length() <= WIFI_CONFIGS_BUF_SIZE &&
+				if( _sta_ssid.length() <= WIFI_CONFIGS_BUF_SIZE && _sta_pswd.length() <= WIFI_CONFIGS_BUF_SIZE
+
+				#ifdef ALLOW_WIFI_CONFIG_MODIFICATION
+          && _ap_ssid.length() <= WIFI_CONFIGS_BUF_SIZE && _ap_pswd.length() <= WIFI_CONFIGS_BUF_SIZE &&
           _sta_ssid.length() > MIN_ACCEPTED_ARG_SIZE && _sta_pswd.length() > MIN_ACCEPTED_ARG_SIZE &&
           _ap_ssid.length() > MIN_ACCEPTED_ARG_SIZE && _ap_pswd.length() > MIN_ACCEPTED_ARG_SIZE
+				#endif
+
         ){
 
           char _ip_address[20]; memset( _ip_address, 0, 20 );
+
+					#ifdef ALLOW_WIFI_CONFIG_MODIFICATION
+
           _ClearObject( &this->web_resource->wifi_configs );
 
           _sta_ssid.toCharArray( this->web_resource->wifi_configs.sta_ssid, _sta_ssid.length()+1 );
@@ -167,12 +218,20 @@ class WiFiConfigController {
           _ap_gip.toCharArray( _ip_address, _ap_gip.length()+1 ); __str_ip_to_int(_ip_address, this->web_resource->wifi_configs.ap_gateway, 20);
           _ap_sip.toCharArray( _ip_address, _ap_sip.length()+1 ); __str_ip_to_int(_ip_address, this->web_resource->wifi_configs.ap_subnet, 20);
 
+					#else
+
+					_sta_ssid.toCharArray( this->web_resource->wifi_configs.sta_ssid, _sta_ssid.length()+1 );
+          _sta_pswd.toCharArray( this->web_resource->wifi_configs.sta_password, _sta_pswd.length()+1 );
+
+					#endif
+
           this->web_resource->ew_db->set_wifi_config_table( &this->web_resource->wifi_configs );
           // this->set_wifi_config_table( &this->wifi_configs );
           _is_error = false;
         }
         _is_posted = true;
       }
+			#endif
 
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_wifi_config_html( _page, _is_error, _is_posted );

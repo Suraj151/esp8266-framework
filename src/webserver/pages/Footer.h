@@ -66,6 +66,7 @@ var rq=new XMLHttpRequest();\
 function rql(){\
 var r=JSON.parse(this.responseText);\
 document.getElementById('stnm').innerHTML=r.nm;\
+document.getElementById('stip').innerHTML=r.ip;\
 document.getElementById('strs').innerHTML=r.rs;\
 document.getElementById('stst').innerHTML=r.st;\
 document.getElementById('stmc').innerHTML=r.mc;\

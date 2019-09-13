@@ -1,7 +1,7 @@
 #ifndef _GPIO_CONFIG_H_
 #define _GPIO_CONFIG_H_
 
-#include <Arduino.h>
+#include "Common.h"
 
 #define MAX_NO_OF_GPIO_PINS           9
 #define GPIO_HOST_BUF_SIZE            60

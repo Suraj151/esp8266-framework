@@ -17,8 +17,12 @@ static const char EW_SERVER_DASHBOARD_PAGE[] PROGMEM = "\
 <h2>Dashboard</h2>\
 \
 <style>\
-#stnm,#strs,#stst,#stmc{\
+#stnm,#stip,#strs,#stst,#stmc{\
 text-align:right;\
+}\
+td{\
+border:1px solid #d0d0d0;\
+padding:4px;\
 }\
 </style>\
 \
@@ -26,6 +30,10 @@ text-align:right;\
 <tr>\
 <td>sta ssid</td>\
 <td id='stnm'></td>\
+</tr>\
+<tr>\
+<td>ip</td>\
+<td id='stip'></td>\
 </tr>\
 <tr>\
 <td>rssi</td>\
