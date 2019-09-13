@@ -40,14 +40,6 @@ Login Settings\
 </div>\
 \
 <div>\
-<a href='/smart-loo-config'>\
-<button class='btn mnwdth125'>\
-SmartLoo Settings\
-</button>\
-</a>\
-</div>\
-\
-<div>\
 <a href='/wifi-config'>\
 <button class='btn mnwdth125'>\
 WiFi Settings\
@@ -111,14 +103,6 @@ Login Settings\
 </div>\
 \
 <div>\
-<a href='/smart-loo-config'>\
-<button class='btn mnwdth125'>\
-SmartLoo Settings\
-</button>\
-</a>\
-</div>\
-\
-<div>\
 <a href='/wifi-config'>\
 <button class='btn mnwdth125'>\
 WiFi Settings\
@@ -174,14 +158,6 @@ Login Settings\
 </div>\
 \
 <div>\
-<a href='/smart-loo-config'>\
-<button class='btn mnwdth125'>\
-SmartLoo Settings\
-</button>\
-</a>\
-</div>\
-\
-<div>\
 <a href='/wifi-config'>\
 <button class='btn mnwdth125'>\
 WiFi Settings\
@@ -232,14 +208,6 @@ static const char EW_SERVER_HOME_AUTHORIZED_PAGE[] PROGMEM = "\
 <a href='/login-config'>\
 <button class='btn mnwdth125'>\
 Login Settings\
-</button>\
-</a>\
-</div>\
-\
-<div>\
-<a href='/smart-loo-config'>\
-<button class='btn mnwdth125'>\
-SmartLoo Settings\
 </button>\
 </a>\
 </div>\

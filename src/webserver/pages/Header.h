@@ -68,6 +68,6 @@ cursor: pointer;\
 </head>\
 <body>\
 <div class='cntnr'>\
-<a href='/'><h1>Smart Loo</h1></a>";
+<a href='/'><h1>Device Manager</h1></a>";
 
 #endif
