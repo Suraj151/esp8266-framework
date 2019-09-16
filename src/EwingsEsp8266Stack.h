@@ -32,6 +32,12 @@ created Date    : 1st June 2019
 #define HTTP_REQUEST_DURATION   10000
 #define HTTP_REQUEST_RETRY      1
 
+#ifdef ENABLE_NAPT_FEATURE
+#include "lwip/lwip_napt.h"
+#include "lwip/app/dhcpserver.h"
+#endif
+
+
 /**
  * EwingsEsp8266Stack class
  * @parent  PeriodicCallBack|public

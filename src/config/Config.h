@@ -20,11 +20,6 @@
 #define GPIO_TABLE_UPDATE_DURATION 300000
 #endif
 
-#ifdef ENABLE_NAPT_FEATURE
-#include "lwip/lwip_napt.h"
-#include "lwip/app/dhcpserver.h"
-#endif
-
 // #define GLOBAL_CONFIG_TABLE_ADDRESS CONFIG_START
 // #define LOGIN_CREDENTIAL_TABLE_ADDRESS GLOBAL_CONFIG_TABLE_ADDRESS +  global_config_size
 // #define WIFI_CONFIG_TABLE_ADDRESS LOGIN_CREDENTIAL_TABLE_ADDRESS + login_credential_size
