@@ -24,7 +24,7 @@
 /**
  * @define wifi cycle check parameters
  */
-#define WIFI_CONNECTIVITY_CHECK_DURATION 30000
+#define WIFI_CONNECTIVITY_CHECK_DURATION 10000
 
 /**
  * @define network address & port translation feature

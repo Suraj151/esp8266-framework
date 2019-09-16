@@ -41,6 +41,7 @@ void EwingsEsp8266Stack::start_wifi(){
 
   this->wifi->mode(WIFI_AP_STA);
   this->wifi->persistent(false);
+  this->wifi->setAutoReconnect(false);
   this->configure_wifi_station( &_wifi_credentials );
   this->configure_wifi_access_point( &_wifi_credentials );
   this->setInterval( [&]() { this->handleWiFiConnectivity(); }, WIFI_CONNECTIVITY_CHECK_DURATION );
@@ -141,8 +142,8 @@ bool EwingsEsp8266Stack::configure_wifi_station( wifi_config_table* _wifi_creden
     Log(F("IP address: "));
     Logln(this->wifi->localIP());
     #endif
-    this->wifi->setAutoConnect(true);
-    this->wifi->setAutoReconnect(true);
+    // this->wifi->setAutoConnect(true);
+    // this->wifi->setAutoReconnect(true);
     return true;
   }else if( this->wifi->status() == WL_NO_SSID_AVAIL ){
     #ifdef EW_SERIAL_LOG
@@ -248,7 +249,8 @@ void EwingsEsp8266Stack::handleWiFiConnectivity(){
   #ifdef EW_SERIAL_LOG
   Logln( F("\nHandeling WiFi Connectivity") );
   #endif
-  if( !this->wifi->isConnected() ){
+
+  if( !this->wifi->localIP().isSet() || !this->wifi->isConnected() ){
     #ifdef EW_SERIAL_LOG
     Logln( F("Handeling WiFi Reconnect Manually.") );
     #endif
