@@ -149,6 +149,7 @@ class HTTPUpdateServiceProvider{
                _firmware_bin_url += ".bin";
 
                ESPhttpUpdate.rebootOnUpdate(false);
+               ESPhttpUpdate.followRedirects(true);
                t_httpUpdate_return ret = ESPhttpUpdate.update( *this->wifi_client, _firmware_bin_url );
 
                if( ret == HTTP_UPDATE_FAILED ){

@@ -7,6 +7,8 @@
 #include "ServerConfig.h"
 #include "OtaConfig.h"
 
+#include "NetworkConfig.h"
+
 #ifdef ENABLE_MQTT_CONFIG
 #include "MqttConfig.h"
 #endif

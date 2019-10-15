@@ -18,40 +18,51 @@ created Date    : 1st June 2019
 #include <database/EwingsDefaultDB.h>
 #include <webserver/EwingsWebServer.h>
 #include <service_provider/NtpServiceProvider.h>
+#include <service_provider/PingServiceProvider.h>
 #include <service_provider/HttpUpdateServiceProvider.h>
+
+#ifdef ENABLE_ESP_NOW
+#include <service_provider/ESPNOWServiceProvider.h>
+#endif
+
 #include <utility/Log.h>
 
 #ifdef ENABLE_MQTT_CONFIG
 #include <mqtt_client/Mqtt.h>
 #endif
 
-/**
- * @define general http parameters
- */
-#define HTTP_HOST_ADDR_MAX_SIZE 100
-#define HTTP_REQUEST_DURATION   10000
-#define HTTP_REQUEST_RETRY      1
-
-#ifdef ENABLE_NAPT_FEATURE
+#if defined( ENABLE_NAPT_FEATURE )
 #include "lwip/lwip_napt.h"
 #include "lwip/app/dhcpserver.h"
-#endif
 
+#elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
+
+#include <lwip/napt.h>
+#include <lwip/dns.h>
+#include <dhcpserver.h>
+#endif
 
 /**
  * EwingsEsp8266Stack class
- * @parent  PeriodicCallBack|public
+ * @parent  TaskScheduler|public
  * @parent  DeviceFactoryReset|public
  * @parent  EwingsDefaultDB|public
  * @parent  NTPServiceProvider|public
+ * @parent  PingServiceProvider|public
  * @parent  HTTPUpdateServiceProvider|public
+ * @parent  ESPNOWServiceProvider|public
  */
 class EwingsEsp8266Stack :
-public PeriodicCallBack,
+public TaskScheduler,
 public DeviceFactoryReset,
 public EwingsDefaultDB,
 public NTPServiceProvider,
-public HTTPUpdateServiceProvider{
+public PingServiceProvider,
+#ifdef ENABLE_ESP_NOW
+public ESPNOWServiceProvider,
+#endif
+public HTTPUpdateServiceProvider
+{
 
   public:
 
@@ -63,7 +74,7 @@ public HTTPUpdateServiceProvider{
     /**
 		 * @var	uint8_t|18  wifi_connection_timeout
 		 */
-    uint8_t wifi_connection_timeout=18;
+    uint8_t wifi_connection_timeout=15;
     /**
 		 * @var	uint8_t|0 flash_key_pressed
 		 */
@@ -101,6 +112,10 @@ public HTTPUpdateServiceProvider{
     #endif
 
     /**
+		 * @var	uint8_t array temperory mac buffer
+		 */
+    uint8_t temp_mac[6];
+    /**
 		 * @var	char array http_host
 		 */
     char http_host[HTTP_HOST_ADDR_MAX_SIZE];
@@ -114,8 +129,17 @@ public HTTPUpdateServiceProvider{
     int http_retry=HTTP_REQUEST_RETRY;
 
     bool configure_wifi_access_point( wifi_config_table* _wifi_credentials );
-    bool configure_wifi_station( wifi_config_table* _wifi_credentials );
+    bool configure_wifi_station( wifi_config_table* _wifi_credentials, uint8_t* mac = NULL );
+
+    bool scan_within_station( char* ssid, uint8_t* bssid );
+    bool scan_within_station_async( char* ssid, uint8_t* bssid, int _scanCount );
+    void scan_aps_and_configure_wifi_station( void );
+    void scan_aps_and_configure_wifi_station_async( int _scanCount );
+
+    void reconfigure_wifi_access_point( void );
     void start_wifi(void);
+    uint32_t getStationSubnetIP(void);
+    uint32_t getStationBroadcastIP(void);
 
     void handleFlashKeyPress( void );
 
@@ -125,11 +149,12 @@ public HTTPUpdateServiceProvider{
 
     bool followHttpRequest( int _httpCode );
 
+    void handleInternetConnectivity( void );
     void handleWiFiConnectivity( void );
     void handleOta( void );
     void connected_softap_client_info( void );
 
-    #ifdef ENABLE_NAPT_FEATURE
+    #if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
     void enable_napt_service( void );
     #endif
 

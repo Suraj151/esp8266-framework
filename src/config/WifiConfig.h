@@ -8,8 +8,11 @@
 #define DEFAULT_USERNAME     USER
 #define DEFAULT_PASSWORD     PASSPHRASE
 
-#define DEFAULT_SSID         "Cohive Power Backup"
-#define DEFAULT_PASSPHRASE   "cohive@backup"
+#define DEFAULT_SSID         USER
+#define DEFAULT_PASSPHRASE   PASSPHRASE
+
+// #define DEFAULT_SSID         "Cohive Power Backup"
+// #define DEFAULT_PASSPHRASE   "cohive@backup"
 
 #define DEFAULT_STA_LOCAL_IP  {0, 0, 0, 0}
 #define DEFAULT_STA_GATEWAY   {0, 0, 0, 0}
@@ -24,6 +27,18 @@
  */
 #define ALLOW_WIFI_CONFIG_MODIFICATION
 #define ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
+
+/**
+ * wifi status variable
+ */
+typedef struct {
+  bool wifi_connected;
+  bool internet_available;
+  uint32_t last_internet_millis;
+  uint8_t ignore_bssid[6];
+} device_wifi_status_t;
+
+extern device_wifi_status_t _wifi_status;
 
 struct wifi_configs {
   char sta_ssid[WIFI_CONFIGS_BUF_SIZE];

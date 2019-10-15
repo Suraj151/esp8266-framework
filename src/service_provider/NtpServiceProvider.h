@@ -11,13 +11,19 @@ created Date    : 1st June 2019
 #ifndef _NTP_SERVICE_PROVIDER_H_
 #define _NTP_SERVICE_PROVIDER_H_
 
+
+#include <TZ.h>
 #include <ESP8266WiFi.h>
 #include <config/Config.h>
 
-#define TZ              5       // (utc+) TZ in hours
-#define DST_MN          30      // use 60mn for summer time in some countries
+#ifndef TZ_Asia_Kolkata
+#define TZ_Asia_Kolkata	PSTR("IST-5:30")
+#endif
+
+#define TZ              5.5       // (utc+) TZ in hours
 #define TZ_MN           ((TZ)*60)
 #define TZ_SEC          ((TZ)*3600)
+#define DST_MN          0      // use 60mn for summer time in some countries
 #define DST_SEC         ((DST_MN)*60)
 
 /**
@@ -45,7 +51,8 @@ class NTPServiceProvider{
      */
     void init_ntp_time(){
 
-      configTime( TZ_SEC, DST_SEC, NTP_SERVER1 );
+      // configTime( TZ_SEC, DST_SEC, NTP_SERVER1 );
+      configTime( TZ_Asia_Kolkata, NTP_SERVER1 );
     }
 
     /**

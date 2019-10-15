@@ -110,12 +110,28 @@ char* __strtrim_val(char *str, char _val, uint16_t _overflow_limit){
  */
 bool __are_str_equals(char *str1, char *str2, uint16_t _overflow_limit ){
 
-	int len = strlen( str1 );
+	uint16_t len = strlen( str1 );
 	if( len != strlen( str2 ) ) return false;
 
-	for ( int i = 0; i < len; i++ ) {
+	for ( uint16_t i = 0; i < len && i < _overflow_limit; i++ ) {
 
 		if( str1[i] != str2[i] ) return false;
+	} return true;
+}
+
+/**
+ * This function checks whether given arrays are equals or not.
+ *
+ * @param   char* array1
+ * @param   char* array2
+ * @param   uint16_t|300	_overflow_limit
+ * @return  bool
+ */
+bool __are_arrays_equal(char *array1, char *array2, uint16_t len ){
+
+	for ( uint16_t i = 0; i < len; i++ ) {
+
+		if( array1[i] != array2[i] ) return false;
 	} return true;
 }
 

@@ -154,6 +154,7 @@ class WiFiConfigController {
 		 * when posted, get wifi configs from client and set them in database.
 		 */
     void handleWiFiConfigRoute( void ) {
+			this->web_resource->use_wifi_configs();
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling WiFi Config route"));
       #endif
@@ -242,7 +243,7 @@ class WiFiConfigController {
       this->web_resource->EwServer->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
       if( _is_posted && !_is_error && this->_ewstack_callback_fn!=NULL){
-        this->_ewstack_callback_fn( 1000 );
+        this->_ewstack_callback_fn( 100 );
       }
     }
 

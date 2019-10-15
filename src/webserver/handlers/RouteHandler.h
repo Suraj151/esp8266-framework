@@ -145,7 +145,8 @@ class EwRouteHandler {
       this->_mqtt_controller.handle( _web_resource );
       #endif
       //here the list of headers to be recorded
-      const char * headerkeys[] = {"User-Agent", "Cookie"} ;
+      // const char * headerkeys[] = {"User-Agent", "Cookie"} ;
+      const char * headerkeys[] = {"Cookie"} ;
       size_t headerkeyssize = sizeof(headerkeys) / sizeof(char*);
       //ask Server to track these headers
       this->_web_resource->EwServer->collectHeaders(headerkeys, headerkeyssize);

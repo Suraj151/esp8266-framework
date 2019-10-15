@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define MAX_ROUTES 10
+#define MAX_ROUTES 50
 
 struct route_entry {
     ip_addr_t ip;

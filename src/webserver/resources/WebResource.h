@@ -103,16 +103,15 @@ class EwWebResourceProvider : protected EwSessionHandler{
       this->ew_db = db_handler;
       this->wifi = _wifi;
       this->use_login_credential( db_handler->get_login_credential_table() );
-      this->use_wifi_configs( db_handler->get_wifi_config_table() );
+      this->use_wifi_configs();
     }
 
     /**
 		 * fetch wifi config table here
      *
-     * @param wifi_config_table _wifi_configs
 		 */
-    void use_wifi_configs( wifi_config_table _wifi_configs ){
-      this->wifi_configs = _wifi_configs;
+    void use_wifi_configs( void ){
+      this->wifi_configs = this->ew_db->get_wifi_config_table();
     }
 
     /**

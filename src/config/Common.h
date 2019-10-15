@@ -15,6 +15,11 @@
 #define ENABLE_EWING_HTTP_SERVER
 
 /**
+ * enable/disable esp now feature here
+ */
+// #define ENABLE_ESP_NOW
+
+/**
  * @define flash key parameters
  */
 #define FLASH_KEY_PIN             D3
@@ -22,16 +27,26 @@
 #define FLASH_KEY_PRESS_COUNT_THR 5
 
 /**
- * @define wifi cycle check parameters
+ * @define wifi & internet connectivity check cycle parameters
  */
 #define WIFI_CONNECTIVITY_CHECK_DURATION 10000
+#define INTERNET_CONNECTIVITY_CHECK_DURATION WIFI_CONNECTIVITY_CHECK_DURATION
 
 /**
  * @define network address & port translation feature
  */
-//#define ENABLE_NAPT_FEATURE
+// #define ENABLE_NAPT_FEATURE
+#define ENABLE_NAPT_FEATURE_LWIP_V2
 
 #define USER            "Ewings"
 #define PASSPHRASE      "Ewings@123"
+
+/**
+ * @define general http parameters
+ */
+#define HTTP_HOST_ADDR_MAX_SIZE 100
+#define HTTP_REQUEST_DURATION   10000
+#define HTTP_REQUEST_RETRY      1
+
 
 #endif
