@@ -13,6 +13,11 @@
 #define GPIO_GRAPH_BOTTOM_MARGIN      GPIO_GRAPH_TOP_MARGIN
 #define GPIO_DATA_POST_FREQ           5
 
+/**
+ * @define gpio parameters
+ */
+#define GPIO_OPERATION_DURATION 1000
+#define GPIO_TABLE_UPDATE_DURATION 300000
 
 struct last_gpio_monitor_point{
   int x;

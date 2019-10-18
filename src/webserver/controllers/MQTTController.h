@@ -11,25 +11,14 @@ created Date    : 1st June 2019
 #ifndef _EW_SERVER_MQTT_CONTROLLER_
 #define _EW_SERVER_MQTT_CONTROLLER_
 
-#include <webserver/resources/WebResource.h>
+#include "Controller.h"
 #include <webserver/pages/MqttConfigPage.h>
+#include <service_provider/MqttServiceProvider.h>
 
 /**
  * MqttController class
  */
-class MqttController {
-
-	protected:
-
-		/**
-		 * @var	EwWebResourceProvider*	web_resource
-		 */
-		EwWebResourceProvider* web_resource;
-
-		/**
-		 * @var	CallBackIntArgFn|NULL	_ewstack_mqtt_config_callback_fn
-		 */
-		CallBackIntArgFn _ewstack_mqtt_config_callback_fn=NULL;
+class MqttController : public Controller {
 
 	public:
 
@@ -46,27 +35,16 @@ class MqttController {
 		}
 
 		/**
-		 * register mqtt route handler
+		 * register mqtt controller
 		 *
-		 * @param	EwWebResourceProvider*	_web_resource
 		 */
-		void handle( EwWebResourceProvider* _web_resource ){
+		void boot( void ){
 
-			this->web_resource = _web_resource;
-			this->web_resource->register_route( EW_SERVER_MQTT_MANAGE_CONFIG_ROUTE, [&]() { this->handleMqttManageRoute(); }, AUTH_MIDDLEWARE );
-      this->web_resource->register_route( EW_SERVER_MQTT_GENERAL_CONFIG_ROUTE, [&]() { this->handleMqttGeneralConfigRoute(); }, AUTH_MIDDLEWARE );
-      this->web_resource->register_route( EW_SERVER_MQTT_LWT_CONFIG_ROUTE, [&]() { this->handleMqttLWTConfigRoute(); }, AUTH_MIDDLEWARE );
-      this->web_resource->register_route( EW_SERVER_MQTT_PUBSUB_CONFIG_ROUTE, [&]() { this->handleMqttPubSubConfigRoute(); }, AUTH_MIDDLEWARE );
+			this->route_handler->register_route( EW_SERVER_MQTT_MANAGE_CONFIG_ROUTE, [&]() { this->handleMqttManageRoute(); }, AUTH_MIDDLEWARE );
+      this->route_handler->register_route( EW_SERVER_MQTT_GENERAL_CONFIG_ROUTE, [&]() { this->handleMqttGeneralConfigRoute(); }, AUTH_MIDDLEWARE );
+      this->route_handler->register_route( EW_SERVER_MQTT_LWT_CONFIG_ROUTE, [&]() { this->handleMqttLWTConfigRoute(); }, AUTH_MIDDLEWARE );
+      this->route_handler->register_route( EW_SERVER_MQTT_PUBSUB_CONFIG_ROUTE, [&]() { this->handleMqttPubSubConfigRoute(); }, AUTH_MIDDLEWARE );
 		}
-
-		/**
-		 * set mqtt config callback. called when mqtt config modified by client.
-		 *
-		 * @param	CallBackIntArgFn	_fn
-		 */
-		void set_ewstack_mqtt_config_callback( CallBackIntArgFn _fn ){
-      this->_ewstack_mqtt_config_callback_fn = _fn;
-    }
 
 		/**
 		 * build html page with header, middle and footer part.
@@ -110,7 +88,7 @@ class MqttController {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_html( _page, EW_SERVER_MQTT_MANAGE_PAGE );
 
-      this->web_resource->EwServer->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 
@@ -127,7 +105,7 @@ class MqttController {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_MQTT_GENERAL_PAGE_TOP );
 
-      mqtt_general_config_table _mqtt_general_configs = this->web_resource->ew_db->get_mqtt_general_config_table();
+      mqtt_general_config_table _mqtt_general_configs = this->web_resource->db_conn->get_mqtt_general_config_table();
 
       char _port[10],_keepalive[10];memset( _port, 0, 10 );memset( _keepalive, 0, 10 );
       __appendUintToBuff( _port, "%d", _mqtt_general_configs.port, 8 );
@@ -173,15 +151,15 @@ class MqttController {
       bool _is_posted = false;
 
 			#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
-      if ( this->web_resource->EwServer->hasArg("hst") && this->web_resource->EwServer->hasArg("prt") ) {
+      if ( this->web_resource->server->hasArg("hst") && this->web_resource->server->hasArg("prt") ) {
 
-        String _mqtt_host = this->web_resource->EwServer->arg("hst");
-        String _mqtt_port = this->web_resource->EwServer->arg("prt");
-        String _client_id = this->web_resource->EwServer->arg("clid");
-        String _username = this->web_resource->EwServer->arg("usrn");
-        String _password = this->web_resource->EwServer->arg("pswd");
-        String _keep_alive = this->web_resource->EwServer->arg("kpalv");
-        String _clean_session = this->web_resource->EwServer->arg("cln");
+        String _mqtt_host = this->web_resource->server->arg("hst");
+        String _mqtt_port = this->web_resource->server->arg("prt");
+        String _client_id = this->web_resource->server->arg("clid");
+        String _username = this->web_resource->server->arg("usrn");
+        String _password = this->web_resource->server->arg("pswd");
+        String _keep_alive = this->web_resource->server->arg("kpalv");
+        String _clean_session = this->web_resource->server->arg("cln");
 
         #ifdef EW_SERIAL_LOG
           Logln(F("\nSubmitted info :\n"));
@@ -197,7 +175,7 @@ class MqttController {
 
         mqtt_general_config_table* _mqtt_general_configs = new mqtt_general_config_table;
         memset( (void*)_mqtt_general_configs, 0, sizeof(mqtt_general_config_table) );
-        // mqtt_general_config_table _mqtt_general_configs = this->ew_db->get_mqtt_general_config_table();
+        // mqtt_general_config_table _mqtt_general_configs = this->db_conn->get_mqtt_general_config_table();
 
         _mqtt_host.toCharArray( _mqtt_general_configs->host, _mqtt_host.length()+1 );
         _mqtt_general_configs->port = (int)_mqtt_port.toInt();
@@ -207,7 +185,7 @@ class MqttController {
         _mqtt_general_configs->keepalive = (int)_keep_alive.toInt();
         _mqtt_general_configs->clean_session = (int)( _clean_session == "clean" );
 
-        this->web_resource->ew_db->set_mqtt_general_config_table( _mqtt_general_configs);
+        this->web_resource->db_conn->set_mqtt_general_config_table( _mqtt_general_configs);
         delete _mqtt_general_configs;
 
         _is_posted = true;
@@ -217,10 +195,10 @@ class MqttController {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_mqtt_general_config_html( _page, _is_posted );
 
-      this->web_resource->EwServer->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
-      if( _is_posted && this->_ewstack_mqtt_config_callback_fn!=NULL ){
-        this->_ewstack_mqtt_config_callback_fn(MQTT_GENERAL_CONFIG);
+			if( _is_posted ){
+        __mqtt_service.handleMqttConfigChange(MQTT_GENERAL_CONFIG);
       }
     }
 
@@ -238,7 +216,7 @@ class MqttController {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_MQTT_LWT_PAGE_TOP );
 
-      mqtt_lwt_config_table _mqtt_lwt_configs = this->web_resource->ew_db->get_mqtt_lwt_config_table();
+      mqtt_lwt_config_table _mqtt_lwt_configs = this->web_resource->db_conn->get_mqtt_lwt_config_table();
 
       char* _qos_options[] = {"0", "1", "2"};
 
@@ -276,12 +254,12 @@ class MqttController {
       bool _is_posted = false;
 
 			#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
-      if ( this->web_resource->EwServer->hasArg("wtpc") && this->web_resource->EwServer->hasArg("wmsg") ) {
+      if ( this->web_resource->server->hasArg("wtpc") && this->web_resource->server->hasArg("wmsg") ) {
 
-        String _will_topic = this->web_resource->EwServer->arg("wtpc");
-        String _will_message = this->web_resource->EwServer->arg("wmsg");
-        String _will_qos = this->web_resource->EwServer->arg("wqos");
-        String _will_retain = this->web_resource->EwServer->arg("wrtn");
+        String _will_topic = this->web_resource->server->arg("wtpc");
+        String _will_message = this->web_resource->server->arg("wmsg");
+        String _will_qos = this->web_resource->server->arg("wqos");
+        String _will_retain = this->web_resource->server->arg("wrtn");
 
         #ifdef EW_SERIAL_LOG
           Logln(F("\nSubmitted info :\n"));
@@ -300,7 +278,7 @@ class MqttController {
         _mqtt_lwt_configs->will_qos = (int)_will_qos.toInt() - 1;
         _mqtt_lwt_configs->will_retain = (int)( _will_retain == "retain" );
 
-        this->web_resource->ew_db->set_mqtt_lwt_config_table( _mqtt_lwt_configs );
+        this->web_resource->db_conn->set_mqtt_lwt_config_table( _mqtt_lwt_configs );
 
         delete _mqtt_lwt_configs;
         _is_posted = true;
@@ -310,10 +288,10 @@ class MqttController {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_mqtt_lwt_config_html( _page, _is_posted );
 
-      this->web_resource->EwServer->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
-      if( _is_posted && this->_ewstack_mqtt_config_callback_fn!=NULL ){
-        this->_ewstack_mqtt_config_callback_fn(MQTT_LWT_CONFIG);
+			if( _is_posted ){
+        __mqtt_service.handleMqttConfigChange(MQTT_LWT_CONFIG);
       }
     }
 
@@ -331,7 +309,7 @@ class MqttController {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_MQTT_PUBSUB_PAGE_TOP );
 
-      mqtt_pubsub_config_table _mqtt_pubsub_configs = this->web_resource->ew_db->get_mqtt_pubsub_config_table();
+      mqtt_pubsub_config_table _mqtt_pubsub_configs = this->web_resource->db_conn->get_mqtt_pubsub_config_table();
 
       char* _qos_options[] = {"0", "1", "2"};
       char _topic_name[10], _topic_label[10];memset(_topic_name, 0, 10);memset(_topic_label, 0, 10);
@@ -414,7 +392,7 @@ class MqttController {
       bool _is_posted = false;
 
 			#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
-      if ( this->web_resource->EwServer->hasArg("ptpc0") && this->web_resource->EwServer->hasArg("pqos0") ) {
+      if ( this->web_resource->server->hasArg("ptpc0") && this->web_resource->server->hasArg("pqos0") ) {
 
         mqtt_pubsub_config_table* _mqtt_pubsub_configs = new mqtt_pubsub_config_table;
         memset( (void*)_mqtt_pubsub_configs, 0, sizeof(mqtt_pubsub_config_table) );
@@ -432,9 +410,9 @@ class MqttController {
           _qos_name[4] = (0x30 + i );
           _retain_name[4] = (0x30 + i );
 
-          String _topic = this->web_resource->EwServer->arg(_topic_name);
-          String _qos = this->web_resource->EwServer->arg(_qos_name);
-          String _retain = this->web_resource->EwServer->arg(_retain_name);
+          String _topic = this->web_resource->server->arg(_topic_name);
+          String _qos = this->web_resource->server->arg(_qos_name);
+          String _retain = this->web_resource->server->arg(_retain_name);
 
           _topic.toCharArray( _mqtt_pubsub_configs->publish_topics[i].topic, _topic.length()+1 );
           _mqtt_pubsub_configs->publish_topics[i].qos = (int)_qos.toInt() - 1;
@@ -456,8 +434,8 @@ class MqttController {
           _topic_name[4] = (0x30 + i );
           _qos_name[4] = (0x30 + i );
 
-          String _topic = this->web_resource->EwServer->arg(_topic_name);
-          String _qos = this->web_resource->EwServer->arg(_qos_name);
+          String _topic = this->web_resource->server->arg(_topic_name);
+          String _qos = this->web_resource->server->arg(_qos_name);
 
           _topic.toCharArray( _mqtt_pubsub_configs->subscribe_topics[i].topic, _topic.length()+1 );
           _mqtt_pubsub_configs->subscribe_topics[i].qos = (int)_qos.toInt() - 1;
@@ -467,9 +445,9 @@ class MqttController {
             Log(F("QoS")); Log(i); Log(F(" : ")); Logln(_qos);
           #endif
         }
-        _mqtt_pubsub_configs->publish_frequency = (int)this->web_resource->EwServer->arg("pfrq").toInt();
+        _mqtt_pubsub_configs->publish_frequency = (int)this->web_resource->server->arg("pfrq").toInt();
 
-        this->web_resource->ew_db->set_mqtt_pubsub_config_table( _mqtt_pubsub_configs );
+        this->web_resource->db_conn->set_mqtt_pubsub_config_table( _mqtt_pubsub_configs );
 
         delete _mqtt_pubsub_configs;
         _is_posted = true;
@@ -479,10 +457,10 @@ class MqttController {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_mqtt_pubsub_config_html( _page, _is_posted );
 
-      this->web_resource->EwServer->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
-      if( _is_posted && this->_ewstack_mqtt_config_callback_fn!=NULL ){
-        this->_ewstack_mqtt_config_callback_fn(MQTT_PUBSUB_CONFIG);
+			if( _is_posted ){
+        __mqtt_service.handleMqttConfigChange(MQTT_PUBSUB_CONFIG);
       }
     }
 

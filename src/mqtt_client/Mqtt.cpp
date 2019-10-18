@@ -1,3 +1,7 @@
+#include <config/Config.h>
+
+#if defined(ENABLE_MQTT_CONFIG)
+
 #include "Mqtt.h"
 
 #define MQTT_SEND_TIMEOUT           5
@@ -1069,3 +1073,5 @@ bool MQTTClient::sendPacket( uint8_t *buffer, uint16_t len ) {
   }
   return true;
 }
+
+#endif

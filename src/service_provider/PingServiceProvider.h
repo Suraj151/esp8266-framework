@@ -12,9 +12,7 @@ created Date    : 1st June 2019
 #define _PING_SERVICE_PROVIDER_H_
 
 
-#include <ESP8266WiFi.h>
-#include <config/Config.h>
-#include <utility/Log.h>
+#include <service_provider/ServiceProvider.h>
 
 extern "C" {
   #include <ping.h>
@@ -26,7 +24,7 @@ static void ICACHE_FLASH_ATTR ping_recv_cb(void* arg, void* pdata);
 /**
  * PingServiceProvider class
  */
-class PingServiceProvider{
+class PingServiceProvider : public ServiceProvider {
 
   public:
 
@@ -42,11 +40,19 @@ class PingServiceProvider{
     }
 
     /**
+		 * PingServiceProvider destructor
+		 */
+    ~PingServiceProvider(){
+    }
+
+    /**
      * initialize ping
      */
     void init_ping( void );
     bool ping( void );
     bool isHostRespondingToPing( void );
 };
+
+extern PingServiceProvider __ping_service;
 
 #endif

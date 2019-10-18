@@ -11,7 +11,7 @@ created Date    : 1st June 2019
 #ifndef _EW_SERVER_LOGIN_CONTROLLER_
 #define _EW_SERVER_LOGIN_CONTROLLER_
 
-#include <webserver/resources/WebResource.h>
+#include "Controller.h"
 #include <webserver/pages/LoginPage.h>
 #include <webserver/pages/LogoutPage.h>
 #include <webserver/pages/LoginConfigPage.h>
@@ -19,14 +19,14 @@ created Date    : 1st June 2019
 /**
  * LoginController class
  */
-class LoginController {
+class LoginController : public Controller {
 
 	protected:
 
 		/**
-		 * @var	EwWebResourceProvider*	web_resource
+		 * @var	login_credential_table	login_credentials
 		 */
-		EwWebResourceProvider* web_resource;
+    login_credential_table login_credentials;
 
 	public:
 
@@ -43,16 +43,15 @@ class LoginController {
 		}
 
 		/**
-		 * register logins route handler
+		 * register logins controller
 		 *
-		 * @param	EwWebResourceProvider*	_web_resource
 		 */
-		void handle( EwWebResourceProvider* _web_resource ){
+		void boot( void ){
 
-			this->web_resource = _web_resource;
-			this->web_resource->register_route( EW_SERVER_LOGIN_ROUTE, [&]() { this->handleLoginRoute(); } );
-			this->web_resource->register_route( EW_SERVER_LOGOUT_ROUTE, [&]() { this->handleLogoutRoute(); } );
-      this->web_resource->register_route( EW_SERVER_LOGIN_CONFIG_ROUTE, [&]() { this->handleLoginConfigRoute(); }, AUTH_MIDDLEWARE );
+			this->login_credentials = this->web_resource->db_conn->get_login_credential_table();
+			this->route_handler->register_route( EW_SERVER_LOGIN_ROUTE, [&]() { this->handleLoginRoute(); } );
+			this->route_handler->register_route( EW_SERVER_LOGOUT_ROUTE, [&]() { this->handleLogoutRoute(); } );
+      this->route_handler->register_route( EW_SERVER_LOGIN_CONFIG_ROUTE, [&]() { this->handleLoginConfigRoute(); }, AUTH_MIDDLEWARE );
 		}
 
 		/**
@@ -99,8 +98,8 @@ class LoginController {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_LOGIN_CONFIG_PAGE_TOP );
 
-      concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrnm"), this->web_resource->login_credentials.username, LOGIN_CONFIGS_BUF_SIZE-1 );
-      concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), this->web_resource->login_credentials.password, LOGIN_CONFIGS_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrnm"), this->login_credentials.username, LOGIN_CONFIGS_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), this->login_credentials.password, LOGIN_CONFIGS_BUF_SIZE-1 );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
       if( _enable_flash )
@@ -113,16 +112,18 @@ class LoginController {
 		 * when posted, get login configs from client and set them in database.
 		 */
     void handleLoginConfigRoute( void ) {
+
+			this->login_credentials = this->web_resource->db_conn->get_login_credential_table();
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling Login Config route"));
       #endif
       bool _is_posted = false;
       bool _is_error = true;
 
-      if ( this->web_resource->EwServer->hasArg("usrnm") && this->web_resource->EwServer->hasArg("pswd") ) {
+      if ( this->web_resource->server->hasArg("usrnm") && this->web_resource->server->hasArg("pswd") ) {
 
-        String _username = this->web_resource->EwServer->arg("usrnm");
-        String _password = this->web_resource->EwServer->arg("pswd");
+        String _username = this->web_resource->server->arg("usrnm");
+        String _password = this->web_resource->server->arg("pswd");
 
         #ifdef EW_SERIAL_LOG
           Logln(F("\nSubmitted info :\n"));
@@ -135,12 +136,11 @@ class LoginController {
           _username.length() > MIN_ACCEPTED_ARG_SIZE && _password.length() > MIN_ACCEPTED_ARG_SIZE
         ){
 
-          // login_credential_table this->login_credentials = this->get_login_credential_table();
-          memset( this->web_resource->login_credentials.username, 0, LOGIN_CONFIGS_BUF_SIZE );
-          memset( this->web_resource->login_credentials.password, 0, LOGIN_CONFIGS_BUF_SIZE );
-          _username.toCharArray( this->web_resource->login_credentials.username, _username.length()+1 );
-          _password.toCharArray( this->web_resource->login_credentials.password, _password.length()+1 );
-          this->web_resource->ew_db->set_login_credential_table( &this->web_resource->login_credentials );
+          memset( this->login_credentials.username, 0, LOGIN_CONFIGS_BUF_SIZE );
+          memset( this->login_credentials.password, 0, LOGIN_CONFIGS_BUF_SIZE );
+          _username.toCharArray( this->login_credentials.username, _username.length()+1 );
+          _password.toCharArray( this->login_credentials.password, _password.length()+1 );
+          this->web_resource->db_conn->set_login_credential_table( &this->login_credentials );
           // this->set_login_credential_table( &this->login_credentials );
 
           _is_error = false;
@@ -152,9 +152,9 @@ class LoginController {
       this->build_login_config_html( _page, _is_error, _is_posted );
 
       if( _is_posted && !_is_error ){
-        this->web_resource->send_inactive_session_headers();
+        this->route_handler->send_inactive_session_headers();
       }
-      this->web_resource->EwServer->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 
@@ -166,12 +166,12 @@ class LoginController {
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling logout route"));
       #endif
-      this->web_resource->send_inactive_session_headers();
+      this->route_handler->send_inactive_session_headers();
 
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_html( _page, EW_SERVER_LOGOUT_PAGE );
 
-      this->web_resource->EwServer->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 
@@ -182,21 +182,21 @@ class LoginController {
 
       bool _is_posted = false;
 
-      if( this->web_resource->EwServer->hasArg("username") && this->web_resource->EwServer->hasArg("password") ){
+      if( this->web_resource->server->hasArg("username") && this->web_resource->server->hasArg("password") ){
         _is_posted = true;
       }
 
-      if ( this->web_resource->has_active_session() || ( _is_posted && this->web_resource->EwServer->arg("username") == this->web_resource->login_credentials.username &&
-        this->web_resource->EwServer->arg("password") == this->web_resource->login_credentials.password
+      if ( this->route_handler->has_active_session() || ( _is_posted && this->web_resource->server->arg("username") == this->login_credentials.username &&
+        this->web_resource->server->arg("password") == this->login_credentials.password
       ) ) {
 
         char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
-        this->web_resource->build_session_cookie( _session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE, true, this->web_resource->login_credentials.cookie_max_age );
+        this->route_handler->build_session_cookie( _session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE, true, this->login_credentials.cookie_max_age );
 
-        this->web_resource->EwServer->sendHeader("Location", EW_SERVER_HOME_ROUTE);
-        this->web_resource->EwServer->sendHeader("Cache-Control", "no-cache");
-        this->web_resource->EwServer->sendHeader("Set-Cookie", _session_cookie);
-        this->web_resource->EwServer->send(HTTP_REDIRECT);
+        this->web_resource->server->sendHeader("Location", EW_SERVER_HOME_ROUTE);
+        this->web_resource->server->sendHeader("Cache-Control", "no-cache");
+        this->web_resource->server->sendHeader("Set-Cookie", _session_cookie);
+        this->web_resource->server->send(HTTP_REDIRECT);
         #ifdef EW_SERIAL_LOG
         Logln(F("Log in Successful"));
         #endif
@@ -206,7 +206,7 @@ class LoginController {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_html( _page, EW_SERVER_LOGIN_PAGE, _is_posted, (char*)"Wrong Credentials.", ALERT_DANGER );
 
-      this->web_resource->EwServer->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 

@@ -4,43 +4,8 @@
 #include <ESP8266WiFi.h>
 #include <config/Config.h>
 #include <utility/Utility.h>
-#include <database/EwingsDefaultDB.h>
-extern "C" {
-#include <espnow.h>
-}
-
-// #define ESP_NOW_KEY     "jo bole so nihal"
-#define ESP_NOW_KEY     "lets kill people"
-#define ESP_NOW_KEY_LENGTH 16
-#define ESP_NOW_CHANNEL 4
-#define ESP_NOW_MAX_PEER 8
-#define ESP_NOW_DEVICE_TABLE_MAX_SIZE 20
-#define ESP_NOW_MAX_BUFF_SIZE 250
-
-enum esp_now_state {
-  ESP_NOW_STATE_EMPTY,
-  ESP_NOW_STATE_INIT,
-  ESP_NOW_STATE_SENT,
-	ESP_NOW_STATE_SENT_SUCCEED,
-  ESP_NOW_STATE_SENT_FAILED,
-  ESP_NOW_STATE_DATA_AVAILABLE,
-  ESP_NOW_STATE_RECV_AVAILABLE
-};
-
-typedef struct {
-  uint8 mac[6];
-  uint8_t mesh_level;
-} esp_now_device_t;
-
-typedef struct {
-  uint8 mac[6];
-  esp_now_role role;
-  uint8_t channel;
-  esp_now_state state;
-  uint8_t* buffer;
-  uint8_t data_length;
-  uint32_t last_receive;
-} esp_now_peer_t;
+#include <database/DefaultDatabase.h>
+#include <service_provider/ServiceProvider.h>
 
 typedef struct {
   uint8_t mesh_level;
@@ -50,7 +15,6 @@ typedef struct {
   esp_now_device_t device_table[ESP_NOW_DEVICE_TABLE_MAX_SIZE];
   uint8_t device_count;
 } esp_now_payload_t;
-
 
 // esp_now_peer_t esp_now_peers[ESP_NOW_MAX_PEER];
 
@@ -66,7 +30,7 @@ void esp_now_send_cb(uint8_t *macaddr, uint8_t status);
 /**
  * ESPNOWServiceProvider class
  */
-class ESPNOWServiceProvider{
+class ESPNOWServiceProvider : public ServiceProvider{
 
   public:
 
@@ -84,11 +48,10 @@ class ESPNOWServiceProvider{
     ~ESPNOWServiceProvider(){
 
       this->closeAll();
-      this->ew_db = NULL;
       this->wifi = NULL;
     }
 
-    void beginEspNow( ESP8266WiFiClass* _wifi, EwingsDefaultDB* db_handler );
+    void beginEspNow( ESP8266WiFiClass* _wifi );
     void handlePeers(void);
     void scanPeers(void);
     void printPeers(void);
@@ -117,17 +80,12 @@ class ESPNOWServiceProvider{
   protected:
 
     /**
-		 * @var	EwingsDefaultDB*  ew_db
-		 */
-    EwingsDefaultDB* ew_db;
-    /**
 		 * @var	ESP8266WiFiClass*  wifi
 		 */
     ESP8266WiFiClass* wifi;
 
 };
 
-
-
+extern ESPNOWServiceProvider __espnow_service;
 
 #endif

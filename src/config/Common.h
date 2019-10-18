@@ -20,7 +20,7 @@
 // #define ENABLE_ESP_NOW
 
 /**
- * @define flash key parameters
+ * @define flash key parameters for reset factory
  */
 #define FLASH_KEY_PIN             D3
 #define FLASH_KEY_PRESS_DURATION  1000
@@ -48,5 +48,16 @@
 #define HTTP_REQUEST_DURATION   10000
 #define HTTP_REQUEST_RETRY      1
 
+/**
+ * max tasks and callbacks
+ */
+#define MAX_SCHEDULABLE_TASKS	25
+#define MAX_FACTORY_RESET_CALLBACKS	MAX_SCHEDULABLE_TASKS
+
+/**
+ * callback type
+ */
+typedef std::function<void(int)> CallBackIntArgFn;
+typedef std::function<void(void)> CallBackVoidArgFn;
 
 #endif

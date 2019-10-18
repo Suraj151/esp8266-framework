@@ -13,13 +13,12 @@
 #include "MqttConfig.h"
 #endif
 
+#ifdef ENABLE_ESP_NOW
+#include "EspnowConfig.h"
+#endif
+
 #ifdef ENABLE_GPIO_CONFIG
 #include "GpioConfig.h"
-/**
- * @define gpio parameters
- */
-#define GPIO_OPERATION_DURATION 1000
-#define GPIO_TABLE_UPDATE_DURATION 300000
 #endif
 
 // #define GLOBAL_CONFIG_TABLE_ADDRESS CONFIG_START

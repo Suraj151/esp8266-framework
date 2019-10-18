@@ -14,6 +14,7 @@ created Date    : 1st June 2019
 #include <Esp.h>
 #include <config/Config.h>
 #include "TaskScheduler.h"
+#include "FactoryReset.h"
 #include "DataTypeConversions.h"
 #include "StringOperations.h"
 #include "queue/queue.h"
@@ -53,21 +54,5 @@ template <typename Struct> void _ClearObject (const Struct * _object) {
     *((char*) & (*_object) + i) = 0;
 }
 
-#ifdef ENABLE_GPIO_CONFIG
-bool is_exceptional_gpio_pin( uint8_t _pin );
-#endif
-
-// int getPinMode(uint8_t pin){
-//
-//   if (pin >= NUM_DIGITAL_PINS) return (-1);
-//
-//   uint8_t bit = digitalPinToBitMask(pin);
-//   uint8_t port = digitalPinToPort(pin);
-//   volatile uint8_t *reg = portModeRegister(port);
-//   if (*reg & bit) return (OUTPUT);
-//
-//   volatile uint8_t *out = portOutputRegister(port);
-//   return ((*out & bit) ? INPUT_PULLUP : INPUT);
-// }
 
 #endif

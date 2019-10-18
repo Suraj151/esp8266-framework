@@ -11,20 +11,13 @@ created Date    : 1st June 2019
 #ifndef _EW_SERVER_HOME_CONTROLLER_
 #define _EW_SERVER_HOME_CONTROLLER_
 
-#include <webserver/resources/WebResource.h>
+#include "Controller.h"
 #include <webserver/pages/HomePage.h>
 
 /**
  * HomeController class
  */
-class HomeController {
-
-	protected:
-
-		/**
-		 * @var	EwWebResourceProvider*	web_resource
-		 */
-		EwWebResourceProvider* web_resource;
+class HomeController : public Controller {
 
 	public:
 
@@ -41,15 +34,13 @@ class HomeController {
 		}
 
 		/**
-		 * register home, not found route handler
+		 * register home controller
 		 *
-		 * @param	EwWebResourceProvider*	_web_resource
 		 */
-		void handle( EwWebResourceProvider* _web_resource ){
+		void boot( void ){
 
-			this->web_resource = _web_resource;
-			this->web_resource->register_route( EW_SERVER_HOME_ROUTE, [&]() { this->handleHomeRoute(); } );
-      this->web_resource->register_not_found_fn( [&]() { this->handleNotFound(); } );
+			this->route_handler->register_route( EW_SERVER_HOME_ROUTE, [&]() { this->handleHomeRoute(); } );
+      this->route_handler->register_not_found_fn( [&]() { this->handleNotFound(); } );
 		}
 
 		/**
@@ -95,7 +86,7 @@ class HomeController {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_html( _page, EW_SERVER_404_PAGE );
 
-      this->web_resource->EwServer->send( HTTP_NOT_FOUND, EW_HTML_CONTENT, _page );
+      this->web_resource->server->send( HTTP_NOT_FOUND, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 
@@ -109,9 +100,9 @@ class HomeController {
       #endif
 
       char* _page = new char[EW_HTML_MAX_SIZE];
-      this->build_html( _page, this->web_resource->has_active_session() ? EW_SERVER_HOME_AUTHORIZED_PAGE : EW_SERVER_HOME_PAGE );
+      this->build_html( _page, this->route_handler->has_active_session() ? EW_SERVER_HOME_AUTHORIZED_PAGE : EW_SERVER_HOME_PAGE );
 
-      this->web_resource->EwServer->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 

@@ -1,3 +1,7 @@
+#include <config/Config.h>
+
+#if defined(ENABLE_ESP_NOW)
+
 #include "ESPNOWServiceProvider.h"
 
 esp_now_peer_t esp_now_peers[ESP_NOW_MAX_PEER];
@@ -202,13 +206,12 @@ void ESPNOWServiceProvider::unregisterCallbacks(void) {
   esp_now_unregister_recv_cb();
 }
 
-void ESPNOWServiceProvider::beginEspNow( ESP8266WiFiClass* _wifi, EwingsDefaultDB* db_handler ){
+void ESPNOWServiceProvider::beginEspNow( ESP8266WiFiClass* _wifi ){
 
   #ifdef EW_SERIAL_LOG
   Logln(F("espnow: begin"));
   #endif
   this->wifi= _wifi;
-  this->ew_db = db_handler;
 
   if( esp_now_init()==0 ){
 
@@ -318,8 +321,8 @@ void ESPNOWServiceProvider::broadcastConfigData(void){
     payload->mesh_level = this->wifi->softAPIP()[2];
   }
 
-  global_config_table _global_configs = this->ew_db->get_global_config_table();
-  wifi_config_table _wifi_configs = this->ew_db->get_wifi_config_table();
+  global_config_table _global_configs = __database_service.get_global_config_table();
+  wifi_config_table _wifi_configs = __database_service.get_wifi_config_table();
   // memcpy( reinterpret_cast<global_config>(payload->global_config), reinterpret_cast<global_config>(_global_configs), sizeof(global_config_table) );
   memcpy( &payload->global_config, &_global_configs, sizeof(global_config_table) );
   memcpy( &payload->ssid, &_wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE );
@@ -665,3 +668,7 @@ void ESPNOWServiceProvider::setPeerToDefaults(uint8_t _peer_index) {
       esp_now_peers[_peer_index].last_receive = 0;
   }
 }
+
+ESPNOWServiceProvider __espnow_service;
+
+#endif

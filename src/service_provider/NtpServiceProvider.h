@@ -13,8 +13,7 @@ created Date    : 1st June 2019
 
 
 #include <TZ.h>
-#include <ESP8266WiFi.h>
-#include <config/Config.h>
+#include <service_provider/ServiceProvider.h>
 
 #ifndef TZ_Asia_Kolkata
 #define TZ_Asia_Kolkata	PSTR("IST-5:30")
@@ -34,7 +33,7 @@ created Date    : 1st June 2019
 /**
  * NTPServiceProvider class
  */
-class NTPServiceProvider{
+class NTPServiceProvider : public ServiceProvider {
 
   public:
 
@@ -47,33 +46,16 @@ class NTPServiceProvider{
     }
 
     /**
-     * initialize network time
-     */
-    void init_ntp_time(){
-
-      // configTime( TZ_SEC, DST_SEC, NTP_SERVER1 );
-      configTime( TZ_Asia_Kolkata, NTP_SERVER1 );
+		 * NTPServiceProvider destructor
+		 */
+    ~NTPServiceProvider(){
     }
 
-    /**
-     * check whether dhcp server started and time is valid
-     */
-    bool is_ntp_in_sync(){
-
-      return (
-        wifi_station_dhcpc_status()==DHCP_STARTED && time(nullptr) > LAUNCH_UNIX_TIME
-      );
-    }
-
-    /**
-     * get network time epoch time
-     *
-     * @return  time_t
-     */
-    time_t get_ntp_time(){
-
-      return time(nullptr);
-    }
+    void init_ntp_time( void );
+    bool is_ntp_in_sync( void );
+    time_t get_ntp_time( void );
 };
+
+extern NTPServiceProvider __nw_time_service;
 
 #endif

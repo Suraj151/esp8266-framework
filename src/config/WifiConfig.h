@@ -29,16 +29,16 @@
 #define ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
 
 /**
- * wifi status variable
+ * global wifi status
  */
 typedef struct {
   bool wifi_connected;
   bool internet_available;
   uint32_t last_internet_millis;
   uint8_t ignore_bssid[6];
-} device_wifi_status_t;
+} __status_wifi_t;
 
-extern device_wifi_status_t _wifi_status;
+extern __status_wifi_t __status_wifi;
 
 struct wifi_configs {
   char sta_ssid[WIFI_CONFIGS_BUF_SIZE];

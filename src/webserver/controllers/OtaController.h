@@ -11,21 +11,14 @@ created Date    : 1st June 2019
 #ifndef _EW_SERVER_OTA_CONTROLLER_
 #define _EW_SERVER_OTA_CONTROLLER_
 
-#include <webserver/resources/WebResource.h>
+#include "Controller.h"
 #include <webserver/pages/WiFiConfigPage.h>
 #include <webserver/pages/OtaConfigPage.h>
 
 /**
  * OtaController class
  */
-class OtaController {
-
-	protected:
-
-		/**
-		 * @var	EwWebResourceProvider*	web_resource
-		 */
-		EwWebResourceProvider* web_resource;
+class OtaController : public Controller {
 
 	public:
 
@@ -42,14 +35,12 @@ class OtaController {
 		}
 
 		/**
-		 * register ota route handler
+		 * register ota controller
 		 *
-		 * @param	EwWebResourceProvider*	_web_resource
 		 */
-		void handle( EwWebResourceProvider* _web_resource ){
+		void boot( void ){
 
-			this->web_resource = _web_resource;
-			this->web_resource->register_route( EW_SERVER_OTA_CONFIG_ROUTE, [&]() { this->handleOtaServerConfigRoute(); }, AUTH_MIDDLEWARE );
+			this->route_handler->register_route( EW_SERVER_OTA_CONFIG_ROUTE, [&]() { this->handleOtaServerConfigRoute(); }, AUTH_MIDDLEWARE );
 		}
 
 		/**
@@ -65,7 +56,7 @@ class OtaController {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_OTA_CONFIG_PAGE_TOP );
 
-      ota_config_table _ota_configs = this->web_resource->ew_db->get_ota_config_table();
+      ota_config_table _ota_configs = this->web_resource->db_conn->get_ota_config_table();
 
       char _port[10];memset( _port, 0, 10 );
       __appendUintToBuff( _port, "%d", _ota_configs.ota_port, 8 );
@@ -100,10 +91,10 @@ class OtaController {
       bool _is_posted = false;
 
 			#ifdef ALLOW_OTA_CONFIG_MODIFICATION
-      if ( this->web_resource->EwServer->hasArg("hst") && this->web_resource->EwServer->hasArg("prt") ) {
+      if ( this->web_resource->server->hasArg("hst") && this->web_resource->server->hasArg("prt") ) {
 
-        String _ota_host = this->web_resource->EwServer->arg("hst");
-        String _ota_port = this->web_resource->EwServer->arg("prt");
+        String _ota_host = this->web_resource->server->arg("hst");
+        String _ota_port = this->web_resource->server->arg("prt");
 
         #ifdef EW_SERIAL_LOG
           Logln(F("\nSubmitted info :\n"));
@@ -112,12 +103,12 @@ class OtaController {
           Logln();
         #endif
 
-        ota_config_table _ota_configs = this->web_resource->ew_db->get_ota_config_table();
+        ota_config_table _ota_configs = this->web_resource->db_conn->get_ota_config_table();
 
         _ota_host.toCharArray( _ota_configs.ota_host, _ota_host.length()+1 );
         _ota_configs.ota_port = (int)_ota_port.toInt();
 
-        this->web_resource->ew_db->set_ota_config_table( &_ota_configs);
+        this->web_resource->db_conn->set_ota_config_table( &_ota_configs);
 
         _is_posted = true;
       }
@@ -126,7 +117,7 @@ class OtaController {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_ota_server_config_html( _page, _is_posted );
 
-      this->web_resource->EwServer->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 

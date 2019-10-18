@@ -11,7 +11,8 @@ created Date    : 1st June 2019
 #include "PingServiceProvider.h"
 
 volatile bool _host_resp = false;
-IPAddress PING_TARGET(8,8,8,8);
+const uint32_t _host = 0x08080808;
+// IPAddress PING_TARGET(8,8,8,8);
 
 // This function is called when a ping is received or the request times out:
 static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
@@ -20,8 +21,8 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
 
   if (pingrsp->bytes > 0) {
     #ifdef EW_SERIAL_LOG
-    Plain_Log(F("\nPing: Reply from: "));
-    Plain_Log(PING_TARGET);
+    Plain_Log(F("\nPing: Reply "));
+    // Plain_Log(PING_TARGET);
     Plain_Log(F(": "));
     Plain_Log(F("bytes="));
     Plain_Log(pingrsp->bytes);
@@ -42,7 +43,7 @@ void PingServiceProvider::init_ping(){
 
   memset(&this->_opt, 0, sizeof(struct ping_option));
   this->_opt.count = 1;
-  this->_opt.ip = PING_TARGET;
+  this->_opt.ip = _host;
   this->_opt.coarse_time = 0;
   // _opt.sent_function = NULL;
   // _opt.recv_function = NULL;
@@ -61,3 +62,5 @@ bool PingServiceProvider::isHostRespondingToPing(){
 
   return _host_resp;
 }
+
+PingServiceProvider __ping_service;

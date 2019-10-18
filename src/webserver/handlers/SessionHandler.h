@@ -11,16 +11,13 @@ created Date    : 1st June 2019
 #ifndef _EW_SERVER_SESSION_HANDLER_
 #define _EW_SERVER_SESSION_HANDLER_
 
+#include <webserver/resources/WebResource.h>
+
 /**
  * @define	max buf size for client cookies.
  */
 #define EW_COOKIE_BUFF_MAX_SIZE 60
 
-#include <Arduino.h>
-#include <ESP8266WebServer.h>
-#include <utility/Utility.h>
-#include <utility/Log.h>
-#include <database/EwingsDefaultDB.h>
 
 /**
  * EwSessionHandler class
@@ -36,48 +33,20 @@ class EwSessionHandler{
     }
 
     /**
-		 * EwSessionHandler constructor
-     *
-     * @param ESP8266WebServer* server
-		 */
-    EwSessionHandler( ESP8266WebServer* server ){
-      this->begin(server );
-    }
-
-    /**
 		 * EwSessionHandler destructor
 		 */
     ~EwSessionHandler(){
-      this->EwServer = NULL;
-    }
-
-    /**
-		 * begin with web server
-     *
-     * @param ESP8266WebServer* server
-		 */
-    void begin( ESP8266WebServer* server ){
-      this->EwServer = server;
-    }
-
-    /**
-		 * assign login credential table to session handler
-     *
-     * @param login_credential_table _login_credentials
-		 */
-    void use_login_credential( login_credential_table _login_credentials ){
-      this->login_credentials = _login_credentials;
     }
 
     /**
 		 * send inactive session to client. this will remove any login cache from client side.
 		 */
-    void send_inactive_session_headers(){
+    void send_inactive_session_headers( void ){
 
       char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
       this->build_session_cookie( _session_cookie, false, EW_COOKIE_BUFF_MAX_SIZE, true, 0 );
-      this->EwServer->sendHeader("Cache-Control", "no-cache");
-      this->EwServer->sendHeader("Set-Cookie", _session_cookie);
+      __web_resource.server->sendHeader("Cache-Control", "no-cache");
+      __web_resource.server->sendHeader("Set-Cookie", _session_cookie);
     }
 
     /**
@@ -91,9 +60,9 @@ class EwSessionHandler{
 		 */
     void build_session_cookie( char* _str, bool _stat, int _max_size, bool _enable_max_age=false, uint32_t _max_age=EW_COOKIE_MAX_AGE ){
 
-      // login_credential_table _login_credentials = this->get_login_credential_table();
+      login_credential_table _login_credentials = __web_resource.db_conn->get_login_credential_table();
       memset( _str, 0, _max_size );
-      strcat( _str, this->login_credentials.session_name );
+      strcat( _str, _login_credentials.session_name );
       strcat( _str, _stat ? "=1": "=0" );
       if( _enable_max_age ){
         strcat( _str, ";Max-Age=" );
@@ -112,9 +81,9 @@ class EwSessionHandler{
       Logln(F("checking active session"));
       #endif
 
-      if ( this->EwServer->hasHeader("Cookie") ) {
+      if ( __web_resource.server->hasHeader("Cookie") ) {
 
-        String cookie = this->EwServer->header("Cookie");
+        String cookie = __web_resource.server->header("Cookie");
         char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
         this->build_session_cookie( _session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE );
 
@@ -147,8 +116,8 @@ class EwSessionHandler{
       Logln(F("checking inactive session"));
       #endif
 
-      if ( this->EwServer->hasHeader("Cookie") ) {
-        String cookie = this->EwServer->header("Cookie");
+      if ( __web_resource.server->hasHeader("Cookie") ) {
+        String cookie = __web_resource.server->header("Cookie");
         char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
         this->build_session_cookie( _session_cookie, false, EW_COOKIE_BUFF_MAX_SIZE );
 
@@ -169,19 +138,6 @@ class EwSessionHandler{
       #endif
       return false;
     }
-
-  protected:
-
-    /**
-		 * @var	ESP8266WebServer*	EwServer
-		 */
-    ESP8266WebServer* EwServer;
-
-    /**
-		 * @var	login_credential_table	login_credentials
-		 */
-    login_credential_table login_credentials;
-
 };
 
 #endif
