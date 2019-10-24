@@ -23,10 +23,10 @@ void DefaultDatabase::init_default_database(  uint16_t _size ){
   this->register_table( &_login_credential_defaults, LOGIN_CREDENTIAL_TABLE_ADDRESS );
   this->register_table( &_wifi_config_defaults, WIFI_CONFIG_TABLE_ADDRESS );
   this->register_table( &_ota_config_defaults, OTA_CONFIG_TABLE_ADDRESS );
-  #ifdef ENABLE_GPIO_CONFIG
+  #ifdef ENABLE_GPIO_SERVICE
   this->register_table( &_gpio_config_defaults, GPIO_CONFIG_TABLE_ADDRESS );
   #endif
-  #ifdef ENABLE_MQTT_CONFIG
+  #ifdef ENABLE_MQTT_SERVICE
   this->register_table( &_mqtt_general_config_defaults, MQTT_GENERAL_CONFIG_TABLE_ADDRESS );
   this->register_table( &_mqtt_lwt_config_defaults, MQTT_LWT_CONFIG_TABLE_ADDRESS );
   this->register_table( &_mqtt_pubsub_config_defaults, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS );
@@ -42,10 +42,10 @@ void DefaultDatabase::clear_default_tables(){
   this->clear_table_to_defaults( &_login_credential_defaults, LOGIN_CREDENTIAL_TABLE_ADDRESS );
   this->clear_table_to_defaults( &_wifi_config_defaults, WIFI_CONFIG_TABLE_ADDRESS );
   this->clear_table_to_defaults( &_ota_config_defaults, OTA_CONFIG_TABLE_ADDRESS );
-  #ifdef ENABLE_GPIO_CONFIG
+  #ifdef ENABLE_GPIO_SERVICE
   this->clear_table_to_defaults( &_gpio_config_defaults, GPIO_CONFIG_TABLE_ADDRESS );
   #endif
-  #ifdef ENABLE_MQTT_CONFIG
+  #ifdef ENABLE_MQTT_SERVICE
   this->clear_table_to_defaults( &_mqtt_general_config_defaults, MQTT_GENERAL_CONFIG_TABLE_ADDRESS );
   this->clear_table_to_defaults( &_mqtt_lwt_config_defaults, MQTT_LWT_CONFIG_TABLE_ADDRESS );
   this->clear_table_to_defaults( &_mqtt_pubsub_config_defaults, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS );
@@ -88,7 +88,7 @@ ota_config_table DefaultDatabase::get_ota_config_table(){
   return this->get_table_by_address<ota_config_table>(OTA_CONFIG_TABLE_ADDRESS);
 }
 
-#ifdef ENABLE_GPIO_CONFIG
+#ifdef ENABLE_GPIO_SERVICE
 /**
  * get/fetch gpio config table from database.
  *
@@ -99,7 +99,7 @@ gpio_config_table DefaultDatabase::get_gpio_config_table(){
 }
 #endif
 
-#ifdef ENABLE_MQTT_CONFIG
+#ifdef ENABLE_MQTT_SERVICE
 /**
  * get/fetch mqtt general config table from database.
  *
@@ -164,7 +164,7 @@ void DefaultDatabase::set_ota_config_table( ota_config_table* _table ){
   this->set_table( _table, OTA_CONFIG_TABLE_ADDRESS );
 }
 
-#ifdef ENABLE_GPIO_CONFIG
+#ifdef ENABLE_GPIO_SERVICE
 /**
  * set gpio config table in database.
  *
@@ -175,7 +175,7 @@ void DefaultDatabase::set_gpio_config_table( gpio_config_table* _table ){
 }
 #endif
 
-#ifdef ENABLE_MQTT_CONFIG
+#ifdef ENABLE_MQTT_SERVICE
 /**
  * set mqtt general config table in database.
  *
@@ -236,14 +236,14 @@ template <typename T> T DefaultDatabase::get_table_by_address( uint16_t _address
       this->get_table( &_t, OTA_CONFIG_TABLE_ADDRESS );
       break;
     }
-    #ifdef ENABLE_GPIO_CONFIG
+    #ifdef ENABLE_GPIO_SERVICE
     case GPIO_CONFIG_TABLE_ADDRESS:{
 
       this->get_table( &_t, GPIO_CONFIG_TABLE_ADDRESS );
       break;
     }
     #endif
-    #ifdef ENABLE_MQTT_CONFIG
+    #ifdef ENABLE_MQTT_SERVICE
     case MQTT_GENERAL_CONFIG_TABLE_ADDRESS:{
 
       this->get_table( &_t, MQTT_GENERAL_CONFIG_TABLE_ADDRESS );

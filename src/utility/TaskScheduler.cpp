@@ -43,10 +43,10 @@ int TaskScheduler::setInterval( CallBackVoidArgFn _task_fn, uint32_t _duration )
  * @param		CallBackVoidArgFn	_task_fn
  * @param		uint32_t	_duration
  * @param		unsigned long|0	_last_millis
- * @param		int|-1	_max_attampts
+ * @param		int|-1	_max_attempts
  * @return	int
  */
-int TaskScheduler::updateInterval( int _task_id, CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _last_millis, int _max_attampts ){
+int TaskScheduler::updateInterval( int _task_id, CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _last_millis, int _max_attempts ){
 
 	int _registered_index = this->is_registered_task( _task_id );
 	if( _registered_index > -1 ){
@@ -54,11 +54,11 @@ int TaskScheduler::updateInterval( int _task_id, CallBackVoidArgFn _task_fn, uin
 		this->_tasks[_registered_index]._task = _task_fn;
 		this->_tasks[_registered_index]._duration = _duration;
 		this->_tasks[_registered_index]._last_millis = _last_millis;
-		this->_tasks[_registered_index]._max_attempts = _max_attampts;
+		this->_tasks[_registered_index]._max_attempts = _max_attempts;
 		return _task_id;
 	}else{
 
-		return this->register_task( _task_fn, _duration,_last_millis, _max_attampts );
+		return this->register_task( _task_fn, _duration,_last_millis, _max_attempts );
 	}
 }
 
@@ -91,10 +91,10 @@ bool TaskScheduler::clearInterval( int _id ){
  * @param		CallBackVoidArgFn	_task_fn
  * @param		uint32_t	_duration
  * @param		unsigned long|0	_last_millis
- * @param		int|-1	_max_attampts
+ * @param		int|-1	_max_attempts
  * @return	int
  */
-int TaskScheduler::register_task( CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _last_millis, int _max_attampts ){
+int TaskScheduler::register_task( CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _last_millis, int _max_attempts ){
 
 	if( this->_tasks.size() < MAX_SCHEDULABLE_TASKS ){
 
@@ -102,7 +102,7 @@ int TaskScheduler::register_task( CallBackVoidArgFn _task_fn, uint32_t _duration
 		_new_task._task = _task_fn;
 		_new_task._duration = _duration;
 		_new_task._last_millis = _last_millis;
-		_new_task._max_attempts = _max_attampts;
+		_new_task._max_attempts = _max_attempts;
 		_new_task._task_id = this->get_unique_task_id();
 		this->_tasks.push_back(_new_task);
 		return _new_task._task_id;

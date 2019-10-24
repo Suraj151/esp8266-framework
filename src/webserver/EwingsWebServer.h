@@ -16,10 +16,10 @@ created Date    : 1st June 2019
 #include <webserver/controllers/OtaController.h>
 #include <webserver/controllers/WiFiConfigController.h>
 #include <webserver/controllers/LoginController.h>
-#ifdef ENABLE_GPIO_CONFIG
+#ifdef ENABLE_GPIO_SERVICE
 #include <webserver/controllers/GPIOController.h>
 #endif
-#ifdef ENABLE_MQTT_CONFIG
+#ifdef ENABLE_MQTT_SERVICE
 #include <webserver/controllers/MQTTController.h>
 #endif
 
@@ -85,14 +85,14 @@ class WebServer {
 		 */
     LoginController login_controller;
 
-    #ifdef ENABLE_GPIO_CONFIG
+    #ifdef ENABLE_GPIO_SERVICE
     /**
 		 * @var	GpioController  gpio_controller
 		 */
     GpioController gpio_controller;
     #endif
 
-    #ifdef ENABLE_MQTT_CONFIG
+    #ifdef ENABLE_MQTT_SERVICE
     /**
 		 * @var	MqttController  mqtt_controller
 		 */

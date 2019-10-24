@@ -10,7 +10,7 @@ created Date    : 1st June 2019
 
 #include <config/Config.h>
 
-#if defined(ENABLE_MQTT_CONFIG)
+#if defined(ENABLE_MQTT_SERVICE)
 
 #include "MqttServiceProvider.h"
 
@@ -49,7 +49,7 @@ void MqttServiceProvider::handleMqttPublish(){
 
       String _payload = "";
 
-      #ifdef ENABLE_GPIO_CONFIG
+      #ifdef ENABLE_GPIO_SERVICE
 
       _payload += "{\"data\":{";
       for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {

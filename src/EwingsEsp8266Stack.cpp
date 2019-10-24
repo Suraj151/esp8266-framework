@@ -10,24 +10,24 @@ void EwingsEsp8266Stack::initialize(){
   Logln(F("Initializing..."));
   #endif
   __database_service.init_default_database();
+  __event_service.begin();
   __wifi_service.begin( this->wifi );
   #ifdef ENABLE_EWING_HTTP_SERVER
   __web_server.start_server( this->wifi );
   #endif
   __ota_service.begin_ota( &this->wifi_client, &__http_service.client );
-  #ifdef ENABLE_GPIO_CONFIG
+  #ifdef ENABLE_GPIO_SERVICE
   __gpio_service.begin( &this->wifi_client );
   #endif
-  #ifdef ENABLE_MQTT_CONFIG
+  #ifdef ENABLE_MQTT_SERVICE
   __mqtt_service.begin( this->wifi );
   #endif
 
   #ifdef EW_SERIAL_LOG
-  __task_scheduler.setInterval( [&]() { this->handleLogPrints(); }, EW_DEFAULT_LOG_DURATION );
+  __task_scheduler.setInterval( this->handleLogPrints, EW_DEFAULT_LOG_DURATION );
   #endif
 
   __task_scheduler.setInterval( [&]() { __factory_reset.handleFlashKeyPress(); }, FLASH_KEY_PRESS_DURATION );
-  __task_scheduler.setInterval( [&]() { this->handleOta(); }, OTA_API_CHECK_DURATION );
   __factory_reset.run_while_factory_reset( [&]() { __database_service.clear_default_tables(); this->wifi->disconnect(true); } );
 
   #if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
@@ -91,26 +91,6 @@ void EwingsEsp8266Stack::serve(){
   __task_scheduler.handle_tasks();
 }
 
-/**
- * check for ota updates and restart device on successful updates
- */
-void EwingsEsp8266Stack::handleOta(){
-
-  #ifdef EW_SERIAL_LOG
-  Logln( F("\nHandeling OTA") );
-  #endif
-  http_ota_status _stat = __ota_service.handle_ota();
-  #ifdef EW_SERIAL_LOG
-  Log( F("OTA status : ") );Logln( _stat );
-  #endif
-  if( _stat == UPDATE_OK ){
-    #ifdef EW_SERIAL_LOG
-    Logln( F("\nOTA Done ....Rebooting ") );
-    #endif
-    ESP.restart();
-  }
-}
-
 #ifdef EW_SERIAL_LOG
 /**
  * prints log as per defined duration
@@ -119,10 +99,10 @@ void EwingsEsp8266Stack::handleLogPrints(){
 
   __wifi_service.printWiFiConfigLogs();
   __ota_service.printOtaConfigLogs();
-  #ifdef ENABLE_GPIO_CONFIG
+  #ifdef ENABLE_GPIO_SERVICE
   __gpio_service.printGpioConfigLogs();
   #endif
-  #ifdef ENABLE_MQTT_CONFIG
+  #ifdef ENABLE_MQTT_SERVICE
   __mqtt_service.printMqttConfigLogs();
   #endif
   Log( F("\nNTP Validity : ") );

@@ -36,9 +36,9 @@ class WiFiServiceProvider : public ServiceProvider {
 		}
 
     /**
-		 * @var	uint8_t|18  wifi_connection_timeout
+		 * @var	uint8_t|16  wifi_connection_timeout
 		 */
-    uint8_t wifi_connection_timeout=15;
+    uint8_t wifi_connection_timeout=16;
 
     /**
 		 * @var	uint8_t array temperory mac buffer
@@ -55,7 +55,9 @@ class WiFiServiceProvider : public ServiceProvider {
     void scan_aps_and_configure_wifi_station( void );
     void scan_aps_and_configure_wifi_station_async( int _scanCount );
 
+    #ifdef ENABLE_DYNAMIC_SUBNETTING
     void reconfigure_wifi_access_point( void );
+    #endif
 
     uint32_t getStationSubnetIP(void);
     uint32_t getStationBroadcastIP(void);

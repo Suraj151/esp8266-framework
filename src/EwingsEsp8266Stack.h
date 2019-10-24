@@ -24,16 +24,17 @@ created Date    : 1st June 2019
 #include <service_provider/HttpServiceProvider.h>
 #include <service_provider/OtaServiceProvider.h>
 #include <service_provider/WiFiServiceProvider.h>
+#include <service_provider/EventServiceProvider.h>
 
 #ifdef ENABLE_ESP_NOW
 #include <service_provider/ESPNOWServiceProvider.h>
 #endif
 
-#ifdef ENABLE_GPIO_CONFIG
+#ifdef ENABLE_GPIO_SERVICE
 #include <service_provider/GpioServiceProvider.h>
 #endif
 
-#ifdef ENABLE_MQTT_CONFIG
+#ifdef ENABLE_MQTT_SERVICE
 #include <service_provider/MqttServiceProvider.h>
 #endif
 
@@ -68,9 +69,8 @@ class EwingsEsp8266Stack {
     WiFiClient wifi_client;
 
     #ifdef EW_SERIAL_LOG
-    void handleLogPrints( void );
+    static void handleLogPrints( void );
     #endif
-    void handleOta( void );
     #if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
     void enable_napt_service( void );
     #endif

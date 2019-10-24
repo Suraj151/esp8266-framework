@@ -14,7 +14,7 @@ created Date    : 1st June 2019
 
 #include <database/DefaultDatabase.h>
 #include <service_provider/ServiceProvider.h>
-#ifdef ENABLE_GPIO_CONFIG
+#ifdef ENABLE_GPIO_SERVICE
 #include <service_provider/GpioServiceProvider.h>
 #endif
 #include <mqtt_client/Mqtt.h>

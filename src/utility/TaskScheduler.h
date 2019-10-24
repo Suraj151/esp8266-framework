@@ -12,6 +12,7 @@ created Date    : 1st June 2019
 #define __TASK_SCHEDULER_H__
 
 
+#include "Log.h"
 #include <config/Config.h>
 
 
@@ -40,6 +41,12 @@ class TaskScheduler{
 		}
 
 		/**
+		 * TaskScheduler destructor
+		 */
+    ~TaskScheduler(){
+    }
+
+		/**
 		 * TaskScheduler constructor
 		 *
 		 * @param	CallBackVoidArgFn	_task_fn
@@ -53,10 +60,10 @@ class TaskScheduler{
 
 		int setTimeout( CallBackVoidArgFn _task_fn, uint32_t _duration );
 		int setInterval( CallBackVoidArgFn _task_fn, uint32_t _duration );
-		int updateInterval( int _task_id, CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _last_millis=0, int _max_attampts=-1 );
+		int updateInterval( int _task_id, CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _last_millis=0, int _max_attempts=-1 );
 		bool clearTimeout( int _id );
 		bool clearInterval( int _id );
-		int register_task( CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _last_millis=0, int _max_attampts=-1 );
+		int register_task( CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _last_millis=0, int _max_attempts=-1 );
 		void handle_tasks( unsigned long _millis=millis() );
 		void remove_expired_tasks( void );
 		int is_registered_task( int _id );

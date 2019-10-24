@@ -26,7 +26,7 @@ to login\
 </div>";
 
 
-#if defined( ENABLE_GPIO_CONFIG ) && defined( ENABLE_MQTT_CONFIG )
+#if defined( ENABLE_GPIO_SERVICE ) && defined( ENABLE_MQTT_SERVICE )
 
 static const char EW_SERVER_HOME_AUTHORIZED_PAGE[] PROGMEM = "\
 <div>\
@@ -89,7 +89,7 @@ Logout\
 \
 </div>";
 
-#elif defined( ENABLE_GPIO_CONFIG )
+#elif defined( ENABLE_GPIO_SERVICE )
 
 static const char EW_SERVER_HOME_AUTHORIZED_PAGE[] PROGMEM = "\
 <div>\
@@ -144,7 +144,7 @@ Logout\
 \
 </div>";
 
-#elif  defined( ENABLE_MQTT_CONFIG )
+#elif  defined( ENABLE_MQTT_SERVICE )
 
 static const char EW_SERVER_HOME_AUTHORIZED_PAGE[] PROGMEM = "\
 <div>\

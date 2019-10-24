@@ -52,10 +52,10 @@ class WebResourceProvider {
     // friend class EwRouteHandler;
     // friend class HomeController;
     // friend class LoginController;
-    // #ifdef ENABLE_GPIO_CONFIG
+    // #ifdef ENABLE_GPIO_SERVICE
     // friend class GpioController;
     // #endif
-    // #ifdef ENABLE_MQTT_CONFIG
+    // #ifdef ENABLE_MQTT_SERVICE
     // friend class MqttController;
     // #endif
     // friend class OtaController;

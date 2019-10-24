@@ -28,10 +28,10 @@ void WebServer::start_server( ESP8266WiFiClass* _wifi ){
   this->dashboard_controller.boot();
   this->ota_controller.boot();
   this->wificonfig_controller.boot();
-  #ifdef ENABLE_GPIO_CONFIG
+  #ifdef ENABLE_GPIO_SERVICE
   this->gpio_controller.boot();
   #endif
-  #ifdef ENABLE_MQTT_CONFIG
+  #ifdef ENABLE_MQTT_SERVICE
   this->mqtt_controller.boot();
   #endif
 

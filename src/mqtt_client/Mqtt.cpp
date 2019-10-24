@@ -1,6 +1,6 @@
 #include <config/Config.h>
 
-#if defined(ENABLE_MQTT_CONFIG)
+#if defined(ENABLE_MQTT_SERVICE)
 
 #include "Mqtt.h"
 
@@ -167,13 +167,19 @@ void MQTTClient::mqtt_client_recv(){
 
     if ( len < MQTT_BUF_SIZE && len > 0 ) {
 
+        uint8_t msg_type = mqtt_get_type(this->mqttClient.mqtt_state.in_buffer);
+        uint8_t msg_qos = mqtt_get_qos(this->mqttClient.mqtt_state.in_buffer);
+        uint16_t msg_id = mqtt_get_id(this->mqttClient.mqtt_state.in_buffer, this->mqttClient.mqtt_state.in_buffer_length);
+
+        if( !( msg_type == MQTT_MSG_TYPE_PUBLISH && msg_qos == 0 ) )
         this->mqttClient.keepAliveTick = 0;
         this->mqttClient.readTimeout = 0;
         this->mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
 
-        uint8_t msg_type = mqtt_get_type(this->mqttClient.mqtt_state.in_buffer);
-        uint8_t msg_qos = mqtt_get_qos(this->mqttClient.mqtt_state.in_buffer);
-        uint16_t msg_id = mqtt_get_id(this->mqttClient.mqtt_state.in_buffer, this->mqttClient.mqtt_state.in_buffer_length);
+        #ifdef EW_SERIAL_LOG
+        Log(F("MQTT: recieved msg type :"));Logln(msg_type);
+        Log(F("MQTT: recieved msg qos :"));Logln(msg_qos);
+        #endif
 
         switch ( this->mqttClient.connState ) {
 

@@ -9,7 +9,7 @@ created Date    : 1st June 2019
 ******************************************************************************/
 #include <config/Config.h>
 
-#if defined(ENABLE_GPIO_CONFIG)
+#if defined(ENABLE_GPIO_SERVICE)
 
 #include "GpioServiceProvider.h"
 

@@ -12,6 +12,7 @@ created Date    : 1st June 2019
 
 /**
  * begin ota with client and database configs
+ * schedule task for ota check once in perticuler duration
  *
  * @param WiFiClient*	      _wifi_client
  * @param HTTPClient*	      _http_client
@@ -21,6 +22,29 @@ void OtaServiceProvider::begin_ota( WiFiClient* _wifi_client, HTTPClient* _http_
 
   this->wifi_client = _wifi_client;
   this->http_client = _http_client;
+
+  __task_scheduler.setInterval( [&]() {  this->handleOta();  }, OTA_API_CHECK_DURATION );
+}
+
+/**
+ * check for ota updates and restart device on successful updates
+ *
+ */
+void OtaServiceProvider::handleOta(){
+
+  #ifdef EW_SERIAL_LOG
+  Logln( F("\nHandeling OTA") );
+  #endif
+  http_ota_status _stat = this->handle();
+  #ifdef EW_SERIAL_LOG
+  Log( F("OTA status : ") );Logln( _stat );
+  #endif
+  if( _stat == UPDATE_OK ){
+    #ifdef EW_SERIAL_LOG
+    Logln( F("\nOTA Done ....Rebooting ") );
+    #endif
+    ESP.restart();
+  }
 }
 
 /**
@@ -29,7 +53,7 @@ void OtaServiceProvider::begin_ota( WiFiClient* _wifi_client, HTTPClient* _http_
  *
  * @return  http_ota_status
  */
-http_ota_status OtaServiceProvider::handle_ota(){
+http_ota_status OtaServiceProvider::handle(){
 
    if( !this->wifi_client || !this->http_client ) return BEGIN_FAILED;
 

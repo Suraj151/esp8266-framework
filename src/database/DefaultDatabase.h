@@ -41,11 +41,11 @@ class DefaultDatabase : public EepromDatabase {
     wifi_config_table get_wifi_config_table();
     ota_config_table get_ota_config_table();
 
-    #ifdef ENABLE_GPIO_CONFIG
+    #ifdef ENABLE_GPIO_SERVICE
     gpio_config_table get_gpio_config_table();
     #endif
 
-    #ifdef ENABLE_MQTT_CONFIG
+    #ifdef ENABLE_MQTT_SERVICE
     mqtt_general_config_table get_mqtt_general_config_table();
     mqtt_lwt_config_table get_mqtt_lwt_config_table();
     mqtt_pubsub_config_table get_mqtt_pubsub_config_table();
@@ -56,11 +56,11 @@ class DefaultDatabase : public EepromDatabase {
     void set_wifi_config_table( wifi_config_table* _table );
     void set_ota_config_table( ota_config_table* _table );
 
-    #ifdef ENABLE_GPIO_CONFIG
+    #ifdef ENABLE_GPIO_SERVICE
     void set_gpio_config_table( gpio_config_table* _table );
     #endif
 
-    #ifdef ENABLE_MQTT_CONFIG
+    #ifdef ENABLE_MQTT_SERVICE
     void set_mqtt_general_config_table( mqtt_general_config_table* _table );
     void set_mqtt_lwt_config_table( mqtt_lwt_config_table* _table );
     void set_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _table );

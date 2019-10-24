@@ -64,7 +64,8 @@ class OtaServiceProvider : public ServiceProvider{
     }
 
     void begin_ota( WiFiClient* _wifi_client, HTTPClient* _http_client );
-    http_ota_status handle_ota( void );
+    void handleOta( void );
+    http_ota_status handle( void );
     #ifdef EW_SERIAL_LOG
     void printOtaConfigLogs( void );
     #endif

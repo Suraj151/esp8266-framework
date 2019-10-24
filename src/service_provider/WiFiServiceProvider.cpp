@@ -38,7 +38,9 @@ void WiFiServiceProvider::begin( ESP8266WiFiClass* _wifi ){
   this->configure_wifi_access_point( &_wifi_credentials );
   __task_scheduler.setInterval( [&]() {
     this->handleWiFiConnectivity();
+    #ifdef ENABLE_DYNAMIC_SUBNETTING
     this->reconfigure_wifi_access_point();
+    #endif
   }, WIFI_CONNECTIVITY_CHECK_DURATION );
   __task_scheduler.setInterval( [&]() {
     this->handleInternetConnectivity();
@@ -171,7 +173,7 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
   while ( ! this->wifi->isConnected() ) {
 
     delay(999);
-    if( _wait%6 == 0 ){
+    if( _wait%8 == 0 ){
       #ifdef EW_SERIAL_LOG
         Log(F("\ntrying reconnect"));
       #endif
@@ -215,6 +217,7 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
   return false;
 }
 
+#ifdef ENABLE_DYNAMIC_SUBNETTING
 /**
  * reconfigure and start wifi access point functionality
  *
@@ -281,6 +284,7 @@ void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
     }, 1);
   }
 }
+#endif
 
 /**
  * configure and start wifi access point functionality
