@@ -41,9 +41,7 @@ created Date    : 1st June 2019
 #if defined( ENABLE_NAPT_FEATURE )
 #include "lwip/lwip_napt.h"
 #include "lwip/app/dhcpserver.h"
-
 #elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
-
 #include <lwip/napt.h>
 #include <lwip/dns.h>
 #include <dhcpserver.h>

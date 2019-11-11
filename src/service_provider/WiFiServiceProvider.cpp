@@ -11,7 +11,9 @@ created Date    : 1st June 2019
 #include "WiFiServiceProvider.h"
 
 extern "C" void preinit() {
+#ifdef ENABLE_NAPT_FEATURE_LWIP_V2
   ESP8266WiFiClass::preinitWiFiOff();
+#endif
   ESP.eraseConfig();
 	uint8_t sta_mac[6];
   wifi_get_macaddr(STATION_IF, sta_mac);
@@ -341,6 +343,17 @@ bool WiFiServiceProvider::scan_within_station_async( char* ssid, uint8_t* bssid,
   #endif
 
   int n = _scanCount;
+  // int indices[n];
+  // for (int i = 0; i < n; i++) {
+  //   indices[i] = i;
+  // }
+  // for (int i = 0; i < n; i++) {
+  //   for (int j = i + 1; j < n; j++) {
+  //     if (this->wifi->RSSI(indices[j]) > this->wifi->RSSI(indices[i])) {
+  //       std::swap(indices[i], indices[j]);
+  //     }
+  //   }
+  // }
   struct station_info * stat_info = wifi_softap_get_station_info();
   struct station_info * stat_info_copy = stat_info;
   char* _ssid_buff = new char[WIFI_CONFIGS_BUF_SIZE]; memset( _ssid_buff, 0, WIFI_CONFIGS_BUF_SIZE );

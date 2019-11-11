@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _NTP_SERVICE_PROVIDER_H_
 
 
-#include <TZ.h>
+// #include <TZ.h>
 #include <service_provider/ServiceProvider.h>
 
 #ifndef TZ_Asia_Kolkata

@@ -13,6 +13,7 @@ created Date    : 1st June 2019
 
 #include <Esp.h>
 #include <config/Config.h>
+#include "Log.h"
 
 struct factory_reset_cb_ {
 	CallBackVoidArgFn _cb;
