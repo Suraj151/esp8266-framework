@@ -125,6 +125,17 @@ void MqttServiceProvider::handleMqttSubScribe(){
 }
 
 /**
+ * stop mqtt client
+ *
+ */
+void MqttServiceProvider::stop(){
+
+  this->mqtt_client.DeleteClient();
+  __task_scheduler.clearInterval( this->_mqtt_timer_cb_id );
+  this->_mqtt_timer_cb_id = 0;
+}
+
+/**
  * handle restart of mqtt services on config change from autherised client
  *
  * @param   int _mqtt_config_type

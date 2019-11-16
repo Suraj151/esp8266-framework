@@ -11,8 +11,11 @@ created Date    : 1st June 2019
 #ifndef _SERVICE_PROVIDER_H_
 #define _SERVICE_PROVIDER_H_
 
+
+#include <ESP8266WiFi.h>
 #include <config/Config.h>
 #include <utility/Utility.h>
+#include <database/DefaultDatabase.h>
 extern "C" {
 #include "user_interface.h"
 }

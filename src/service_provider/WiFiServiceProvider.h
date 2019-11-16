@@ -11,8 +11,6 @@ created Date    : 1st June 2019
 #ifndef _WIFI_SERVICE_PROVIDER_H_
 #define _WIFI_SERVICE_PROVIDER_H_
 
-#include <ESP8266WiFi.h>
-#include <database/DefaultDatabase.h>
 #include <service_provider/ServiceProvider.h>
 #include <service_provider/PingServiceProvider.h>
 
@@ -59,10 +57,12 @@ class WiFiServiceProvider : public ServiceProvider {
     void reconfigure_wifi_access_point( void );
     #endif
 
-    uint32_t getStationSubnetIP(void);
-    uint32_t getStationBroadcastIP(void);
+    uint32_t getStationSubnetIP( void );
+    uint32_t getStationBroadcastIP( void );
 
+    #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
     void handleInternetConnectivity( void );
+    #endif
     void handleWiFiConnectivity( void );
 
     #ifdef EW_SERIAL_LOG

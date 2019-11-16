@@ -11,12 +11,10 @@ created Date    : 1st June 2019
 #ifndef _HTTP_OTA_SERVICE_PROVIDER_H_
 #define _HTTP_OTA_SERVICE_PROVIDER_H_
 
-#include <ESP8266WiFi.h>
+#include <service_provider/ServiceProvider.h>
 #include <WiFiClient.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
-#include <database/DefaultDatabase.h>
-#include <service_provider/ServiceProvider.h>
 
 /**
  * ota status enum

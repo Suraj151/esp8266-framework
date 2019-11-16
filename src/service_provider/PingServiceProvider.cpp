@@ -11,7 +11,8 @@ created Date    : 1st June 2019
 #include "PingServiceProvider.h"
 
 volatile bool _host_resp = false;
-const uint32_t _host = 0x08080808;
+const uint32_t _pinghostip = 0x08080808;
+static const char _pinghostname[] = "google.com";
 // IPAddress PING_TARGET(8,8,8,8);
 
 // This function is called when a ping is received or the request times out:
@@ -39,11 +40,12 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
   }
 }
 
-void PingServiceProvider::init_ping(){
+void PingServiceProvider::init_ping( ESP8266WiFiClass* _wifi ){
 
+  this->wifi = _wifi;
   memset(&this->_opt, 0, sizeof(struct ping_option));
   this->_opt.count = 1;
-  this->_opt.ip = _host;
+  this->_opt.ip = _pinghostip;
   this->_opt.coarse_time = 0;
   // _opt.sent_function = NULL;
   // _opt.recv_function = NULL;
@@ -55,7 +57,14 @@ void PingServiceProvider::init_ping(){
 
 bool PingServiceProvider::ping(){
 
-  return ping_start(&this->_opt);
+  IPAddress _ip;
+  this->wifi->hostByName(_pinghostname, _ip, 1500);
+  this->_opt.ip = (uint32_t)_ip;
+  #ifdef EW_SERIAL_LOG
+  Log(F("\nPing ip: "));
+  Logln(_ip);
+  #endif
+  return _ip.isSet() ? ping_start(&this->_opt) : false;
 }
 
 bool PingServiceProvider::isHostRespondingToPing(){

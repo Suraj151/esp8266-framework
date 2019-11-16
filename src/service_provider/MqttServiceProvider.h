@@ -12,7 +12,6 @@ created Date    : 1st June 2019
 #define _MQTT_SERVICE_PROVIDER_H_
 
 
-#include <database/DefaultDatabase.h>
 #include <service_provider/ServiceProvider.h>
 #ifdef ENABLE_GPIO_SERVICE
 #include <service_provider/GpioServiceProvider.h>
@@ -56,6 +55,7 @@ class MqttServiceProvider : public ServiceProvider {
     void handleMqttPublish( void );
     void handleMqttSubScribe( void );
     void handleMqttConfigChange( int _mqtt_config_type=MQTT_GENERAL_CONFIG );
+    void stop( void );
 
     #ifdef EW_SERIAL_LOG
     void printMqttConfigLogs( void );

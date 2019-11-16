@@ -812,7 +812,7 @@ void MQTTClient::mqtt_timer(){
     if (this->mqttClient.connState == MQTT_DATA) {
 
         this->mqttClient.keepAliveTick ++;
-        int _keep_alive = this->mqttClient.mqtt_state.connect_info->keepalive * 0.9;
+        int _keep_alive = this->mqttClient.mqtt_state.connect_info->keepalive * 0.85;
         if ( this->mqttClient.keepAliveTick > _keep_alive ) {
             this->mqttClient.connState = MQTT_KEEPALIVE_REQ;
             // this->MQTT_Task();

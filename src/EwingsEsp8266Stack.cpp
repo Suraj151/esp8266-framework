@@ -11,6 +11,7 @@ void EwingsEsp8266Stack::initialize(){
   #endif
   __database_service.init_default_database();
   __event_service.begin();
+  __ping_service.init_ping( this->wifi );
   __wifi_service.begin( this->wifi );
   #ifdef ENABLE_EWING_HTTP_SERVER
   __web_server.start_server( this->wifi );

@@ -12,10 +12,9 @@ created Date    : 1st June 2019
 #define _GPIO_SERVICE_PROVIDER_H_
 
 
-#include <WiFiClient.h>
-#include <database/DefaultDatabase.h>
 #include <service_provider/ServiceProvider.h>
 #include <service_provider/HttpServiceProvider.h>
+#include <WiFiClient.h>
 
 
 /**

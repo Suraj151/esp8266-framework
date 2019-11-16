@@ -23,6 +23,11 @@ extern "C" {
 // #define ENABLE_DYNAMIC_SUBNETTING
 
 /**
+ * enable/disable internet availability based station connections
+ */
+// #define ENABLE_INTERNET_BASED_CONNECTIONS
+
+/**
  * enable/disable esp now feature here
  */
 // #define ENABLE_ESP_NOW
@@ -43,9 +48,12 @@ extern "C" {
 /**
  * @define network address & port translation feature
  */
-// #define ENABLE_NAPT_FEATURE
-#define ENABLE_NAPT_FEATURE_LWIP_V2
+#define ENABLE_NAPT_FEATURE
+// #define ENABLE_NAPT_FEATURE_LWIP_V2
 
+/**
+ * @define default username/ssid and password
+ */
 #define USER            "Ewings"
 #define PASSPHRASE      "Ewings@123"
 

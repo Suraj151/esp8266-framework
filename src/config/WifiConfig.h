@@ -11,9 +11,6 @@
 #define DEFAULT_SSID         USER
 #define DEFAULT_PASSPHRASE   PASSPHRASE
 
-// #define DEFAULT_SSID         "Cohive Power Backup"
-// #define DEFAULT_PASSPHRASE   "cohive@backup"
-
 #define DEFAULT_STA_LOCAL_IP  {0, 0, 0, 0}
 #define DEFAULT_STA_GATEWAY   {0, 0, 0, 0}
 #define DEFAULT_STA_SUBNET    {0, 0, 0, 0}

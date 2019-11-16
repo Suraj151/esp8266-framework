@@ -11,7 +11,6 @@ created Date    : 1st June 2019
 #ifndef _PING_SERVICE_PROVIDER_H_
 #define _PING_SERVICE_PROVIDER_H_
 
-
 #include <service_provider/ServiceProvider.h>
 
 extern "C" {
@@ -35,8 +34,6 @@ class PingServiceProvider : public ServiceProvider {
      * PingServiceProvider constructor.
      */
     PingServiceProvider(){
-
-      this->init_ping();
     }
 
     /**
@@ -48,9 +45,15 @@ class PingServiceProvider : public ServiceProvider {
     /**
      * initialize ping
      */
-    void init_ping( void );
+    void init_ping( ESP8266WiFiClass* _wifi );
     bool ping( void );
     bool isHostRespondingToPing( void );
+
+  protected:
+    /**
+		 * @var	ESP8266WiFiClass*|&WiFi wifi
+		 */
+    ESP8266WiFiClass* wifi;
 };
 
 extern PingServiceProvider __ping_service;

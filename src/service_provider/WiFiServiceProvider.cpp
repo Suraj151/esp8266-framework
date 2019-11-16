@@ -34,6 +34,8 @@ void WiFiServiceProvider::begin( ESP8266WiFiClass* _wifi ){
   wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
 
   // this->wifi->mode(WIFI_AP_STA);
+  this->wifi->setSleepMode(WIFI_NONE_SLEEP);  // WIFI_NONE_SLEEP = 0, WIFI_LIGHT_SLEEP = 1, WIFI_MODEM_SLEEP = 2
+  this->wifi->setOutputPower(21.0);  // dBm max: +20.5dBm  min: 0dBm
   this->wifi->persistent(false);
   this->wifi->setAutoReconnect(false);
   this->configure_wifi_station( &_wifi_credentials );
@@ -43,14 +45,21 @@ void WiFiServiceProvider::begin( ESP8266WiFiClass* _wifi ){
     #ifdef ENABLE_DYNAMIC_SUBNETTING
     this->reconfigure_wifi_access_point();
     #endif
-  }, WIFI_CONNECTIVITY_CHECK_DURATION );
-  __task_scheduler.setInterval( [&]() {
+    #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
     this->handleInternetConnectivity();
-  }, INTERNET_CONNECTIVITY_CHECK_DURATION );
+    #endif
+  }, WIFI_CONNECTIVITY_CHECK_DURATION );
+
+  // #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
+  // __task_scheduler.setInterval( [&]() {
+  //   this->handleInternetConnectivity();
+  // }, INTERNET_CONNECTIVITY_CHECK_DURATION );
+  // #endif
 
   _ClearObject(&_wifi_credentials);
 }
 
+#ifdef ENABLE_INTERNET_BASED_CONNECTIONS
 /**
  * handle internet availability by ping function
  */
@@ -106,6 +115,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
   Logln( (millis()-__status_wifi.last_internet_millis) );
   #endif
 }
+#endif
 
 /**
  * return station subnet ip address
