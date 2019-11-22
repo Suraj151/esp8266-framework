@@ -22,6 +22,9 @@ created Date    : 1st June 2019
 #ifdef ENABLE_MQTT_SERVICE
 #include <webserver/controllers/MQTTController.h>
 #endif
+#ifdef ENABLE_EMAIL_SERVICE
+#include <webserver/controllers/EmailConfigController.h>
+#endif
 
 /**
  * WebServer class
@@ -97,6 +100,12 @@ class WebServer {
 		 * @var	MqttController  mqtt_controller
 		 */
     MqttController mqtt_controller;
+    #endif
+    #ifdef ENABLE_EMAIL_SERVICE
+    /**
+		 * @var	EmailConfigController  emailconfig_controller
+		 */
+    EmailConfigController emailconfig_controller;
     #endif
 
 };

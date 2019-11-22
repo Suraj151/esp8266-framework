@@ -31,6 +31,9 @@ void DefaultDatabase::init_default_database(  uint16_t _size ){
   this->register_table( &_mqtt_lwt_config_defaults, MQTT_LWT_CONFIG_TABLE_ADDRESS );
   this->register_table( &_mqtt_pubsub_config_defaults, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS );
   #endif
+  #ifdef ENABLE_EMAIL_SERVICE
+  this->register_table( &_email_config_defaults, EMAIL_CONFIG_TABLE_ADDRESS );
+  #endif
 }
 
 /**
@@ -49,6 +52,9 @@ void DefaultDatabase::clear_default_tables(){
   this->clear_table_to_defaults( &_mqtt_general_config_defaults, MQTT_GENERAL_CONFIG_TABLE_ADDRESS );
   this->clear_table_to_defaults( &_mqtt_lwt_config_defaults, MQTT_LWT_CONFIG_TABLE_ADDRESS );
   this->clear_table_to_defaults( &_mqtt_pubsub_config_defaults, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS );
+  #endif
+  #ifdef ENABLE_EMAIL_SERVICE
+  this->clear_table_to_defaults( &_email_config_defaults, EMAIL_CONFIG_TABLE_ADDRESS );
   #endif
 }
 
@@ -128,6 +134,17 @@ mqtt_pubsub_config_table DefaultDatabase::get_mqtt_pubsub_config_table(){
 }
 #endif
 
+#ifdef ENABLE_EMAIL_SERVICE
+/**
+ * get/fetch email config table from database.
+ *
+ * @return email_config_table
+ */
+email_config_table DefaultDatabase::get_email_config_table(){
+  return this->get_table_by_address<email_config_table>(EMAIL_CONFIG_TABLE_ADDRESS);
+}
+#endif
+
 /**
  * set global config table in database.
  *
@@ -204,6 +221,17 @@ void DefaultDatabase::set_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _t
 }
 #endif
 
+#ifdef ENABLE_EMAIL_SERVICE
+/**
+ * set email config table in database.
+ *
+ * @param email_config_table* _table
+ */
+void DefaultDatabase::set_email_config_table( email_config_table* _table ){
+  this->set_table( _table, EMAIL_CONFIG_TABLE_ADDRESS );
+}
+#endif
+
 /**
  * template to return different type of tables in database by their
  * address.
@@ -257,6 +285,13 @@ template <typename T> T DefaultDatabase::get_table_by_address( uint16_t _address
     case MQTT_PUBSUB_CONFIG_TABLE_ADDRESS:{
 
       this->get_table( &_t, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS );
+      break;
+    }
+    #endif
+    #ifdef ENABLE_EMAIL_SERVICE
+    case EMAIL_CONFIG_TABLE_ADDRESS:{
+
+      this->get_table( &_t, EMAIL_CONFIG_TABLE_ADDRESS );
       break;
     }
     #endif

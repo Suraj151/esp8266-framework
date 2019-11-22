@@ -13,6 +13,12 @@ extern "C" {
 #define ENABLE_GPIO_SERVICE
 
 /**
+ * enable/disable email service here
+ */
+#define ENABLE_EMAIL_SERVICE
+// #define EMAIL_SERVICE_ROUTINE_INTERVAL  60000
+
+/**
  * enable/disable http server feature here
  */
 #define ENABLE_EWING_HTTP_SERVER
@@ -48,8 +54,8 @@ extern "C" {
 /**
  * @define network address & port translation feature
  */
-#define ENABLE_NAPT_FEATURE
-// #define ENABLE_NAPT_FEATURE_LWIP_V2
+// #define ENABLE_NAPT_FEATURE
+#define ENABLE_NAPT_FEATURE_LWIP_V2
 
 /**
  * @define default username/ssid and password

@@ -11,8 +11,8 @@ void EwingsEsp8266Stack::initialize(){
   #endif
   __database_service.init_default_database();
   __event_service.begin();
-  __ping_service.init_ping( this->wifi );
   __wifi_service.begin( this->wifi );
+  __ping_service.init_ping( this->wifi );
   #ifdef ENABLE_EWING_HTTP_SERVER
   __web_server.start_server( this->wifi );
   #endif
@@ -22,6 +22,10 @@ void EwingsEsp8266Stack::initialize(){
   #endif
   #ifdef ENABLE_MQTT_SERVICE
   __mqtt_service.begin( this->wifi );
+  #endif
+
+  #ifdef ENABLE_EMAIL_SERVICE
+  __email_service.begin( this->wifi, &this->wifi_client );
   #endif
 
   #ifdef EW_SERIAL_LOG
@@ -105,6 +109,9 @@ void EwingsEsp8266Stack::handleLogPrints(){
   #endif
   #ifdef ENABLE_MQTT_SERVICE
   __mqtt_service.printMqttConfigLogs();
+  #endif
+  #ifdef ENABLE_EMAIL_SERVICE
+  __email_service.printEmailConfigLogs();
   #endif
   Log( F("\nNTP Validity : ") );
   Logln( __nw_time_service.is_ntp_in_sync() );

@@ -21,6 +21,10 @@
 #include "GpioConfig.h"
 #endif
 
+#ifdef ENABLE_EMAIL_SERVICE
+#include "EmailConfig.h"
+#endif
+
 // #define GLOBAL_CONFIG_TABLE_ADDRESS CONFIG_START
 // #define LOGIN_CREDENTIAL_TABLE_ADDRESS GLOBAL_CONFIG_TABLE_ADDRESS +  global_config_size
 // #define WIFI_CONFIG_TABLE_ADDRESS LOGIN_CREDENTIAL_TABLE_ADDRESS + login_credential_size
@@ -49,6 +53,9 @@ enum eeprom_db_table_address {
   MQTT_GENERAL_CONFIG_TABLE_ADDRESS = 700,
   MQTT_LWT_CONFIG_TABLE_ADDRESS = 1400,
   MQTT_PUBSUB_CONFIG_TABLE_ADDRESS = 1600,
+  #endif
+  #ifdef ENABLE_EMAIL_SERVICE
+  EMAIL_CONFIG_TABLE_ADDRESS = 1900,
   #endif
 };
 

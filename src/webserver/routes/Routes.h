@@ -17,6 +17,7 @@ created Date    : 1st June 2019
 #define EW_SERVER_WIFI_CONFIG_ROUTE "/wifi-config"
 #define EW_SERVER_LOGIN_CONFIG_ROUTE "/login-config"
 #define EW_SERVER_OTA_CONFIG_ROUTE "/ota-config"
+#define EW_SERVER_EMAIL_CONFIG_ROUTE "/email-config"
 #define EW_SERVER_DASHBOARD_ROUTE "/dashboard"
 #define EW_SERVER_DASHBOARD_MONITOR_ROUTE "/listen-dashboard"
 

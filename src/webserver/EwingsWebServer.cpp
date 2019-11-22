@@ -34,6 +34,9 @@ void WebServer::start_server( ESP8266WiFiClass* _wifi ){
   #ifdef ENABLE_MQTT_SERVICE
   this->mqtt_controller.boot();
   #endif
+  #ifdef ENABLE_EMAIL_SERVICE
+  this->emailconfig_controller.boot();
+  #endif
 
   //here the list of headers to be recorded
   // const char * headerkeys[] = {"User-Agent", "Cookie"} ;

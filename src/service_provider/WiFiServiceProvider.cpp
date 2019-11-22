@@ -105,6 +105,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
         if( !this->wifi->localIP().isSet() || !this->wifi->isConnected() ){
           wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
           this->configure_wifi_station( &_wifi_credentials );
+          _ClearObject(&_wifi_credentials);
         }
       }, 2*INTERNET_CONNECTIVITY_CHECK_DURATION );
     }
@@ -366,7 +367,8 @@ bool WiFiServiceProvider::scan_within_station_async( char* ssid, uint8_t* bssid,
   // }
   struct station_info * stat_info = wifi_softap_get_station_info();
   struct station_info * stat_info_copy = stat_info;
-  char* _ssid_buff = new char[WIFI_CONFIGS_BUF_SIZE]; memset( _ssid_buff, 0, WIFI_CONFIGS_BUF_SIZE );
+  char* _ssid_buff = new char[WIFI_CONFIGS_BUF_SIZE];
+  memset( _ssid_buff, 0, WIFI_CONFIGS_BUF_SIZE );
 
   for (int i = 0; i < n; ++i) {
 
@@ -401,6 +403,7 @@ bool WiFiServiceProvider::scan_within_station_async( char* ssid, uint8_t* bssid,
 
         if( !__are_arrays_equal( (char*)__status_wifi.ignore_bssid, (char*)this->wifi->BSSID(i), 6 ) ){
           memcpy(bssid, this->wifi->BSSID(i), 6);
+          delete[] _ssid_buff;
           return true;
         }
       }
@@ -432,11 +435,15 @@ bool WiFiServiceProvider::scan_within_station( char* ssid, uint8_t* bssid ){
 void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCount ){
 
   wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
-  if( !this->scan_within_station_async( _wifi_credentials.sta_ssid, this->temp_mac, _scanCount ) ) return;
-  __task_scheduler.setTimeout([&](){
-    wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
-    this->configure_wifi_station( &_wifi_credentials, this->temp_mac );
-  }, 1);
+  if( !this->scan_within_station_async( _wifi_credentials.sta_ssid, this->temp_mac, _scanCount ) ) {
+    _ClearObject(&_wifi_credentials);
+  }else{
+    __task_scheduler.setTimeout([&](){
+      wifi_config_table __wifi_credentials = __database_service.get_wifi_config_table();
+      this->configure_wifi_station( &__wifi_credentials, this->temp_mac );
+      _ClearObject(&__wifi_credentials);
+    }, 1);
+  }
 }
 
 /**
@@ -449,11 +456,15 @@ void WiFiServiceProvider::scan_aps_and_configure_wifi_station( ){
   //   Logln(F("scanning connected stations for wifi config.."));
   // #endif
   wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
-  if( !this->scan_within_station( _wifi_credentials.sta_ssid, this->temp_mac) ) return;
-  __task_scheduler.setTimeout([&](){
-    wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
-    this->configure_wifi_station( &_wifi_credentials, this->temp_mac );
-  }, 1);
+  if( !this->scan_within_station( _wifi_credentials.sta_ssid, this->temp_mac) ){
+    _ClearObject(&_wifi_credentials);
+  }else{
+    __task_scheduler.setTimeout([&](){
+      wifi_config_table __wifi_credentials = __database_service.get_wifi_config_table();
+      this->configure_wifi_station( &__wifi_credentials, this->temp_mac );
+      _ClearObject(&__wifi_credentials);
+    }, 1);
+  }
 }
 
 /**
@@ -482,7 +493,9 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
     }else{
       this->wifi->reconnect();
     }
+    __status_wifi.wifi_connected = false;
   }else{
+    __status_wifi.wifi_connected = true;
     #ifdef EW_SERIAL_LOG
     Log(F("IP address: "));
     Log(this->wifi->gatewayIP());

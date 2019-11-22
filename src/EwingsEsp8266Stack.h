@@ -38,6 +38,10 @@ created Date    : 1st June 2019
 #include <service_provider/MqttServiceProvider.h>
 #endif
 
+#ifdef ENABLE_EMAIL_SERVICE
+#include <service_provider/EmailServiceProvider.h>
+#endif
+
 #if defined( ENABLE_NAPT_FEATURE )
 #include "lwip/lwip_napt.h"
 #include "lwip/app/dhcpserver.h"

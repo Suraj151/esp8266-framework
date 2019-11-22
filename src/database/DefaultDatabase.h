@@ -51,6 +51,10 @@ class DefaultDatabase : public EepromDatabase {
     mqtt_pubsub_config_table get_mqtt_pubsub_config_table();
     #endif
 
+    #ifdef ENABLE_EMAIL_SERVICE
+    email_config_table get_email_config_table();
+    #endif
+
     void set_global_config_table( global_config_table* _table );
     void set_login_credential_table( login_credential_table* _table );
     void set_wifi_config_table( wifi_config_table* _table );
@@ -64,6 +68,10 @@ class DefaultDatabase : public EepromDatabase {
     void set_mqtt_general_config_table( mqtt_general_config_table* _table );
     void set_mqtt_lwt_config_table( mqtt_lwt_config_table* _table );
     void set_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _table );
+    #endif
+
+    #ifdef ENABLE_EMAIL_SERVICE
+    void set_email_config_table( email_config_table* _table );
     #endif
 
     template <typename T> T get_table_by_address( uint16_t _address );
