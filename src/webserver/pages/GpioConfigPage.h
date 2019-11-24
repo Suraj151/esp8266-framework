@@ -13,43 +13,11 @@ created Date    : 1st June 2019
 
 #include <Arduino.h>
 
-static const char EW_SERVER_GPIO_MANAGE_PAGE[] PROGMEM = "\
-<div>\
-\
-<div>\
-<a href='/gpio-config'>\
-<button class='btn' style='min-width:125px;'>\
-GPIO Modes\
-</button>\
-</a>\
-</div>\
-\
-<div>\
-<a href='/gpio-write'>\
-<button class='btn' style='min-width:125px;'>\
-GPIO Control\
-</button>\
-</a>\
-</div>\
-\
-<div>\
-<a href='/gpio-server'>\
-<button class='btn' style='min-width:125px;'>\
-GPIO Server\
-</button>\
-</a>\
-</div>\
-\
-<div>\
-<a href='/gpio-monitor'>\
-<button class='btn' style='min-width:125px;'>\
-GPIO Monitor\
-</button>\
-</a>\
-</div>\
-\
-</div>\
-";
+static const char EW_SERVER_GPIO_MENU_TITLE_MODES     [] PROGMEM = "gpio modes";
+static const char EW_SERVER_GPIO_MENU_TITLE_CONTROL   [] PROGMEM = "gpio control";
+static const char EW_SERVER_GPIO_MENU_TITLE_SERVER    [] PROGMEM = "gpio server";
+static const char EW_SERVER_GPIO_MENU_TITLE_MONITOR   [] PROGMEM = "gpio monitor";
+static const char EW_SERVER_GPIO_MENU_TITLE_ALERT     [] PROGMEM = "gpio alerts";
 
 static const char EW_SERVER_GPIO_MONITOR_PAGE_TOP[] PROGMEM = "\
 <h2>GPIO Monitor</h2>\
@@ -78,8 +46,13 @@ static const char EW_SERVER_GPIO_WRITE_PAGE_TOP[] PROGMEM = "\
 <form action='/gpio-write' method='POST'>\
 <table>";
 
-static const char EW_SERVER_GPIO_WRITE_EMPTY_MESSAGE[] PROGMEM = "\
-<h4>No GPIO enabled for write operation.</h4>\
+static const char EW_SERVER_GPIO_ALERT_PAGE_TOP[] PROGMEM = "\
+<h2>GPIO Alert Control</h2>\
+<form action='/gpio-alert' method='POST'>\
+<table>";
+
+static const char EW_SERVER_GPIO_ALERT_EMPTY_MESSAGE[] PROGMEM = "\
+<h4>No GPIO enabled for operation.</h4>\
 <div>enable from \
 <a href='/gpio-config'>\
 <button class='btn' type='button'>\
@@ -90,5 +63,20 @@ GPIO Modes\
 </table>\
 </form>\
 ";
+
+static const char* EW_SERVER_GPIO_WRITE_EMPTY_MESSAGE = EW_SERVER_GPIO_ALERT_EMPTY_MESSAGE;
+
+// static const char EW_SERVER_GPIO_WRITE_EMPTY_MESSAGE[] PROGMEM = "\
+// <h4>No GPIO enabled for write operation.</h4>\
+// <div>enable from \
+// <a href='/gpio-config'>\
+// <button class='btn' type='button'>\
+// GPIO Modes\
+// </button>\
+// </a>\
+// </div>\
+// </table>\
+// </form>\
+// ";
 
 #endif

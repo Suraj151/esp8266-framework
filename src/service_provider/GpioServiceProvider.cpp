@@ -13,11 +13,16 @@ created Date    : 1st June 2019
 
 #include "GpioServiceProvider.h"
 
+__gpio_alert_track_t __gpio_alert_track = {
+  false, 0
+};
+
 /**
  * start gpio services if enabled
  */
-void GpioServiceProvider::begin( WiFiClient* _wifi_client ){
+void GpioServiceProvider::begin( ESP8266WiFiClass* _wifi, WiFiClient* _wifi_client ){
 
+  this->wifi = _wifi;
   this->wifi_client = _wifi_client;
 
   this->handleGpioModes();
@@ -83,6 +88,40 @@ void GpioServiceProvider::handleGpioHttpRequest( ){
 }
 
 /**
+ * handle gpio email alert
+ * @return bool
+ */
+bool GpioServiceProvider::handleGpioEmailAlert(){
+
+  #ifdef EW_SERIAL_LOG
+  Logln( F("Handling GPIO email alert") );
+  #endif
+  String _payload = "";
+  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
+
+    if( !this->is_exceptional_gpio_pin(_pin) ){
+
+      _payload += "D";
+      _payload += _pin;
+      _payload += " ( mode : ";
+      _payload += this->virtual_gpio_configs.gpio_mode[_pin];
+      _payload += ", val : ";
+      _payload += this->virtual_gpio_configs.gpio_readings[_pin];
+      _payload += ")\n";
+    }
+  }
+  _payload += "A0 ( mode : ";
+  _payload += this->virtual_gpio_configs.gpio_mode[MAX_NO_OF_GPIO_PINS];
+  _payload += ", val : ";
+  _payload += this->virtual_gpio_configs.gpio_readings[MAX_NO_OF_GPIO_PINS];
+  _payload += ")\n\n";
+  _payload += "Hello from Esp\n";
+  _payload += this->wifi->macAddress();
+
+  return __email_service.sendMail( _payload );
+}
+
+/**
  * handle gpio operations as per gpio configs
  */
 void GpioServiceProvider::handleGpioOperations(){
@@ -116,10 +155,48 @@ void GpioServiceProvider::handleGpioOperations(){
       }
     }
 
+    if( !this->is_exceptional_gpio_pin(_pin) && this->virtual_gpio_configs.gpio_alert_channel[_pin] != NO_ALERT ){
+
+      bool _is_alert_condition = false;
+
+      switch ( this->virtual_gpio_configs.gpio_alert_comparator[_pin] ) {
+
+        case EQUAL:{
+          _is_alert_condition = ( this->virtual_gpio_configs.gpio_readings[_pin] == this->virtual_gpio_configs.gpio_alert_values[_pin] );
+          break;
+        }
+        case GREATER_THAN:{
+          _is_alert_condition = ( this->virtual_gpio_configs.gpio_readings[_pin] > this->virtual_gpio_configs.gpio_alert_values[_pin] );
+          break;
+        }
+        case LESS_THAN:{
+          _is_alert_condition = ( this->virtual_gpio_configs.gpio_readings[_pin] < this->virtual_gpio_configs.gpio_alert_values[_pin] );
+          break;
+        }
+        default: break;
+      }
+
+      uint32_t _now = millis();
+      if( _is_alert_condition && ( __gpio_alert_track.is_last_alert_succeed ?
+        GPIO_ALERT_DURATION_FOR_SUCCEED < ( _now - __gpio_alert_track.last_alert_millis ) :
+        GPIO_ALERT_DURATION_FOR_FAILED < ( _now - __gpio_alert_track.last_alert_millis )
+      ) ){
+
+        __gpio_alert_track.last_alert_millis = _now;
+        switch ( this->virtual_gpio_configs.gpio_alert_channel[_pin] ) {
+
+          case EMAIL:{
+            __gpio_alert_track.is_last_alert_succeed = this->handleGpioEmailAlert();
+            break;
+          }
+          default: break;
+        }
+      }
+    }
+
   }
 
   if( this->update_gpio_table_from_virtual ){
-    // this->set_gpio_config_table(&this->virtual_gpio_configs);
     __database_service.set_gpio_config_table(&this->virtual_gpio_configs);
     this->update_gpio_table_from_virtual = false;
   }
@@ -127,7 +204,7 @@ void GpioServiceProvider::handleGpioOperations(){
 }
 
 /**
- * enable gpio data update to database from virtual table in heap
+ * enable gpio data update to database from virtual table
  */
 void GpioServiceProvider::enable_update_gpio_table_from_virtual(){
   this->update_gpio_table_from_virtual = true;
@@ -156,6 +233,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
       case ANALOG_READ:
       break;
     }
+
   }
 
   this->virtual_gpio_configs = _gpio_configs;
@@ -166,7 +244,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
     this->_gpio_http_request_cb_id = __task_scheduler.updateInterval(
       this->_gpio_http_request_cb_id,
       [&]() { this->handleGpioHttpRequest(); },
-      this->virtual_gpio_configs.gpio_post_frequency*1000
+      this->virtual_gpio_configs.gpio_post_frequency*1000, millis()
     );
   }else{
     __task_scheduler.clearInterval( this->_gpio_http_request_cb_id );
@@ -190,6 +268,18 @@ void GpioServiceProvider::printGpioConfigLogs(){
   Logln(F("\nGPIO Configs (readings) :"));
   for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
     Log(this->virtual_gpio_configs.gpio_readings[_pin]); Log("\t");
+  }
+  Logln(F("\nGPIO Configs (alert comparator) :"));
+  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
+    Log(this->virtual_gpio_configs.gpio_alert_comparator[_pin]); Log("\t");
+  }
+  Logln(F("\nGPIO Configs (alert channels) :"));
+  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
+    Log(this->virtual_gpio_configs.gpio_alert_channel[_pin]); Log("\t");
+  }
+  Logln(F("\nGPIO Configs (alert values) :"));
+  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
+    Log(this->virtual_gpio_configs.gpio_alert_values[_pin]); Log("\t");
   }
   Logln(F("\nGPIO Configs (server) :"));
   Log(this->virtual_gpio_configs.gpio_host); Log("\t");

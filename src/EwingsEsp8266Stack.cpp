@@ -18,7 +18,7 @@ void EwingsEsp8266Stack::initialize(){
   #endif
   __ota_service.begin_ota( &this->wifi_client, &__http_service.client );
   #ifdef ENABLE_GPIO_SERVICE
-  __gpio_service.begin( &this->wifi_client );
+  __gpio_service.begin( this->wifi, &this->wifi_client );
   #endif
   #ifdef ENABLE_MQTT_SERVICE
   __mqtt_service.begin( this->wifi );

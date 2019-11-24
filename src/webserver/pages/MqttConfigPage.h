@@ -13,35 +13,9 @@ created Date    : 1st June 2019
 
 #include <Arduino.h>
 
-static const char EW_SERVER_MQTT_MANAGE_PAGE[] PROGMEM = "\
-<div>\
-\
-<div>\
-<a href='/mqtt-general-config'>\
-<button class='btn' style='min-width:145px;'>\
-MQTT General Config\
-</button>\
-</a>\
-</div>\
-\
-<div>\
-<a href='/mqtt-lwt-config'>\
-<button class='btn' style='min-width:145px;'>\
-MQTT LWT Config\
-</button>\
-</a>\
-</div>\
-\
-<div>\
-<a href='/mqtt-pubsub-config'>\
-<button class='btn' style='min-width:145px;'>\
-MQTT PubSub Config\
-</button>\
-</a>\
-</div>\
-\
-</div>\
-";
+static const char EW_SERVER_MQTT_MENU_TITLE_GENERAL     [] PROGMEM = "mqtt general";
+static const char EW_SERVER_MQTT_MENU_TITLE_LWT         [] PROGMEM = "mqtt lwt";
+static const char EW_SERVER_MQTT_MENU_TITLE_PUBSUB      [] PROGMEM = "mqtt pubsub";
 
 static const char EW_SERVER_MQTT_GENERAL_PAGE_TOP[] PROGMEM = "\
 <h2>MQTT General Configuration</h2>\

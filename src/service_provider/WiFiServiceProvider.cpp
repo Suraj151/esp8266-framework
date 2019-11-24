@@ -45,21 +45,15 @@ void WiFiServiceProvider::begin( ESP8266WiFiClass* _wifi ){
     #ifdef ENABLE_DYNAMIC_SUBNETTING
     this->reconfigure_wifi_access_point();
     #endif
-    #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
     this->handleInternetConnectivity();
-    #endif
   }, WIFI_CONNECTIVITY_CHECK_DURATION );
 
-  // #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
   // __task_scheduler.setInterval( [&]() {
   //   this->handleInternetConnectivity();
   // }, INTERNET_CONNECTIVITY_CHECK_DURATION );
-  // #endif
-
   _ClearObject(&_wifi_credentials);
 }
 
-#ifdef ENABLE_INTERNET_BASED_CONNECTIONS
 /**
  * handle internet availability by ping function
  */
@@ -82,9 +76,9 @@ void WiFiServiceProvider::handleInternetConnectivity(){
 
       __status_wifi.last_internet_millis = millis();
     }
-    __status_wifi.wifi_connected = true;
     __status_wifi.internet_available = ping_ret && ping_resp;
 
+    #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
     if( !__status_wifi.internet_available && ((millis()-__status_wifi.last_internet_millis)/INTERNET_CONNECTIVITY_CHECK_DURATION) >= 6 ){
 
       memcpy( __status_wifi.ignore_bssid, this->wifi->BSSID(), 6 );
@@ -109,6 +103,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
         }
       }, 2*INTERNET_CONNECTIVITY_CHECK_DURATION );
     }
+    #endif
   }
 
   #ifdef EW_SERIAL_LOG
@@ -116,7 +111,6 @@ void WiFiServiceProvider::handleInternetConnectivity(){
   Logln( (millis()-__status_wifi.last_internet_millis) );
   #endif
 }
-#endif
 
 /**
  * return station subnet ip address
@@ -477,14 +471,18 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
   #endif
 
   if( !this->wifi->localIP().isSet() || !this->wifi->isConnected() ){
-    uint8_t number_client= wifi_softap_get_station_num();
 
     #ifdef EW_SERIAL_LOG
     Log( F("Handeling WiFi Reconnect Manually : ") );
-    Log(this->wifi->softAPIP());
-    Log(F(" : "));
-    Logln(number_client);
+    Logln(this->wifi->softAPIP());
+    // Log(F(" : "));
+    // Logln(number_client);
     #endif
+
+    #ifdef IGNORE_FREE_RELAY_CONNECTIONS
+    this->wifi->reconnect();
+    #else
+    uint8_t number_client= wifi_softap_get_station_num();
 
     if( number_client > 0 ){
       this->wifi->scanNetworksAsync( [&](int _scanCount) {
@@ -493,6 +491,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
     }else{
       this->wifi->reconnect();
     }
+    #endif
     __status_wifi.wifi_connected = false;
   }else{
     __status_wifi.wifi_connected = true;

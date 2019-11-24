@@ -47,36 +47,6 @@ class MqttController : public Controller {
 		}
 
 		/**
-		 * build html page with header, middle and footer part.
-		 *
-		 * @param	char*	_page
-		 * @param	PGM_P	_pgm_page
-		 * @param	bool|false	_enable_flash
-		 * @param	char*|""	_message
-		 * @param	FLASH_MSG_TYPE|ALERT_SUCCESS	_alert_type
-		 * @param	bool|true	_enable_header_footer
-		 * @param	int|EW_HTML_MAX_SIZE	_max_size
-		 */
-		void build_html(
-      char* _page,
-      PGM_P _pgm_page,
-      bool _enable_flash=false,
-      char* _message="",
-      FLASH_MSG_TYPE _alert_type=ALERT_SUCCESS ,
-      bool _enable_header_footer=true,
-      int _max_size=EW_HTML_MAX_SIZE
-    ){
-
-      memset( _page, 0, _max_size );
-
-      if( _enable_header_footer ) strcat_P( _page, EW_SERVER_HEADER_HTML );
-      strcat_P( _page, _pgm_page );
-      if( _enable_flash )
-      concat_flash_message_div( _page, _message, _alert_type );
-      if( _enable_header_footer ) strcat_P( _page, EW_SERVER_FOOTER_HTML );
-    }
-
-		/**
 		 * build and send mqtt manage page to client
 		 */
     void handleMqttManageRoute( void ) {
@@ -86,7 +56,17 @@ class MqttController : public Controller {
       #endif
 
       char* _page = new char[EW_HTML_MAX_SIZE];
-      this->build_html( _page, EW_SERVER_MQTT_MANAGE_PAGE );
+			memset( _page, 0, EW_HTML_MAX_SIZE );
+
+			strcat_P( _page, EW_SERVER_HEADER_HTML );
+			strcat_P( _page, EW_SERVER_MENU_CARD_PAGE_WRAP_TOP );
+
+			concat_svg_menu_card( _page, EW_SERVER_MQTT_MENU_TITLE_GENERAL, SVG_ICON48_PATH_SETTINGS, EW_SERVER_MQTT_GENERAL_CONFIG_ROUTE );
+			concat_svg_menu_card( _page, EW_SERVER_MQTT_MENU_TITLE_LWT, SVG_ICON48_PATH_BEENHERE, EW_SERVER_MQTT_LWT_CONFIG_ROUTE );
+			concat_svg_menu_card( _page, EW_SERVER_MQTT_MENU_TITLE_PUBSUB, SVG_ICON48_PATH_IMPORT_EXPORT, EW_SERVER_MQTT_PUBSUB_CONFIG_ROUTE );
+
+			strcat_P( _page, EW_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM );
+			strcat_P( _page, EW_SERVER_FOOTER_HTML );
 
       this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
@@ -119,7 +99,7 @@ class MqttController : public Controller {
       concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrn"), _mqtt_general_configs.username, MQTT_USERNAME_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("Keep Alive:"), PSTR("kpalv"), _keepalive );
-      concat_tr_input_html_tags( _page, PSTR("Clean Session:"), PSTR("cln"), "clean", 20, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_general_configs.clean_session != 0 );
+      concat_tr_input_html_tags( _page, PSTR("Clean Session:"), PSTR("cln"), "clean", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_general_configs.clean_session != 0 );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
 
@@ -131,7 +111,7 @@ class MqttController : public Controller {
       concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrn"), _mqtt_general_configs.username, MQTT_USERNAME_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
       concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
       concat_tr_input_html_tags( _page, PSTR("Keep Alive:"), PSTR("kpalv"), _keepalive, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true );
-      concat_tr_input_html_tags( _page, PSTR("Clean Session:"), PSTR("cln"), "clean", 20, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_general_configs.clean_session != 0, true );
+      concat_tr_input_html_tags( _page, PSTR("Clean Session:"), PSTR("cln"), "clean", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_general_configs.clean_session != 0, true );
 
 			#endif
 
@@ -225,7 +205,7 @@ class MqttController : public Controller {
 			concat_tr_input_html_tags( _page, PSTR("Will Topic:"), PSTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("Will Message:"), PSTR("wmsg"), _mqtt_lwt_configs.will_message, MQTT_TOPIC_BUF_SIZE-1 );
       concat_tr_select_html_tags( _page, PSTR("Will QoS:"), PSTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos+1 );
-      concat_tr_input_html_tags( _page, PSTR("Will Retain:"), PSTR("wrtn"), "retain", 20, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_lwt_configs.will_retain != 0 );
+      concat_tr_input_html_tags( _page, PSTR("Will Retain:"), PSTR("wrtn"), "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_lwt_configs.will_retain != 0 );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
 
@@ -234,7 +214,7 @@ class MqttController : public Controller {
 			concat_tr_input_html_tags( _page, PSTR("Will Topic:"), PSTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
       concat_tr_input_html_tags( _page, PSTR("Will Message:"), PSTR("wmsg"), _mqtt_lwt_configs.will_message, MQTT_TOPIC_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
       concat_tr_select_html_tags( _page, PSTR("Will QoS:"), PSTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos+1, 0, true );
-      concat_tr_input_html_tags( _page, PSTR("Will Retain:"), PSTR("wrtn"), "retain", 20, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_lwt_configs.will_retain != 0, true );
+      concat_tr_input_html_tags( _page, PSTR("Will Retain:"), PSTR("wrtn"), "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_lwt_configs.will_retain != 0, true );
 
 			#endif
 

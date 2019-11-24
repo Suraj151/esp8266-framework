@@ -25,94 +25,99 @@ void EmailServiceProvider::begin( ESP8266WiFiClass* _wifi, WiFiClient* _wifi_cli
 
   this->wifi = _wifi;
   this->wifi_client = _wifi_client;
-  this->handleEmails();
+  this->_mail_handler_cb_id = 0;
 }
 
 /**
  * handle emails
  *
  */
-void EmailServiceProvider::handleEmails(){
-
-  email_config_table __email_config = __database_service.get_email_config_table();
+void EmailServiceProvider::handleEmail(){
 
   this->_mail_handler_cb_id = __task_scheduler.updateInterval(
     this->_mail_handler_cb_id,
     [&]() {
 
-      email_config_table _email_config = __database_service.get_email_config_table();
       #ifdef EW_SERIAL_LOG
-      Logln(F("Handling emails"));
+      Logln(F("Handling email"));
       #endif
-      if( strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
-        strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0 && _email_config.mail_frequency > 0
-      ){
+      String _payload = "";
 
-        String _payload = "";
+      // _payload += "MIME-Version: 1.0\n";
+      // _payload += "Content-Type: multipart/mixed;";
+      // _payload += "boundary=\"jncvdcsjnss\"\r\n\n";
+      //
+      // _payload += "--jncvdcsjnss\n";
+      // _payload += "Content-Type: text/plain; charset=utf-8\n";
+      // _payload += "Content-Transfer-Encoding: quoted-printable\r\n\n";
+      //
+      // _payload += "this is test file.\r\n\n";
+      //
+      // _payload += "--jncvdcsjnss\n";
+      // _payload += "Content-Type: text/plain; name=test.txt\n";
+      // _payload += "Content-Transfer-Encoding: base64\n";
+      // _payload += "Content-Disposition: attachment; filename=test.txt\r\n\n";
+      //
+      // _payload += "dGVzdCBmaWxlIAo=\r\n\n";
+      //
+      // _payload += "--jncvdcsjnss--\n";
 
-        _payload += "MIME-Version: 1.0\n";
-        _payload += "Content-Type: multipart/mixed; boundary=jncvdcsjnss\n";
-        _payload += "--jncvdcsjnss\n";
-        _payload += "Content-Type: text/plain; name=\"test.txt\"\n";
-        _payload += "Content-Disposition:attachment; filename=\"test.txt\"\n";
-        // _payload += "Content-Transfer-Encoding:base64\n";
+      #ifdef ENABLE_GPIO_SERVICE
 
-        _payload += "this is test file.\n";
+      for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
 
-        _payload += "--jncvdcsjnss\n";
-        // #ifdef ENABLE_GPIO_SERVICE
-        //
-        // for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
-        //
-        //   if( !__gpio_service.is_exceptional_gpio_pin(_pin) ){
-        //
-        //     _payload += "D";
-        //     _payload += _pin;
-        //     _payload += " ( mode : ";
-        //     _payload += __gpio_service.virtual_gpio_configs.gpio_mode[_pin];
-        //     _payload += ", val : ";
-        //     _payload += __gpio_service.virtual_gpio_configs.gpio_readings[_pin];
-        //     _payload += ")\n";
-        //   }
-        // }
-        // _payload += "A0 ( mode : ";
-        // _payload += __gpio_service.virtual_gpio_configs.gpio_mode[MAX_NO_OF_GPIO_PINS];
-        // _payload += ", val : ";
-        // _payload += __gpio_service.virtual_gpio_configs.gpio_readings[MAX_NO_OF_GPIO_PINS];
-        // _payload += ")\n\n";
-        // #endif
-        //
-        // _payload += "Hello from Esp\n";
-        // _payload += this->wifi->macAddress();
+        if( !__gpio_service.is_exceptional_gpio_pin(_pin) ){
 
-        int _size = _payload.length() + 1;
-        char* _pload = new char[ _size ];
-        memset( _pload, 0, _size );
-        _payload.toCharArray( _pload, _size );
-
-        this->sendMail( _pload );
-        delete[] _pload;
+          _payload += "D";
+          _payload += _pin;
+          _payload += " ( mode : ";
+          _payload += __gpio_service.virtual_gpio_configs.gpio_mode[_pin];
+          _payload += ", val : ";
+          _payload += __gpio_service.virtual_gpio_configs.gpio_readings[_pin];
+          _payload += ")\n";
+        }
       }
-      _ClearObject(&_email_config);
-    },
-    __email_config.mail_frequency*1000, millis()
-  );
+      _payload += "A0 ( mode : ";
+      _payload += __gpio_service.virtual_gpio_configs.gpio_mode[MAX_NO_OF_GPIO_PINS];
+      _payload += ", val : ";
+      _payload += __gpio_service.virtual_gpio_configs.gpio_readings[MAX_NO_OF_GPIO_PINS];
+      _payload += ")\n\n";
+      #endif
 
-  _ClearObject(&__email_config);
+      _payload += "Hello from Esp\n";
+      _payload += this->wifi->macAddress();
+
+      // int _size = _payload.length() + 1;
+      // char* _pload = new char[ _size ];
+      // memset( _pload, 0, _size );
+      // _payload.toCharArray( _pload, _size );
+
+      if( this->sendMail( _payload ) ){
+        __task_scheduler.clearInterval(this->_mail_handler_cb_id);
+        this->_mail_handler_cb_id = 0;
+      }
+      // delete[] _pload;
+    },
+    60000, millis()
+  );
 }
 
 /**
  * send email and return the result of operation
  *
+ * @param	  String*	mail_body
  * @return  bool
  */
-bool EmailServiceProvider::sendMail( char* mail_body ){
+bool EmailServiceProvider::sendMail( String mail_body ){
 
   email_config_table _email_config = __database_service.get_email_config_table();
 
   bool ret = false;
 
-  if( __status_wifi.wifi_connected ){
+  if( __status_wifi.wifi_connected && __status_wifi.internet_available &&
+    strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
+    strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0
+  ){
 
     ret = this->smtp.begin( this->wifi_client, _email_config.mail_host, _email_config.mail_port );
     if( ret ){
@@ -145,6 +150,98 @@ bool EmailServiceProvider::sendMail( char* mail_body ){
   return ret;
 }
 
+/**
+ * send email and return the result of operation
+ *
+ * @param	  char*	mail_body
+ * @return  bool
+ */
+bool EmailServiceProvider::sendMail( char* mail_body ){
+
+  email_config_table _email_config = __database_service.get_email_config_table();
+
+  bool ret = false;
+
+  if( __status_wifi.wifi_connected && __status_wifi.internet_available &&
+    strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
+    strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0
+  ){
+
+    ret = this->smtp.begin( this->wifi_client, _email_config.mail_host, _email_config.mail_port );
+    if( ret ){
+      ret = this->smtp.sendHello( _email_config.sending_domain );
+    }
+    if( ret ){
+      ret = this->smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
+    }
+    if( ret ){
+      ret = this->smtp.sendFrom( _email_config.mail_from );
+    }
+    if( ret ){
+      ret = this->smtp.sendTo( _email_config.mail_to );
+    }
+    if( ret ){
+      ret = this->smtp.sendDataCommand();
+    }
+    if( ret ){
+      this->smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
+      ret = this->smtp.sendDataBody( mail_body );
+    }
+    if( ret ){
+      ret = this->smtp.sendQuit();
+    }
+
+    this->smtp.end();
+  }
+
+  _ClearObject(&_email_config);
+  return ret;
+}
+
+/**
+ * send email and return the result of operation
+ *
+ * @param	  PGM_P	mail_body
+ * @return  bool
+ */
+bool EmailServiceProvider::sendMail( PGM_P mail_body ){
+
+  email_config_table _email_config = __database_service.get_email_config_table();
+
+  bool ret = false;
+
+  if( __status_wifi.wifi_connected && __status_wifi.internet_available ){
+
+    ret = this->smtp.begin( this->wifi_client, _email_config.mail_host, _email_config.mail_port );
+    if( ret ){
+      ret = this->smtp.sendHello( _email_config.sending_domain );
+    }
+    if( ret ){
+      ret = this->smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
+    }
+    if( ret ){
+      ret = this->smtp.sendFrom( _email_config.mail_from );
+    }
+    if( ret ){
+      ret = this->smtp.sendTo( _email_config.mail_to );
+    }
+    if( ret ){
+      ret = this->smtp.sendDataCommand();
+    }
+    if( ret ){
+      this->smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
+      ret = this->smtp.sendDataBody( mail_body );
+    }
+    if( ret ){
+      ret = this->smtp.sendQuit();
+    }
+
+    this->smtp.end();
+  }
+
+  _ClearObject(&_email_config);
+  return ret;
+}
 
 #ifdef EW_SERIAL_LOG
 /**

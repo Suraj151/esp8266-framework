@@ -49,11 +49,26 @@ border-radius:4px;\
 h1{\
 color:#0062af;\
 }\
-table{\
+svg,table{\
 margin:auto;\
+}\
+svg{\
+display:block;\
 }\
 .mnwdth125{\
 min-width:125px;\
+}\
+#mncntr a{\
+margin:auto;\
+color:#2f2f2f;\
+}\
+#mncntr>div{\
+display:inline-flex;\
+min-width:100px;\
+margin:10px 3px;\
+padding:10px 0px;\
+border:1px solid #d0d0d0;\
+border-radius:4px;\
 }\
 .btn{\
 padding:6px;\
@@ -62,7 +77,7 @@ border:1px solid #ccc;\
 color:white;\
 background:#337ab7;\
 margin:0px 2px;\
-cursor: pointer;\
+cursor:pointer;\
 }\
 </style>\
 </head>\

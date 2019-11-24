@@ -99,7 +99,7 @@ class LoginController : public Controller {
       strcat_P( _page, EW_SERVER_LOGIN_CONFIG_PAGE_TOP );
 
       concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrnm"), this->login_credentials.username, LOGIN_CONFIGS_BUF_SIZE-1 );
-      concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), this->login_credentials.password, LOGIN_CONFIGS_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), this->login_credentials.password, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
       if( _enable_flash )

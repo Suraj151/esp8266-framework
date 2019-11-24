@@ -25,6 +25,7 @@ created Date    : 1st June 2019
 #define EW_SERVER_GPIO_SERVER_CONFIG_ROUTE "/gpio-server"
 #define EW_SERVER_GPIO_MODE_CONFIG_ROUTE "/gpio-config"
 #define EW_SERVER_GPIO_WRITE_CONFIG_ROUTE "/gpio-write"
+#define EW_SERVER_GPIO_ALERT_CONFIG_ROUTE "/gpio-alert"
 #define EW_SERVER_GPIO_MONITOR_ROUTE "/gpio-monitor"
 #define EW_SERVER_GPIO_ANALOG_MONITOR_ROUTE "/listen-monitor"
 

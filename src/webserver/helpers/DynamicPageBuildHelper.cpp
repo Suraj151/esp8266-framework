@@ -10,40 +10,52 @@ created Date    : 1st June 2019
 
 #include "DynamicPageBuildHelper.h"
 
+
 /**
- * build and append tr input html tag to html page. It build html tr/input tag with
- * given type, name, value, label etc. attributes.
+ * build and append input html tag to html page.
+ * given type, name, value etc. attributes.
  * this function uses program memory arguments to optimise ram
  *
  * @param	char*	_page
- * @param	PGM_P _label
  * @param	PGM_P _name
  * @param	char*	_value
  * @param	int   _maxlength
  * @param	char*	_type
  * @param	bool  _checked
+ * @param	bool  _disabled
+ * @param	int   _min
+ * @param	int   _max
  */
-void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _value, int _maxlength, char* _type, bool _checked, bool _disabled ){
+void concat_input_html_tag(
+  char* _page,
+  PGM_P _name,
+  char* _value,
+  int _maxlength,
+  char* _type,
+  bool _checked,
+  bool _disabled,
+  int _min,
+  int _max ){
 
   bool _is_checkbox = false;
-  char _maxlen[7]; memset(_maxlen, 0, 7);
-  itoa( _maxlength, _maxlen, 10 );
+  bool _is_range = false;
 
   if( 0 <= __strstr( _type, HTML_INPUT_CHECKBOX_TAG_TYPE, 10 ) )
     _is_checkbox = true;
 
-  strcat_P( _page, HTML_TR_OPEN_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, _label );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
+  if( 0 <= __strstr( _type, HTML_INPUT_RANGE_TAG_TYPE, 10 ) )
+    _is_range = true;
+
   strcat_P( _page, HTML_INPUT_OPEN );
   strcat_P( _page, HTML_TYPE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _type );
   strcat( _page, "'" );
 
-  if( !_is_checkbox ){
+  if( !_is_checkbox && !_is_range ){
+    char _maxlen[7]; memset(_maxlen, 0, 7);
+    itoa( _maxlength, _maxlen, 10 );
+
     strcat_P( _page, HTML_MAXLEN_ATTR );
     strcat( _page, "'" );
     strcat( _page, _maxlen );
@@ -52,6 +64,21 @@ void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _v
 
   if( _checked ){
     strcat_P( _page, HTML_CHECKED_ATTR );
+  }
+
+  if( _is_range ){
+    char _minbuff[7]; char _maxbuff[7];
+    memset(_minbuff, 0, 7); memset(_maxbuff, 0, 7);
+    itoa( _min, _minbuff, 10 ); itoa( _max, _maxbuff, 10 );
+
+    strcat_P( _page, HTML_MIN_RANGE_ATTR );
+    strcat( _page, "'" );
+    strcat( _page, _minbuff );
+    strcat( _page, "'" );
+    strcat_P( _page, HTML_MAX_RANGE_ATTR );
+    strcat( _page, "'" );
+    strcat( _page, _maxbuff );
+    strcat( _page, "'" );
   }
 
   strcat_P( _page, HTML_NAME_ATTR );
@@ -63,43 +90,53 @@ void concat_tr_input_html_tags( char* _page, PGM_P _label, PGM_P _name, char* _v
   strcat( _page, "'" );
   strcat( _page, _value );
   strcat_P( _page, PSTR("'/>") );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
 
+
 /**
- * build and append tr input html tag to html page. It build html tr/input tag with
- * given type, name, value, label etc. attributes
+ * build and append input html tag to html page.
+ * given type, name, value etc. attributes
  *
  * @param	char*	_page
- * @param	char* _label
  * @param	char* _name
  * @param	char*	_value
  * @param	int   _maxlength
  * @param	char*	_type
  * @param	bool  _checked
+ * @param	bool  _disabled
+ * @param	int   _min
+ * @param	int   _max
  */
-void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _value, int _maxlength, char* _type, bool _checked, bool _disabled ){
+void concat_input_html_tag(
+  char* _page,
+  char* _name,
+  char* _value,
+  int _maxlength,
+  char* _type,
+  bool _checked,
+  bool _disabled,
+  int _min,
+  int _max ){
 
   bool _is_checkbox = false;
-  char _maxlen[7]; memset(_maxlen, 0, 7);
-  itoa( _maxlength, _maxlen, 10 );
+  bool _is_range = false;
 
   if( 0 <= __strstr( _type, HTML_INPUT_CHECKBOX_TAG_TYPE, 10 ) )
     _is_checkbox = true;
 
-  strcat_P( _page, HTML_TR_OPEN_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat( _page, _label );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
+  if( 0 <= __strstr( _type, HTML_INPUT_RANGE_TAG_TYPE, 10 ) )
+    _is_range = true;
+
   strcat_P( _page, HTML_INPUT_OPEN );
   strcat_P( _page, HTML_TYPE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _type );
   strcat( _page, "'" );
 
-  if( !_is_checkbox ){
+  if( !_is_checkbox && !_is_range ){
+    char _maxlen[7]; memset(_maxlen, 0, 7);
+    itoa( _maxlength, _maxlen, 10 );
+
     strcat_P( _page, HTML_MAXLEN_ATTR );
     strcat( _page, "'" );
     strcat( _page, _maxlen );
@@ -108,6 +145,21 @@ void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _v
 
   if( _checked ){
     strcat_P( _page, HTML_CHECKED_ATTR );
+  }
+
+  if( _is_range ){
+    char _minbuff[7]; char _maxbuff[7];
+    memset(_minbuff, 0, 7); memset(_maxbuff, 0, 7);
+    itoa( _min, _minbuff, 10 ); itoa( _max, _maxbuff, 10 );
+
+    strcat_P( _page, HTML_MIN_RANGE_ATTR );
+    strcat( _page, "'" );
+    strcat( _page, _minbuff );
+    strcat( _page, "'" );
+    strcat_P( _page, HTML_MAX_RANGE_ATTR );
+    strcat( _page, "'" );
+    strcat( _page, _maxbuff );
+    strcat( _page, "'" );
   }
 
   strcat_P( _page, HTML_NAME_ATTR );
@@ -119,106 +171,222 @@ void concat_tr_input_html_tags( char* _page, char* _label, char* _name, char* _v
   strcat( _page, "'" );
   strcat( _page, _value );
   strcat_P( _page, PSTR("'/>") );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
 
 /**
- * build and append tr select html tag to html page. It build html tr/select tag with
- * given name, options, label etc. attributes
+ * build and append td input html tag to html page. It build html tr/input tag
+ */
+void concat_td_input_html_tags(
+  char* _page,
+  PGM_P _label,
+  PGM_P _name,
+  char* _value,
+  int _maxlength,
+  char* _type,
+  bool _checked,
+  bool _disabled,
+  int _min,
+  int _max ){
+
+  strcat_P( _page, HTML_TD_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_P( _page, _label );
+  strcat_P( _page, HTML_TD_CLOSE_TAG );
+  strcat_P( _page, HTML_TD_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  concat_input_html_tag( _page, _name, _value, _maxlength, _type, _checked, _disabled, _min, _max );
+  strcat_P( _page, HTML_TD_CLOSE_TAG );
+}
+
+void concat_tr_input_html_tags(
+  char* _page,
+  PGM_P _label,
+  PGM_P _name,
+  char* _value,
+  int _maxlength,
+  char* _type,
+  bool _checked,
+  bool _disabled,
+  int _min,
+  int _max ){
+
+    strcat_P( _page, HTML_TR_OPEN_TAG );
+    strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+    concat_td_input_html_tags(_page, _label, _name, _value, _maxlength, _type, _checked, _disabled, _min, _max);
+    strcat_P( _page, HTML_TR_CLOSE_TAG );
+}
+
+/**
+ * build and append td input html tag to html page. It build html tr/input tag
+ */
+void concat_td_input_html_tags(
+  char* _page,
+  char* _label,
+  char* _name,
+  char* _value,
+  int _maxlength,
+  char* _type,
+  bool _checked,
+  bool _disabled,
+  int _min,
+  int _max ){
+
+  strcat_P( _page, HTML_TD_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat( _page, _label );
+  strcat_P( _page, HTML_TD_CLOSE_TAG );
+  strcat_P( _page, HTML_TD_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  concat_input_html_tag( _page, _name, _value, _maxlength, _type, _checked, _disabled, _min, _max );
+  strcat_P( _page, HTML_TD_CLOSE_TAG );
+}
+
+void concat_tr_input_html_tags(
+  char* _page,
+  char* _label,
+  char* _name,
+  char* _value,
+  int _maxlength,
+  char* _type,
+  bool _checked,
+  bool _disabled,
+  int _min,
+  int _max ){
+
+    strcat_P( _page, HTML_TR_OPEN_TAG );
+    strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+    concat_td_input_html_tags(_page, _label, _name, _value, _maxlength, _type, _checked, _disabled, _min, _max);
+    strcat_P( _page, HTML_TR_CLOSE_TAG );
+}
+
+
+/**
+ * build and append select html tag to html page.
+ * given name, options etc. attributes
  *
  * @param	char*	_page
- * @param	char* _label
  * @param	char* _name
  * @param	char**	_options
  * @param	int   _size
  * @param	int   _selected
  * @param	int   _exception
  */
+void concat_select_html_tag( char* _page, char* _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+
+  strcat_P( _page, HTML_SELECT_OPEN );
+  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
+  strcat_P( _page, HTML_NAME_ATTR );
+  strcat( _page, "'" );
+  strcat( _page, _name );
+  strcat( _page, "'>" );
+
+  for (int i = 0; i < _size; i++) {
+
+    if( strlen(_options[i]) > 0 && ( ( i ) != _exception ) ){
+      char buf[3];
+      memset( buf, 0, 3 );
+      itoa( i, buf, 10 );
+      strcat_P( _page, HTML_OPTION_OPEN );
+      strcat_P( _page, HTML_VALUE_ATTR );
+      strcat( _page, "'" );
+      strcat( _page, buf );
+      strcat( _page, "'" );
+      if( _selected == i )
+      strcat_P( _page, HTML_SELECTED_ATTR );
+      strcat( _page, ">" );
+      strcat( _page, _options[i] );
+      strcat_P( _page, HTML_OPTION_CLOSE );
+    }
+  }
+  strcat_P( _page, HTML_SELECT_CLOSE );
+}
+
+/**
+ * build and append select html tag to html page.
+ * given name, options etc. attributes
+ * this function uses program memory arguments to optimise ram
+ *
+ * @param	char*	_page
+ * @param	PGM_P _name
+ * @param	char**	_options
+ * @param	int   _size
+ * @param	int   _selected
+ * @param	int   _exception
+ */
+void concat_select_html_tag( char* _page, PGM_P _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+
+  strcat_P( _page, HTML_SELECT_OPEN );
+  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
+  strcat_P( _page, HTML_NAME_ATTR );
+  strcat( _page, "'" );
+  strcat_P( _page, _name );
+  strcat( _page, "'>" );
+
+  for (int i = 0; i < _size; i++) {
+
+    if( strlen(_options[i]) > 0 && ( ( i ) != _exception ) ){
+      char buf[3];
+      memset( buf, 0, 3 );
+      itoa( i, buf, 10 );
+      strcat_P( _page, HTML_OPTION_OPEN );
+      strcat_P( _page, HTML_VALUE_ATTR );
+      strcat( _page, "'" );
+      strcat( _page, buf );
+      strcat( _page, "'" );
+      if( _selected == i )
+      strcat_P( _page, HTML_SELECTED_ATTR );
+      strcat( _page, ">" );
+      strcat( _page, _options[i] );
+      strcat_P( _page, HTML_OPTION_CLOSE );
+    }
+  }
+  strcat_P( _page, HTML_SELECT_CLOSE );
+}
+
+
+/**
+ * build and append td select html tag to html page. It build html td/select tag
+ */
+void concat_td_select_html_tags( char* _page, char* _label, char* _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+
+  strcat_P( _page, HTML_TD_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat( _page, _label );
+  strcat_P( _page, HTML_TD_CLOSE_TAG );
+  strcat_P( _page, HTML_TD_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  concat_select_html_tag( _page, _name, _options, _size, _selected, _exception, _disabled );
+  strcat_P( _page, HTML_TD_CLOSE_TAG );
+}
+
 void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat( _page, _label );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_SELECT_OPEN );
-  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
-  strcat_P( _page, HTML_NAME_ATTR );
-  strcat( _page, "'" );
-  strcat( _page, _name );
-  strcat( _page, "'>" );
-
-  for (int i = 0; i < _size; i++) {
-
-    if( strlen(_options[i]) > 0 && ( ( i+1 ) != _exception ) ){
-      char buf[3];
-      memset( buf, 0, 3 );
-      itoa( i+1, buf, 10 );
-      strcat_P( _page, HTML_OPTION_OPEN );
-      strcat_P( _page, HTML_VALUE_ATTR );
-      strcat( _page, "'" );
-      strcat( _page, buf );
-      strcat( _page, "'" );
-      if( _selected == i+1 )
-      strcat_P( _page, HTML_SELECTED_ATTR );
-      strcat( _page, ">" );
-      strcat( _page, _options[i] );
-      strcat_P( _page, HTML_OPTION_CLOSE );
-    }
-  }
-  strcat_P( _page, HTML_SELECT_CLOSE );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  concat_td_select_html_tags( _page, _label, _name, _options, _size, _selected, _exception, _disabled );
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
 
 /**
- * build and append tr select html tag to html page. It build html tr/select tag with
- * given name, options, label etc. attributes
- * this function uses program memory arguments to optimise ram
- *
- * @param	char*	_page
- * @param	PGM_P _label
- * @param	PGM_P _name
- * @param	char**	_options
- * @param	int   _size
- * @param	int   _selected
- * @param	int   _exception
+ * build and append td select html tag to html page. It build html td/select tag
  */
-void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_td_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
-  strcat_P( _page, HTML_TR_OPEN_TAG );
   strcat_P( _page, HTML_TD_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
   strcat_P( _page, _label );
   strcat_P( _page, HTML_TD_CLOSE_TAG );
   strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_SELECT_OPEN );
-  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
-  strcat_P( _page, HTML_NAME_ATTR );
-  strcat( _page, "'" );
-  strcat_P( _page, _name );
-  strcat( _page, "'>" );
-
-  for (int i = 0; i < _size; i++) {
-
-    if( strlen(_options[i]) > 0 && ( ( i+1 ) != _exception ) ){
-      char buf[3];
-      memset( buf, 0, 3 );
-      itoa( i+1, buf, 10 );
-      strcat_P( _page, HTML_OPTION_OPEN );
-      strcat_P( _page, HTML_VALUE_ATTR );
-      strcat( _page, "'" );
-      strcat( _page, buf );
-      strcat( _page, "'" );
-      if( _selected == i+1 )
-      strcat_P( _page, HTML_SELECTED_ATTR );
-      strcat( _page, ">" );
-      strcat( _page, _options[i] );
-      strcat_P( _page, HTML_OPTION_CLOSE );
-    }
-  }
-  strcat_P( _page, HTML_SELECT_CLOSE );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  concat_select_html_tag( _page, _name, _options, _size, _selected, _exception, _disabled );
   strcat_P( _page, HTML_TD_CLOSE_TAG );
+}
+
+void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+
+  strcat_P( _page, HTML_TR_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  concat_td_select_html_tags( _page, _label, _name, _options, _size, _selected, _exception, _disabled );
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
 
@@ -233,12 +401,16 @@ void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** 
 void concat_tr_header_html_tags( char* _page, PGM_P _header ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
   strcat_P( _page, HTML_TD_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
   strcat_P( _page, HTML_H2_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
   strcat_P( _page, _header );
   strcat_P( _page, HTML_H2_CLOSE_TAG );
   strcat_P( _page, HTML_TD_CLOSE_TAG );
   strcat_P( _page, HTML_TD_OPEN_TAG );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
   strcat_P( _page, HTML_TD_CLOSE_TAG );
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
@@ -299,5 +471,70 @@ void concat_graph_axis_title_div( char* _page, char* _title, char* _style ){
   strcat( _page, _style );
   strcat( _page, ";'>" );
   strcat( _page, _title );
+  strcat_P( _page, HTML_DIV_CLOSE_TAG );
+}
+
+/**
+ * build and append svg html tag to html page.
+ * this function uses program memory arguments to optimise ram
+ *
+ * @param	char*	_page
+ * @param	PGM_P _path
+ * @param	int   _width
+ * @param	int   _height
+ * @param	char*	_fill
+ */
+void concat_svg_tag( char* _page, PGM_P _path, int _width, int _height, char* _fill ){
+
+  char _widthbuff[7]; memset(_widthbuff, 0, 7);
+  itoa( _width, _widthbuff, 10 );
+  char _heightbuff[7]; memset(_heightbuff, 0, 7);
+  itoa( _height, _heightbuff, 10 );
+
+  strcat_P( _page, HTML_SVG_OPEN_TAG );
+  strcat_P( _page, HTML_WIDTH_ATTR );
+  strcat( _page, "'" );
+  strcat( _page, _widthbuff );
+  strcat( _page, "'" );
+  strcat_P( _page, HTML_HEIGHT_ATTR );
+  strcat( _page, "'" );
+  strcat( _page, _heightbuff );
+  strcat( _page, "'" );
+  strcat_P( _page, HTML_FILL_ATTR );
+  strcat( _page, "'" );
+  strcat( _page, _fill );
+  strcat( _page, "'>" );
+  strcat_P( _page, _path );
+  strcat_P( _page, HTML_SVG_CLOSE_TAG );
+}
+
+/**
+ * build and append menu card to html page.
+ * this function uses program memory arguments to optimise ram
+ *
+ * @param	char*	_page
+ * @param	PGM_P _menu_title
+ * @param	PGM_P _svg_path
+ * @param	char*	_menu_link
+ */
+void concat_svg_menu_card( char* _page, PGM_P _menu_title, PGM_P _svg_path, char* _menu_link ){
+
+  strcat_P( _page, HTML_DIV_OPEN_TAG );
+  strcat( _page, ">" );
+  strcat_P( _page, HTML_LINK_OPEN_TAG );
+  strcat_P( _page, HTML_HREF_ATTR );
+
+  strcat( _page, "'" );
+  strcat( _page, _menu_link );
+  strcat( _page, "'>" );
+
+  concat_svg_tag( _page, _svg_path );
+
+  strcat_P( _page, HTML_SPAN_OPEN_TAG );
+  strcat( _page, ">" );
+  strcat_P( _page, _menu_title );
+  strcat_P( _page, HTML_SPAN_CLOSE_TAG );
+
+  strcat_P( _page, HTML_LINK_CLOSE_TAG );
   strcat_P( _page, HTML_DIV_CLOSE_TAG );
 }

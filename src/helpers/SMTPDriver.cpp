@@ -19,6 +19,7 @@ bool SMTPdriver::begin( WiFiClient* _client, char*_host, uint16_t _port ){
   this->host = new char[_host_len + 1];
   this->host[_host_len] = 0;
   this->responseBuffer = new char[SMTP_RESPONSE_BUFFER_SIZE];
+  this->lastResponseCode = -1;
 
   memset( this->host, 0, _host_len + 1 );
   memset( this->responseBuffer, 0, SMTP_RESPONSE_BUFFER_SIZE );
@@ -45,7 +46,7 @@ void SMTPdriver::readResponse(){
 		this->responseReaderStatus = SMTP_RESPONSE_WAITING;
 	}
 
-	if( millis() - lastReceive >= this->timeOut ){
+	if( millis() - this->lastReceive >= this->timeOut ){
 		this->responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
 		return;
 	}
@@ -77,15 +78,17 @@ void SMTPdriver::readResponse(){
           if(this->responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE) {
       			this->responseBuffer[this->responseBufferIndex++] = (char)this->client->read();
           }
-          if( millis() - lastReceive >= this->timeOut ){
+          if( millis() - this->lastReceive >= this->timeOut ){
         		this->responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
         		return;
         	}
+          delay(0);
         }
 				this->responseReaderStatus = SMTP_RESPONSE_FINISHED;
 				return;
 			}
 		}
+    delay(0);
 	}
   delay(0);
 }
@@ -103,13 +106,11 @@ void SMTPdriver::startReadResponse( uint16_t _timeOut ) {
 	this->responseReaderStatus = SMTP_RESPONSE_STARTING;
 	this->timeOut = _timeOut;
 	memset(this->responseBuffer, 0, SMTP_RESPONSE_BUFFER_SIZE);
-  this->flushClient();
 }
 
 void SMTPdriver::waitForResponse( uint16_t _timeOut ) {
 
 	this->startReadResponse( _timeOut );
-  delay(10);
 	do {
  		this->readResponse();
 	} while(this->responseReaderStatus == SMTP_RESPONSE_WAITING);
@@ -143,6 +144,7 @@ bool SMTPdriver::sendCommandAndExpect( char* command, char* expectedResponse, ui
     this->responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
     return false;
   }
+  this->flushClient();
   this->client->println( command );
 	return this->waitForExpectedResponse( expectedResponse, _timeOut );
 }
@@ -156,6 +158,7 @@ int SMTPdriver::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
 	#endif
   if( isConnected( this->client ) ){
 
+    this->flushClient();
     if( strlen(command) > 0 )
     this->client->println( command );
     this->waitForResponse( _timeOut );
@@ -176,6 +179,7 @@ int SMTPdriver::sendCommandAndGetCode( char* command, uint16_t _timeOut ){
 	#endif
   if( isConnected( this->client ) ){
 
+    this->flushClient();
     if( strlen(command) > 0 )
     this->client->println( command );
     this->waitForResponse( _timeOut );
@@ -271,7 +275,29 @@ void SMTPdriver::sendDataHeader( char* sender, char* recipient, char* subject ){
   this->client->print(SMTP_COMMAND_CRLF);
 }
 
+bool SMTPdriver::sendDataBody( String body ){
+
+  #ifdef EW_SERIAL_LOG
+  Log(F("SMTP sending data: "));
+	Logln(body);
+	#endif
+  this->client->println( body );
+  int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
+  return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
+}
+
 bool SMTPdriver::sendDataBody( char* body ){
+
+  #ifdef EW_SERIAL_LOG
+  Log(F("SMTP sending data: "));
+	Logln(body);
+	#endif
+  this->client->println( body );
+  int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
+  return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
+}
+
+bool SMTPdriver::sendDataBody( PGM_P body ){
 
   #ifdef EW_SERIAL_LOG
   Log(F("SMTP sending data: "));

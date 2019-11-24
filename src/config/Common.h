@@ -19,6 +19,11 @@ extern "C" {
 // #define EMAIL_SERVICE_ROUTINE_INTERVAL  60000
 
 /**
+ * ignore free relay connections created by same ssid
+ */
+#define IGNORE_FREE_RELAY_CONNECTIONS
+
+/**
  * enable/disable http server feature here
  */
 #define ENABLE_EWING_HTTP_SERVER

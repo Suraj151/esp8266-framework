@@ -49,8 +49,10 @@ class EmailServiceProvider : public ServiceProvider {
     int _mail_handler_cb_id=0;
 
     void begin( ESP8266WiFiClass* _wifi, WiFiClient* _wifi_client );
+    bool sendMail( String mail_body );
     bool sendMail( char* mail_body );
-    void handleEmails( void );
+    bool sendMail( PGM_P mail_body );
+    void handleEmail( void );
 
     #ifdef EW_SERIAL_LOG
     void printEmailConfigLogs( void );

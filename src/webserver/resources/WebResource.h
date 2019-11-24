@@ -26,7 +26,7 @@ static const char EW_HTML_CONTENT[] PROGMEM = "text/html";
 /**
  * @define html page max size
  */
-#define EW_HTML_MAX_SIZE 4000
+#define EW_HTML_MAX_SIZE 5000
 #define MIN_ACCEPTED_ARG_SIZE 3
 
 /**

@@ -60,9 +60,7 @@ class WiFiServiceProvider : public ServiceProvider {
     uint32_t getStationSubnetIP( void );
     uint32_t getStationBroadcastIP( void );
 
-    #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
     void handleInternetConnectivity( void );
-    #endif
     void handleWiFiConnectivity( void );
 
     #ifdef EW_SERIAL_LOG

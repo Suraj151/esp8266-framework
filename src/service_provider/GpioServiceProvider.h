@@ -14,6 +14,7 @@ created Date    : 1st June 2019
 
 #include <service_provider/ServiceProvider.h>
 #include <service_provider/HttpServiceProvider.h>
+#include <service_provider/EmailServiceProvider.h>
 #include <WiFiClient.h>
 
 
@@ -48,14 +49,11 @@ class GpioServiceProvider : public ServiceProvider {
 		 * @var	bool|true update_gpio_table_from_virtual
 		 */
     bool update_gpio_table_from_virtual=true;
-    /**
-		 * @var	WiFiClient  wifi_client
-		 */
-    WiFiClient* wifi_client;
 
 
-    void begin( WiFiClient* _wifi_client );
+    void begin( ESP8266WiFiClass* _wifi, WiFiClient* _wifi_client );
     void enable_update_gpio_table_from_virtual( void );
+    bool handleGpioEmailAlert( void );
     void handleGpioOperations( void );
     void handleGpioModes( int _gpio_config_type=GPIO_MODE_CONFIG );
     uint8_t getGpioFromPinMap( uint8_t _pin );
@@ -64,6 +62,14 @@ class GpioServiceProvider : public ServiceProvider {
     void printGpioConfigLogs( void );
     #endif
     bool is_exceptional_gpio_pin( uint8_t _pin );
+
+  protected:
+
+    /**
+		 * @var	WiFiClient  wifi_client
+		 */
+    WiFiClient* wifi_client;
+    ESP8266WiFiClass* wifi;
 
 };
 

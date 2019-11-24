@@ -100,7 +100,36 @@ class HomeController : public Controller {
       #endif
 
       char* _page = new char[EW_HTML_MAX_SIZE];
-      this->build_html( _page, this->route_handler->has_active_session() ? EW_SERVER_HOME_AUTHORIZED_PAGE : EW_SERVER_HOME_PAGE );
+
+			memset( _page, 0, EW_HTML_MAX_SIZE );
+			strcat_P( _page, EW_SERVER_HEADER_HTML );
+
+			if( this->route_handler->has_active_session() ){
+
+				strcat_P( _page, EW_SERVER_MENU_CARD_PAGE_WRAP_TOP );
+
+				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_LOGIN, SVG_ICON48_PATH_ACCOUNT_CIRCLE, EW_SERVER_LOGIN_CONFIG_ROUTE );
+				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_WIFI, SVG_ICON48_PATH_WIFI, EW_SERVER_WIFI_CONFIG_ROUTE );
+				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_OTA, SVG_ICON48_PATH_CLOUD_DOWNLOAD, EW_SERVER_OTA_CONFIG_ROUTE );
+				#ifdef ENABLE_MQTT_SERVICE
+				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_MQTT, SVG_ICON48_PATH_SEND, EW_SERVER_MQTT_MANAGE_CONFIG_ROUTE );
+				#endif
+				#ifdef ENABLE_GPIO_SERVICE
+				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_GPIO, SVG_ICON48_PATH_MEMORY, EW_SERVER_GPIO_MANAGE_CONFIG_ROUTE );
+				#endif
+				#ifdef ENABLE_EMAIL_SERVICE
+				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_EMAIL, SVG_ICON48_PATH_MAIL, EW_SERVER_EMAIL_CONFIG_ROUTE );
+				#endif
+				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_DASHBOARD, SVG_ICON48_PATH_DASHBOARD, EW_SERVER_DASHBOARD_ROUTE );
+				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_LOGOUT, SVG_ICON48_PATH_POWER, EW_SERVER_LOGOUT_ROUTE );
+
+				strcat_P( _page, EW_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM );
+			}else{
+
+				strcat_P( _page, EW_SERVER_HOME_PAGE );
+			}
+
+			strcat_P( _page, EW_SERVER_FOOTER_HTML );
 
       this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
