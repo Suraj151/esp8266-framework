@@ -87,6 +87,7 @@ void GpioServiceProvider::handleGpioHttpRequest( ){
   }
 }
 
+#ifdef ENABLE_EMAIL_SERVICE
 /**
  * handle gpio email alert
  * @return bool
@@ -120,6 +121,7 @@ bool GpioServiceProvider::handleGpioEmailAlert(){
 
   return __email_service.sendMail( _payload );
 }
+#endif
 
 /**
  * handle gpio operations as per gpio configs
@@ -185,10 +187,13 @@ void GpioServiceProvider::handleGpioOperations(){
         __gpio_alert_track.last_alert_millis = _now;
         switch ( this->virtual_gpio_configs.gpio_alert_channel[_pin] ) {
 
+          #ifdef ENABLE_EMAIL_SERVICE
           case EMAIL:{
             __gpio_alert_track.is_last_alert_succeed = this->handleGpioEmailAlert();
             break;
           }
+          #endif
+          case NO_ALERT:
           default: break;
         }
       }

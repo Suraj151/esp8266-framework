@@ -426,12 +426,16 @@ class GpioController : public Controller {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_GPIO_ALERT_PAGE_TOP );
       char* _gpio_digital_alert_options[] = {"LOW","HIGH"};
+			#ifdef ENABLE_EMAIL_SERVICE
 			char* _gpio_alert_channels[] = {"NOALERT","MAIL"};
+			#else
+			char* _gpio_alert_channels[] = {"NOALERT",""};
+			#endif
 			char* _gpio_analog_alert_comparators[] = {"=",">","<"};
 
       char _analog_value[10], _name[4], _label[4], _alert_label[4];
 			memset(_name, 0, 4); memset(_label, 0, 4); memset(_alert_label, 0, 4);
-      strcpy( _name, "D0 =" );strcpy( _label, "d0" );strcpy( _alert_label, "al0" );
+      strcpy( _name, "D0" );strcpy( _label, "d0" );strcpy( _alert_label, "al0" );
 
       bool _added_options = false;
       for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {

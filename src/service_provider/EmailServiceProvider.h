@@ -52,6 +52,7 @@ class EmailServiceProvider : public ServiceProvider {
     bool sendMail( String mail_body );
     bool sendMail( char* mail_body );
     bool sendMail( PGM_P mail_body );
+    // template <typename T> bool sendMail( T mail_body );
     void handleEmail( void );
 
     #ifdef EW_SERIAL_LOG

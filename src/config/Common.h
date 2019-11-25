@@ -16,7 +16,6 @@ extern "C" {
  * enable/disable email service here
  */
 #define ENABLE_EMAIL_SERVICE
-// #define EMAIL_SERVICE_ROUTINE_INTERVAL  60000
 
 /**
  * ignore free relay connections created by same ssid

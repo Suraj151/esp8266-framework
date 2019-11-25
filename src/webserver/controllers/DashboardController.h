@@ -52,6 +52,9 @@ class DashboardController : public Controller {
       Logln(F("Handling dashboard monitor route"));
       #endif
 
+			struct station_info * stat_info = wifi_softap_get_station_info();
+			int n = 1;
+
       String _response = "{\"nm\":\"";
       _response += this->web_resource->wifi->SSID();
 			_response += "\",\"ip\":\"";
@@ -62,7 +65,32 @@ class DashboardController : public Controller {
       _response += this->web_resource->wifi->macAddress();
       _response += "\",\"st\":";
       _response += this->web_resource->wifi->status();
-      _response += ",\"r\":";
+			_response += ",\"nt\":";
+      _response += __status_wifi.internet_available;
+			_response += ",\"dl\":\"";
+
+			while (stat_info != NULL) {
+				char macStr[30];
+				memset(macStr, 0, 30);
+			  sprintf(
+					macStr,
+					"%02X:%02X:%02X:%02X:%02X:%02X",
+					stat_info->bssid[0], stat_info->bssid[1], stat_info->bssid[2], stat_info->bssid[3], stat_info->bssid[4], stat_info->bssid[5]
+				);
+				_response += "<tr><td>";
+				_response += String(macStr);
+				_response += "</td><td>";
+				_response += (uint8_t)stat_info->ip.addr;
+				_response += ".";
+				_response += (uint8_t)(stat_info->ip.addr>>8);
+				_response += ".";
+				_response += (uint8_t)(stat_info->ip.addr>>16);
+				_response += ".";
+				_response += (uint8_t)(stat_info->ip.addr>>24);
+				_response += "</td></tr>";
+				stat_info = STAILQ_NEXT(stat_info, next);
+      }
+      _response += "\",\"r\":";
       _response += !this->route_handler->has_active_session();
       _response += "}";
 

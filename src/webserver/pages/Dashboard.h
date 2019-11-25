@@ -18,17 +18,18 @@ static const char EW_SERVER_DASHBOARD_PAGE[] PROGMEM = "\
 \
 <style>\
 #stnm,#stip,#strs,#stst,#stmc{\
-text-align:right;\
+text-align:left;\
 }\
 td{\
 border:1px solid #d0d0d0;\
 padding:4px;\
+min-width:100px;\
 }\
 </style>\
 \
 <table>\
 <tr>\
-<td>sta ssid</td>\
+<td>station ssid</td>\
 <td id='stnm'></td>\
 </tr>\
 <tr>\
@@ -47,6 +48,14 @@ padding:4px;\
 <td>mac</td>\
 <td id='stmc'></td>\
 </tr>\
+<tr>\
+<td>internet</td>\
+<td id='inet'></td>\
+</tr>\
+</table>\
+\
+<h2>Connected Devices</h2>\
+\
+<table id='cndl'>\
 </table>";
-
 #endif

@@ -159,7 +159,7 @@ int SMTPdriver::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
   if( isConnected( this->client ) ){
 
     this->flushClient();
-    if( strlen(command) > 0 )
+    if( strlen_P(command) > 0 )
     this->client->println( command );
     this->waitForResponse( _timeOut );
     respcode = (int)StringToUint16( this->responseBuffer );

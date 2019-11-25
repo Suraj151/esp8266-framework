@@ -27,9 +27,6 @@ margin:auto;\
 text-align:center;\
 padding:15px;\
 }\
-select{\
-padding-left:0px !important;\
-}\
 a{\
 text-decoration:none;\
 }\
@@ -40,7 +37,9 @@ border-radius:4px;\
 background:white;\
 }\
 select{\
-width:100%\
+width:100%;\
+min-width:40px;\
+padding-left:0px !important;\
 }\
 .msg{\
 padding:3px;\

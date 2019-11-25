@@ -102,6 +102,55 @@ void EmailServiceProvider::handleEmail(){
   );
 }
 
+
+// /**
+//  * This template send email and return the result of operation
+//  *
+//  * @param	  T*	mail_body
+//  * @return  bool
+//  */
+// template <typename T> bool EmailServiceProvider::sendMail ( T mail_body ){
+//
+//   email_config_table _email_config = __database_service.get_email_config_table();
+//
+//   bool ret = false;
+//
+//   if( __status_wifi.wifi_connected && __status_wifi.internet_available &&
+//     strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
+//     strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0
+//   ){
+//
+//     ret = this->smtp.begin( this->wifi_client, _email_config.mail_host, _email_config.mail_port );
+//     if( ret ){
+//       ret = this->smtp.sendHello( _email_config.sending_domain );
+//     }
+//     if( ret ){
+//       ret = this->smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
+//     }
+//     if( ret ){
+//       ret = this->smtp.sendFrom( _email_config.mail_from );
+//     }
+//     if( ret ){
+//       ret = this->smtp.sendTo( _email_config.mail_to );
+//     }
+//     if( ret ){
+//       ret = this->smtp.sendDataCommand();
+//     }
+//     if( ret ){
+//       this->smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
+//       ret = this->smtp.sendDataBody( mail_body );
+//     }
+//     if( ret ){
+//       ret = this->smtp.sendQuit();
+//     }
+//
+//     this->smtp.end();
+//   }
+//
+//   _ClearObject(&_email_config);
+//   return ret;
+// }
+
 /**
  * send email and return the result of operation
  *

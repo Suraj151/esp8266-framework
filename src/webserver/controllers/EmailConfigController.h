@@ -16,6 +16,8 @@ created Date    : 1st June 2019
 #include <webserver/pages/EmailConfigPage.h>
 #include <webserver/pages/WiFiConfigPage.h>
 
+#define	TEST_EMAIL_MESSAGE	"this is test mail from esp"
+
 /**
  * EmailConfigController class
  */
@@ -170,7 +172,7 @@ class EmailConfigController : public Controller {
       delete[] _page;
 
 			if( _is_posted && !_is_error && _is_test_mail ){
-				__email_service.sendMail( PSTR("this is test mail from esp") );
+				__email_service.sendMail( TEST_EMAIL_MESSAGE );
       }
     }
 

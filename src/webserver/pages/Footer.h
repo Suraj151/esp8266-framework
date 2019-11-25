@@ -70,13 +70,15 @@ document.getElementById('stip').innerHTML=r.ip;\
 document.getElementById('strs').innerHTML=r.rs;\
 document.getElementById('stst').innerHTML=r.st;\
 document.getElementById('stmc').innerHTML=r.mc;\
+document.getElementById('inet').innerHTML=r.nt;\
+document.getElementById('cndl').innerHTML=r.dl;\
 if(r.r)location.href='/';\
 }\
 rq.addEventListener('load',rql);\
 setInterval(function(){\
 rq.open('GET','/listen-dashboard');\
 rq.send();\
-},2000);\
+},3000);\
 </script>\
 </body>\
 </html>\

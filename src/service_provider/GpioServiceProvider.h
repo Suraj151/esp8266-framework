@@ -53,7 +53,9 @@ class GpioServiceProvider : public ServiceProvider {
 
     void begin( ESP8266WiFiClass* _wifi, WiFiClient* _wifi_client );
     void enable_update_gpio_table_from_virtual( void );
+    #ifdef ENABLE_EMAIL_SERVICE
     bool handleGpioEmailAlert( void );
+    #endif
     void handleGpioOperations( void );
     void handleGpioModes( int _gpio_config_type=GPIO_MODE_CONFIG );
     uint8_t getGpioFromPinMap( uint8_t _pin );
