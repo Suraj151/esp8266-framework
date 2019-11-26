@@ -173,6 +173,7 @@ class EmailConfigController : public Controller {
 
 			if( _is_posted && !_is_error && _is_test_mail ){
 				__email_service.sendMail( TEST_EMAIL_MESSAGE );
+				// __email_service.sendMail( PSTR("this is test mail") );
       }
     }
 

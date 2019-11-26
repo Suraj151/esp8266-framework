@@ -43,6 +43,10 @@ void EwingsEsp8266Stack::initialize(){
   __espnow_service.beginEspNow( this->wifi );
   __task_scheduler.setInterval( [&]() { __espnow_service.handlePeers(); }, ESP_NOW_HANDLE_DURATION );
   #endif
+
+  #ifdef ENABLE_EXCEPTION_NOTIFIER
+  beginCrashHandler();
+  #endif
 }
 
 #if defined( ENABLE_NAPT_FEATURE )

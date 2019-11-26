@@ -13,7 +13,9 @@ created Date    : 1st June 2019
 
 
 #include <service_provider/ServiceProvider.h>
+#ifdef ENABLE_GPIO_SERVICE
 #include <service_provider/GpioServiceProvider.h>
+#endif
 #include <helpers/SMTPDriver.h>
 
 

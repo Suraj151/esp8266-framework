@@ -288,8 +288,10 @@ void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
     __task_scheduler.setTimeout( [&](){
       wifi_config_table __wifi_credentials = __database_service.get_wifi_config_table();
       this->configure_wifi_access_point(&__wifi_credentials);
+      _ClearObject(&__wifi_credentials);
     }, 1);
   }
+  _ClearObject(&_wifi_credentials);
 }
 #endif
 
@@ -429,15 +431,14 @@ bool WiFiServiceProvider::scan_within_station( char* ssid, uint8_t* bssid ){
 void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCount ){
 
   wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
-  if( !this->scan_within_station_async( _wifi_credentials.sta_ssid, this->temp_mac, _scanCount ) ) {
-    _ClearObject(&_wifi_credentials);
-  }else{
+  if( this->scan_within_station_async( _wifi_credentials.sta_ssid, this->temp_mac, _scanCount ) ) {
     __task_scheduler.setTimeout([&](){
       wifi_config_table __wifi_credentials = __database_service.get_wifi_config_table();
       this->configure_wifi_station( &__wifi_credentials, this->temp_mac );
       _ClearObject(&__wifi_credentials);
     }, 1);
   }
+  _ClearObject(&_wifi_credentials);
 }
 
 /**
@@ -450,15 +451,14 @@ void WiFiServiceProvider::scan_aps_and_configure_wifi_station( ){
   //   Logln(F("scanning connected stations for wifi config.."));
   // #endif
   wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
-  if( !this->scan_within_station( _wifi_credentials.sta_ssid, this->temp_mac) ){
-    _ClearObject(&_wifi_credentials);
-  }else{
+  if( this->scan_within_station( _wifi_credentials.sta_ssid, this->temp_mac) ){
     __task_scheduler.setTimeout([&](){
       wifi_config_table __wifi_credentials = __database_service.get_wifi_config_table();
       this->configure_wifi_station( &__wifi_credentials, this->temp_mac );
       _ClearObject(&__wifi_credentials);
     }, 1);
   }
+  _ClearObject(&_wifi_credentials);
 }
 
 /**

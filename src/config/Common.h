@@ -18,6 +18,11 @@ extern "C" {
 #define ENABLE_EMAIL_SERVICE
 
 /**
+ * enable/disable exception notifier
+ */
+#define ENABLE_EXCEPTION_NOTIFIER
+
+/**
  * ignore free relay connections created by same ssid
  */
 #define IGNORE_FREE_RELAY_CONNECTIONS

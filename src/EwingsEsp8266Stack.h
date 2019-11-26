@@ -42,6 +42,10 @@ created Date    : 1st June 2019
 #include <service_provider/EmailServiceProvider.h>
 #endif
 
+#ifdef ENABLE_EXCEPTION_NOTIFIER
+#include <helpers/ExceptionsNotifier.h>
+#endif
+
 #if defined( ENABLE_NAPT_FEATURE )
 #include "lwip/lwip_napt.h"
 #include "lwip/app/dhcpserver.h"

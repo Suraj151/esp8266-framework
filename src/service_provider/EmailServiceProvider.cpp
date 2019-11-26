@@ -81,24 +81,18 @@ void EmailServiceProvider::handleEmail(){
       _payload += __gpio_service.virtual_gpio_configs.gpio_mode[MAX_NO_OF_GPIO_PINS];
       _payload += ", val : ";
       _payload += __gpio_service.virtual_gpio_configs.gpio_readings[MAX_NO_OF_GPIO_PINS];
-      _payload += ")\n\n";
+      _payload += ")";
       #endif
 
-      _payload += "Hello from Esp\n";
+      _payload += "\n\nHello from Esp\n";
       _payload += this->wifi->macAddress();
-
-      // int _size = _payload.length() + 1;
-      // char* _pload = new char[ _size ];
-      // memset( _pload, 0, _size );
-      // _payload.toCharArray( _pload, _size );
 
       if( this->sendMail( _payload ) ){
         __task_scheduler.clearInterval(this->_mail_handler_cb_id);
         this->_mail_handler_cb_id = 0;
       }
-      // delete[] _pload;
     },
-    60000, millis()
+    180000, millis()
   );
 }
 
