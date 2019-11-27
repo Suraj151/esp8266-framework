@@ -20,7 +20,7 @@ extern "C" {
 /**
  * enable/disable exception notifier
  */
-#define ENABLE_EXCEPTION_NOTIFIER
+// #define ENABLE_EXCEPTION_NOTIFIER
 
 /**
  * ignore free relay connections created by same ssid

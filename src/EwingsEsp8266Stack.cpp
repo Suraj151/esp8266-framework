@@ -60,6 +60,9 @@ void EwingsEsp8266Stack::enable_napt_service(){
   ip_napt_enable_no(1, 1);
   // Set the DNS server for clients of the AP to the one we also use for the STA interface
   dhcps_set_DNS(this->wifi->dnsIP());
+  #ifdef EW_SERIAL_LOG
+    Logln(F("NAPT initialization done"));
+  #endif
 }
 #elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
 /**
@@ -117,6 +120,7 @@ void EwingsEsp8266Stack::handleLogPrints(){
   #ifdef ENABLE_EMAIL_SERVICE
   __email_service.printEmailConfigLogs();
   #endif
+  __task_scheduler.printTaskSchedulerLogs();
   Log( F("\nNTP Validity : ") );
   Logln( __nw_time_service.is_ntp_in_sync() );
   Log( F("NTP Time : ") );

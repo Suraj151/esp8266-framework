@@ -92,7 +92,7 @@ void EmailServiceProvider::handleEmail(){
         this->_mail_handler_cb_id = 0;
       }
     },
-    180000, millis()
+    180000
   );
 }
 
