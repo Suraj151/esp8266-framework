@@ -453,8 +453,8 @@ void MQTTClient::MQTT_Task(){
     Log(F("MQTT: Task ")); Logln(this->mqttClient.connState);
     #endif
 
-    uint8_t dataBuffer[MQTT_BUF_SIZE];
-    uint16_t dataLen;
+    uint8_t dataBuffer[MQTT_BUF_SIZE];  uint16_t dataLen;
+    memset( dataBuffer, 0, MQTT_BUF_SIZE );
 
     delay(0); // yield purpose
 
@@ -599,6 +599,11 @@ void MQTTClient::mqtt_client_delete(){
       this->mqttClient.mqtt_state.out_buffer = NULL;
     }
 
+    if(this->mqttClient.msgQueue.buf != NULL) {
+      delete[] this->mqttClient.msgQueue.buf;
+      this->mqttClient.msgQueue.buf = NULL;
+    }
+
     if(this->wifi_client != NULL) {
       delete this->wifi_client;
       this->wifi_client = NULL;
@@ -609,8 +614,8 @@ void MQTTClient::mqtt_client_delete(){
 
 bool MQTTClient::Subscribe( char* topic, uint8_t qos){
 
-    uint8_t dataBuffer[MQTT_BUF_SIZE];
-    uint16_t dataLen;
+    uint8_t dataBuffer[MQTT_BUF_SIZE];  uint16_t dataLen;
+    memset( dataBuffer, 0, MQTT_BUF_SIZE );
 
     if( !this->connected() ) return false;
 
@@ -643,8 +648,9 @@ bool MQTTClient::Subscribe( char* topic, uint8_t qos){
 
 bool MQTTClient::UnSubscribe( char* topic ) {
 
-    uint8_t dataBuffer[MQTT_BUF_SIZE];
-    uint16_t dataLen;
+    uint8_t dataBuffer[MQTT_BUF_SIZE];  uint16_t dataLen;
+    memset( dataBuffer, 0, MQTT_BUF_SIZE );
+
     this->mqttClient.mqtt_state.outbound_message = mqtt_msg_unsubscribe(&this->mqttClient.mqtt_state.mqtt_connection,
                                           topic,
                                           &this->mqttClient.mqtt_state.pending_msg_id);
@@ -672,8 +678,8 @@ bool MQTTClient::UnSubscribe( char* topic ) {
 
 bool MQTTClient::Publish( const char* topic, const char* data, int data_length, int qos, int retain ){
 
-    uint8_t dataBuffer[MQTT_BUF_SIZE];
-    uint16_t dataLen;
+    uint8_t dataBuffer[MQTT_BUF_SIZE];  uint16_t dataLen;
+    memset( dataBuffer, 0, MQTT_BUF_SIZE );
 
     if( !this->connected() ) return false;
 
