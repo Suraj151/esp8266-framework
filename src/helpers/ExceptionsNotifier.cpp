@@ -78,6 +78,8 @@ void handleCrashData(){
 	String _filedata = readCrashFileToBuffer( CRASHFILEPATH, _size );
 	if( _filename.length() && _size ){
 
+		_filedata += "\n\nRegards,\n";
+		_filedata += WiFi.macAddress();
 		bool _candeletefile = false;
 		#ifdef ENABLE_EMAIL_SERVICE
 		if( __email_service.sendMail( _filedata ) ){

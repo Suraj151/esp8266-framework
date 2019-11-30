@@ -38,36 +38,37 @@ bool disconnect( WiFiClient* client ) {
 
 bool sendPacket( WiFiClient* client, uint8_t *buffer, uint16_t len ) {
 
-  uint16_t ret = 0;
+  uint16_t sentBytes = 0;
   uint16_t _buf_len = strlen((char*)buffer);
+  len =  _buf_len < len ? _buf_len : len;
 
   while (len > 0) {
 
     #ifdef EW_SERIAL_LOG
     Log(F("Client: Sending to "));Log(client->remoteIP());Log(F(" : "));Logln(client->remotePort());
     #endif
-    len =  _buf_len < len ? _buf_len : len;
-
     if ( isConnected(client) ) {
       // send 250 bytes at most at a time, can adjust this later based on Client
 
       uint16_t sendlen = len > 250 ? 250 : len;
-      //Serial.print("Sending: "); Serial.println(sendlen);
-      ret = client->write( buffer, sendlen);
+      uint8_t* _buff_pointer = buffer+sentBytes;
+      uint16_t _sent = client->write( _buff_pointer, sendlen);
+      sentBytes += _sent;
+      len -= _sent;
+
       #ifdef EW_SERIAL_LOG
       Log(F("Client: sending packets : "));
       for (int i = 0; i < sendlen; i++) {
-        Log((char)buffer[i]);
+        Log((char)_buff_pointer[i]);
       }
       Logln();
-      Log(F("Client: send packet return ")); Logln(ret);
+      Log(F("Client: sent ")); Log(sentBytes); Log(F("/")); Logln(_buf_len);
       #endif
-      len -= ret;
 
       if (len == 0) {
 	      return true;
       }
-      if (ret != sendlen) {
+      if (_sent != sendlen) {
         #ifdef EW_SERIAL_LOG
         Logln(F("Client: send packet - failed to send"));
         #endif
@@ -79,6 +80,7 @@ bool sendPacket( WiFiClient* client, uint8_t *buffer, uint16_t len ) {
       #endif
       return false;
     }
+    delay(0);
   }
   return true;
 }

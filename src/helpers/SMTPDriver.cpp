@@ -281,7 +281,9 @@ bool SMTPdriver::sendDataBody( String body ){
   Log(F("SMTP sending data: "));
 	Logln(body);
 	#endif
-  this->client->println( body );
+  // this->client->println( body );
+  sendPacket( this->client, (uint8_t*)body.c_str(), body.length()+1 );
+  this->client->println();
   int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
 }
@@ -292,7 +294,9 @@ bool SMTPdriver::sendDataBody( char* body ){
   Log(F("SMTP sending data: "));
 	Logln(body);
 	#endif
-  this->client->println( body );
+  // this->client->println( body );
+  sendPacket( this->client, (uint8_t*)body, strlen(body) );
+  this->client->println();
   int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
 }
