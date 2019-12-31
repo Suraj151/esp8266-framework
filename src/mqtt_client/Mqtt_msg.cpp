@@ -1,3 +1,14 @@
+/******************************** MQTT File ***********************************
+This file is part of the Ewings Esp8266 Stack. It is referred from
+https://github.com/tuanpmt/esp_mqtt
+
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
 #include "Mqtt_msg.h"
 
 #define MQTT_MAX_FIXED_HEADER_SIZE 3

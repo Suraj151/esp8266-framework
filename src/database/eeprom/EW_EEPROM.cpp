@@ -1,24 +1,13 @@
-/*
-  EEPROM.cpp - esp8266 EEPROM emulation
+/***************************** Custom EEPROM **********************************
+This file is part of the Ewings Esp8266 Stack. It is modified/edited copy of
+arduino esp8266 eeprom library.
 
-  Copyright (c) 2014 Ivan Grokhotkov. All rights reserved.
-  This file is part of the esp8266 core for Arduino environment.
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
 
-  This library is free software; you can redistribute it and/or
-  modify it under the terms of the GNU Lesser General Public
-  License as published by the Free Software Foundation; either
-  version 2.1 of the License, or (at your option) any later version.
-
-  This library is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-  Lesser General Public License for more details.
-
-  You should have received a copy of the GNU Lesser General Public
-  License along with this library; if not, write to the Free Software
-  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-*/
-
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
 #include "Arduino.h"
 #include "EW_EEPROM.h"
 

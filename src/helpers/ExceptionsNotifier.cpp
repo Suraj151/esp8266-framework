@@ -1,4 +1,4 @@
-/**************************** exception notifier ******************************
+/**************************** Exception Notifier ******************************
 This file is part of the Ewings Esp8266 Stack.
 
 This is free software. you can redistribute it and/or modify it but without any

@@ -1,3 +1,14 @@
+/******************************** MQTT File ***********************************
+This file is part of the Ewings Esp8266 Stack. It is written with the reference
+of https://github.com/tuanpmt/esp_mqtt
+
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st June 2019
+******************************************************************************/
 #include <config/Config.h>
 
 #if defined(ENABLE_MQTT_SERVICE)
@@ -456,8 +467,6 @@ void MQTTClient::MQTT_Task(){
     uint8_t dataBuffer[MQTT_BUF_SIZE];  uint16_t dataLen;
     memset( dataBuffer, 0, MQTT_BUF_SIZE );
 
-    delay(0); // yield purpose
-
     switch (this->mqttClient.connState) {
 
       default:
@@ -549,6 +558,7 @@ void MQTTClient::MQTT_Task(){
           }
           break;
     }
+    delay(0); // yield purpose
 }
 
 void MQTTClient::mqtt_client_delete(){
@@ -812,8 +822,7 @@ void MQTTClient::mqtt_timer(){
     }
     Logln();
     #endif
-    delay(0); // yield purpose
-    if( this->mqttClient.connState == MQTT_DELETING ) return;
+    // if( this->mqttClient.connState == MQTT_DELETING ) return;
 
     if (this->mqttClient.connState == MQTT_DATA) {
 
@@ -821,7 +830,6 @@ void MQTTClient::mqtt_timer(){
         int _keep_alive = this->mqttClient.mqtt_state.connect_info->keepalive * 0.85;
         if ( this->mqttClient.keepAliveTick > _keep_alive ) {
             this->mqttClient.connState = MQTT_KEEPALIVE_REQ;
-            // this->MQTT_Task();
         }
         this->MQTT_Task();
     } else if (
@@ -862,9 +870,13 @@ void MQTTClient::mqtt_timer(){
           this->mqttClient.connState = MQTT_HOST_RECONNECT;
           this->MQTT_Task();
       }
+    }else{
+
+      //probably this->mqttClient.connState == MQTT_DELETING
     }
 
     if (this->mqttClient.sendTimeout > 0)  this->mqttClient.sendTimeout --;
+    delay(0); // yield purpose
 }
 
 void MQTTClient::Connect(){
