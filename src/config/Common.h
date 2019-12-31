@@ -78,8 +78,8 @@ extern "C" {
 /**
  * @define default username/ssid and password
  */
-#define USER            "Ewings"
-#define PASSPHRASE      "Ewings@123"
+#define USER            "esp8266Stack"
+#define PASSPHRASE      "espStack@8266"
 
 /**
  * @define general http parameters

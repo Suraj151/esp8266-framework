@@ -24,19 +24,19 @@ Ewings framework sits on the top of these Arduino libraries. So the whole struct
 
 ## Usage
 
-clone or download source, copy folder to esp8266 libraries path and restart the arduino ide. now navigate to File->Examples->EwingsEsp8266Stack->testing example compile and upload. 
+clone or download source, copy folder to esp8266 libraries path and restart the arduino ide. now navigate to File->Examples->EwingsEsp8266Stack->testing example compile and upload.
 
 **for now** : if you are uploading it first time in device then to load first default settings press flash key on nodemcu board for upto 10 seconds after 18-20 seconds from device initialize. device will get reset to default settings and restart.
 
-* after initialing device completely check in pc/mobile wifi list if **esp8266** name appear.
-* select it and enter default password **esp@8266**. 
+* after initialing device completely check in pc/mobile wifi list if **esp8266Stack** name appear.
+* select it and enter default password **espStack@8266**.
 * finally after succesful connectinon to device open browser, type **192.168.0.1** in address bar and hit enter
-* you will get in login screen, enter default username and password **( username: esp8266, password: esp@8266 )**
+* you will get in login screen, enter default username and password **( username: esp8266Stack, password: espStack@8266 )**
 * now you will able to see below menu options
 
 ![Local Portal](doc/portal_home_menu.jpg)
 
-you can play with all settings. 
+you can play with all settings.
 
 you can make custom default configs by making changes in files of src/config folder.
 
@@ -128,6 +128,8 @@ These helpers help to dynamically creates html tags.
 * **Views :**
 These are static html pages that split into header, middle and footer sections. At the time of sending http response we gathers them to form a complete html page.
 
+* **Web Resources :**
+These are required resources to server framework components.
 
 ## Features
 
