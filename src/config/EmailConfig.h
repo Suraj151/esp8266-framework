@@ -25,13 +25,14 @@ created Date    : 1st June 2019
 #define DEFAULT_MAIL_FROM_NAME_MAX_SIZE   DEFAULT_MAIL_HOST_MAX_SIZE
 #define DEFAULT_MAIL_TO_MAX_SIZE          DEFAULT_MAIL_FROM_MAX_SIZE
 
+
 #define DEFAULT_SENDING_DOMAIN            "www.example.com"
-#define DEFAULT_MAIL_HOST                 "mail.smtp2go.com"
+#define DEFAULT_MAIL_HOST                 "smtp.mailtrap.io"
 #define DEFAULT_MAIL_PORT                 2525
-#define DEFAULT_MAIL_USERNAME             "surajinamdar151@gmail.com"
-#define DEFAULT_MAIL_PASSWORD             "7057338151"
-#define DEFAULT_MAIL_FROM                 DEFAULT_MAIL_USERNAME
-#define DEFAULT_MAIL_TO                   DEFAULT_MAIL_USERNAME
+#define DEFAULT_MAIL_USERNAME             "sdc10dfgdf326d"
+#define DEFAULT_MAIL_PASSWORD             "zdvfvfdvddfvfd"
+#define DEFAULT_MAIL_FROM                 "surajinamdar151@gmail.com"
+#define DEFAULT_MAIL_TO                   DEFAULT_MAIL_FROM
 #define DEFAULT_MAIL_SUBJECT              "device status"
 #define DEFAULT_MAIL_FREQUENCY            300
 #define DEFAULT_MAIL_FROM_NAME            "esp8266"
