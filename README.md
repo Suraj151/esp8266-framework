@@ -24,9 +24,10 @@ Ewings framework sits on the top of these Arduino libraries. So the whole struct
 
 ## Usage
 
-clone or download source, copy folder to esp8266 libraries path and restart the arduino ide. now navigate to File->Examples->EwingsEsp8266Stack->testing example compile and upload.
+clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.2\libraries...) and restart the arduino ide. now in arduino ide navigate to File->Examples->EwingsEsp8266Stack->testing example compile and upload.
+**Note** that installed version of esp8266 should be > 2.6.x. 2.6.2 or greater is recommended. you can check your installed esp8266 version in tools->boards->board manager.
 
-**for now** : if you are uploading it first time in device then to load first default settings press flash key on nodemcu board for upto 10 seconds after 18-20 seconds from device initialize. device will get reset to default settings and restart.
+**for now** : if you are uploading it first time in device then press flash key on nodemcu board for upto 10 seconds after 18-20 seconds from device initialize to load first default settings. device will get reset to default settings and restart.
 
 * after initialing device completely check in pc/mobile wifi list if **esp8266Stack** name appear.
 * select it and enter default password **espStack@8266**.
@@ -35,11 +36,7 @@ clone or download source, copy folder to esp8266 libraries path and restart the 
 * now you will able to see below menu options
 
 ![Local Portal](doc/portal_home_menu.jpg)
-
-you can play with all settings.
-
-you can make custom default configs by making changes in files of src/config folder.
-
+you can play with all settings. you can make custom default configs by making changes in files of src/config folder.
 
 got to wifi settings and change the default station ssid, password to connect to your station. you can also change ssid and password for access point. device will reset once after you submit wifi settings, i.e. you have to reconnect device.
 
