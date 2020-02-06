@@ -180,7 +180,7 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
   while ( ! this->wifi->isConnected() ) {
 
     delay(999);
-    if( _wait%8 == 0 ){
+    if( _wait%7 == 0 ){
       #ifdef EW_SERIAL_LOG
         Log(F("\ntrying reconnect"));
       #endif
@@ -209,7 +209,7 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
   }else if( this->wifi->status() == WL_NO_SSID_AVAIL ){
     #ifdef EW_SERIAL_LOG
     Log(_wifi_credentials->sta_ssid);
-    Logln(F(" Not Found/reachable. Make sure it's availability in range."));
+    Logln(F(" Not Found/reachable. Make sure it's availability."));
     #endif
   }else if( this->wifi->status() == WL_CONNECT_FAILED ){
     #ifdef EW_SERIAL_LOG

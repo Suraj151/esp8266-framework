@@ -126,7 +126,7 @@ void TaskScheduler::handle_tasks(){
   for (uint16_t i = 0; i < _task_count; i++) _priority_indices[i] = i;
   for (uint16_t i = 0; i < _task_count; i++) {
     for (uint16_t j = i + 1; j < _task_count; j++) {
-      if ( this->_tasks[i]._task_priority < this->_tasks[i]._task_priority ) {
+      if ( this->_tasks[i]._task_priority < this->_tasks[j]._task_priority ) {
         std::swap(_priority_indices[i], _priority_indices[j]);
       }
     }
@@ -231,12 +231,12 @@ int TaskScheduler::get_unique_task_id( ){
 void TaskScheduler::printTaskSchedulerLogs(){
 
 	Logln(F("\nTasks : "));
-	Log(F("id"));Log("\t");
-	Log(F("priority"));Log("\t");
-	Log(F("duration"));Log("\t");
-	Log(F("last_ms"));Log("\t\t");
-	Log(F("execute_ms"));Log("\t");
-	Log(F("max_attempts"));Logln();
+	Log(F("id\t"));
+	Log(F("priority\t"));
+	Log(F("duration\t"));
+	Log(F("last_ms\t\t"));
+	Log(F("execute_ms\t"));
+	Log(F("max_attempts\n"));
 	for ( int i = 0; i < this->_tasks.size(); i++) {
 
     Log(this->_tasks[i]._task_id);Log("\t");

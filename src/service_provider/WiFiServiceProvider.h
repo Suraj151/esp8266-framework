@@ -34,9 +34,9 @@ class WiFiServiceProvider : public ServiceProvider {
 		}
 
     /**
-		 * @var	uint8_t|16  wifi_connection_timeout
+		 * @var	uint8_t  wifi_connection_timeout
 		 */
-    uint8_t wifi_connection_timeout=14;
+    uint8_t wifi_connection_timeout = WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT;
 
     /**
 		 * @var	uint8_t array temperory mac buffer

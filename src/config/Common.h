@@ -66,6 +66,7 @@ extern "C" {
 /**
  * @define wifi & internet connectivity check cycle durations
  */
+#define WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT 5  // will try to connect within this seconds
 #define WIFI_CONNECTIVITY_CHECK_DURATION 10000
 #define INTERNET_CONNECTIVITY_CHECK_DURATION WIFI_CONNECTIVITY_CHECK_DURATION
 
@@ -96,7 +97,7 @@ extern "C" {
 #define MAX_EVENT_CALLBACK_TASKS	MAX_SCHEDULABLE_TASKS
 
 /**
- * callback type
+ * Define required callback type
  */
 typedef std::function<void(int)> CallBackIntArgFn;
 typedef std::function<void(void)> CallBackVoidArgFn;
