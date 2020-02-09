@@ -20,18 +20,26 @@ Arduino has provided user-friendly libraries that use these SDK APIs at bottom. 
 
 Ewings framework sits on the top of these Arduino libraries. So the whole structure looks as shown in the above figure of Ewings Esp8266 Structure.
 
+## Installation
+
+**install from arduino ide**
+Goto Tools->Manage Libraries... then in library manager window type esp8266-framework in search bar then from results find esp8266-framework by Suraj I.and click on install.
+
+**install manually**
+To install manually clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.2\libraries...).
+
 ## Usage
 
-clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.2\libraries...) and restart the arduino ide. now in arduino ide navigate to File->Examples->EwingsEsp8266Stack->testing example compile and upload.
+Restart the arduino ide and navigate to File->Examples->esp8266-framework->EwStack example compile and upload.
 
 **Note** that installed version of esp8266 should be > 2.6.x. 2.6.2 or greater is recommended. you can check your installed esp8266 version in tools->boards->board manager (type "esp" in top search bar).
 
 **for now** : if you are uploading it first time in device then wait for 5 seconds(default station connect timeout on start) and then press flash key on nodemcu board for upto 6-7 seconds to load first default settings. device will get reset to default settings and restart.
 
-* after initialing device completely check in pc/mobile wifi list if **esp8266Stack** name appear.
+* after initializing device completely, check in pc/mobile wifi list if **esp8266Stack** name appear.
 * select it and enter default password **espStack@8266**.
-* finally after succesful connectinon to device open browser, type **192.168.0.1** in address bar and hit enter
-* you will get in login screen, enter default username and password **( username: esp8266Stack, password: espStack@8266 )**
+* finally after succesful connectinon to device open browser, type **192.168.0.1** in address bar and press enter
+* you will directed to login screen, enter default username and password **( username: esp8266Stack, password: espStack@8266 )**
 * now you will able to see below menu options
 
 ![Local Portal](doc/portal_home_menu.jpg)
