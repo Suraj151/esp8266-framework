@@ -23,9 +23,11 @@ Ewings framework sits on the top of these Arduino libraries. So the whole struct
 ## Installation
 
 **install from arduino ide**
-Goto Tools->Manage Libraries... then in library manager window type esp8266-framework in search bar then from results find esp8266-framework by Suraj I.and click on install.
+
+Goto Tools->Manage Libraries... then in library manager window type esp8266-framework in search bar then from results find esp8266-framework by Suraj I., select latest version and click on install.
 
 **install manually**
+
 To install manually clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.2\libraries...).
 
 ## Usage
@@ -141,11 +143,13 @@ Esp8266 has many built in features that will be useful in network applications. 
 * **NAT :**
 Network address translation (NAT) is a method of remapping one IP address space into another by modifying network address information in the IP header of packets while they are in transit across a traffic routing device. With this feature we can extend station network ( network that has active internet ) range.
 
-    from v2.6.^ arduino has provided initial support example of NAT with lwip v2 variant.
+    from v2.6.^ arduino has provided initial support example of NAT with lwip v2 variant (IPv4 only).
 
-    before that lwip 1.4 is used to enable napt ( network address & port transform ) feature but with some customizations in lwip1.4. you can test it just rename ".....esp8266/tools/sdk/lwip" with ".....esp8266/tools/sdk/lwip.org" and copy lwip folder ( in this repo ) there. do not forget to select lwip 1.4 compile from source variant in arduino tools option while building also make required changes in config/Common.h file regarding lwip feature.
+    before that lwip 1.4 is used to enable napt ( network address & port transform ) feature but with some customizations in lwip1.4.
+    
+    **you can test lwip 1.4** just rename "...esp8266/tools/sdk/lwip" with "...esp8266/tools/sdk/lwip.org" and copy lwip folder ( in this repo ) there. do not forget to select lwip 1.4 compile from source variant in arduino tools option while building.
 
-    By default this feature is active.
+    By default this feature is active based on what lwip variant from ide tool option is selected.
 
 * **MESH :**
 This feature easily possible with esp8266 esponow feature. Ewings stack provided basic espnow service to make this available in application where mesh network is required. The basic motive to bring this feature is connectivity.
