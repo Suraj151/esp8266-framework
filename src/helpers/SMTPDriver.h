@@ -132,7 +132,7 @@ enum smtp_command_status {
 };
 
 #define SMTP_RESPONSE_BUFFER_SIZE 520
-#define SMTP_DEFAULT_TIMEOUT 5000
+#define SMTP_DEFAULT_TIMEOUT MILLISECOND_DURATION_5000
 
 /**
  * SMTPdriver class

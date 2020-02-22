@@ -249,7 +249,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
     this->_gpio_http_request_cb_id = __task_scheduler.updateInterval(
       this->_gpio_http_request_cb_id,
       [&]() { this->handleGpioHttpRequest(); },
-      this->virtual_gpio_configs.gpio_post_frequency*1000
+      this->virtual_gpio_configs.gpio_post_frequency*MILLISECOND_DURATION_1000
     );
   }else{
     __task_scheduler.clearInterval( this->_gpio_http_request_cb_id );

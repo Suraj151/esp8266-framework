@@ -26,7 +26,7 @@ created Date    : 1st June 2019
 #define MQTT_MAX_PUBLISH_TOPIC  2
 #define MQTT_MAX_SUBSCRIBE_TOPIC  MQTT_MAX_PUBLISH_TOPIC
 
-#define MQTT_INITIALIZE_DURATION   5000
+#define MQTT_INITIALIZE_DURATION   MILLISECOND_DURATION_5000
 
 /**
  * enable/disable mqtt config modification here

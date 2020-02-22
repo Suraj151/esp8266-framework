@@ -167,7 +167,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
         this->_mqtt_timer_cb_id = __task_scheduler.updateInterval(
           this->_mqtt_timer_cb_id,
           [&]() { this->mqtt_client.mqtt_timer(); },
-          1000
+          MILLISECOND_DURATION_1000
         );
       }else{
         __task_scheduler.clearInterval( this->_mqtt_timer_cb_id );
@@ -200,7 +200,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
     this->_mqtt_publish_cb_id = __task_scheduler.updateInterval(
       this->_mqtt_publish_cb_id,
       [&]() { this->handleMqttPublish(); },
-      _mqtt_pubsub_configs.publish_frequency*1000
+      _mqtt_pubsub_configs.publish_frequency*MILLISECOND_DURATION_1000
     );
   }else{
     __task_scheduler.clearInterval( this->_mqtt_publish_cb_id );
@@ -211,7 +211,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
     this->_mqtt_subscribe_cb_id = __task_scheduler.updateInterval(
       this->_mqtt_subscribe_cb_id,
       [&]() { this->handleMqttSubScribe(); },
-      _mqtt_general_configs.keepalive*1000
+      _mqtt_general_configs.keepalive*MILLISECOND_DURATION_1000
     );
   }else{
     __task_scheduler.clearInterval( this->_mqtt_subscribe_cb_id );

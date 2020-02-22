@@ -28,7 +28,7 @@ created Date    : 1st June 2019
 /**
  * @define gpio parameters
  */
-#define GPIO_OPERATION_DURATION 1000
+#define GPIO_OPERATION_DURATION MILLISECOND_DURATION_1000
 #define GPIO_TABLE_UPDATE_DURATION 300000
 
 /**

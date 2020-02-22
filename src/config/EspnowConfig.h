@@ -23,7 +23,7 @@ extern "C" {
 #define ESP_NOW_DEVICE_TABLE_MAX_SIZE   20
 #define ESP_NOW_MAX_BUFF_SIZE           250
 
-#define ESP_NOW_HANDLE_DURATION         5000
+#define ESP_NOW_HANDLE_DURATION         MILLISECOND_DURATION_5000
 
 enum esp_now_state {
   ESP_NOW_STATE_EMPTY,

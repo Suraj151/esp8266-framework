@@ -16,6 +16,13 @@ extern "C" {
 }
 
 /**
+ * @define common time durations
+ */
+#define MILLISECOND_DURATION_1000   1000
+#define MILLISECOND_DURATION_5000   5000
+#define MILLISECOND_DURATION_10000  10000
+
+/**
  * enable/disable gpio and mqtt feature here
  */
 #define ENABLE_MQTT_SERVICE
@@ -60,21 +67,29 @@ extern "C" {
  * @define flash key parameters for reset factory
  */
 #define FLASH_KEY_PIN             D3
-#define FLASH_KEY_PRESS_DURATION  1000
+#define FLASH_KEY_PRESS_DURATION  MILLISECOND_DURATION_1000
 #define FLASH_KEY_PRESS_COUNT_THR 5
 
 /**
  * @define wifi & internet connectivity check cycle durations
  */
 #define WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT 5  // will try to connect within this seconds
-#define WIFI_CONNECTIVITY_CHECK_DURATION 10000
+#define WIFI_CONNECTIVITY_CHECK_DURATION MILLISECOND_DURATION_10000
 #define INTERNET_CONNECTIVITY_CHECK_DURATION WIFI_CONNECTIVITY_CHECK_DURATION
 
 /**
  * @define network address & port translation feature
  */
-// #define ENABLE_NAPT_FEATURE
-#define ENABLE_NAPT_FEATURE_LWIP_V2
+#if IP_NAPT && LWIP_VERSION_MAJOR==1
+  #define ENABLE_NAPT_FEATURE
+#elif IP_NAPT && LWIP_VERSION_MAJOR==2
+  #define ENABLE_NAPT_FEATURE_LWIP_V2
+#endif
+
+
+#if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
+  #define NAPT_INIT_DURATION_AFTER_WIFI_CONNECT MILLISECOND_DURATION_5000
+#endif
 
 /**
  * @define default username/ssid and password
@@ -86,7 +101,7 @@ extern "C" {
  * @define general http parameters
  */
 #define HTTP_HOST_ADDR_MAX_SIZE 100
-#define HTTP_REQUEST_DURATION   10000
+#define HTTP_REQUEST_DURATION   MILLISECOND_DURATION_10000
 #define HTTP_REQUEST_RETRY      1
 
 /**

@@ -20,6 +20,12 @@ void EwingsEsp8266Stack::initialize(){
   #endif
   __database_service.init_default_database();
   __event_service.begin();
+  #if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
+  __event_service.add_event_listener( EVENT_WIFI_STA_CONNECTED, [&](void*sta_connected) {
+    __task_scheduler.setTimeout( [&]() { this->enable_napt_service(); }, NAPT_INIT_DURATION_AFTER_WIFI_CONNECT );
+  } );
+  #endif
+
   __wifi_service.begin( this->wifi );
   __ping_service.init_ping( this->wifi );
   #ifdef ENABLE_EWING_HTTP_SERVER
@@ -44,10 +50,6 @@ void EwingsEsp8266Stack::initialize(){
   __task_scheduler.setInterval( [&]() { __factory_reset.handleFlashKeyPress(); }, FLASH_KEY_PRESS_DURATION );
   __factory_reset.run_while_factory_reset( [&]() { __database_service.clear_default_tables(); this->wifi->disconnect(true); } );
 
-  #if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
-  this->enable_napt_service();
-  #endif
-
   #ifdef ENABLE_ESP_NOW
   __espnow_service.beginEspNow( this->wifi );
   __task_scheduler.setInterval( [&]() { __espnow_service.handlePeers(); }, ESP_NOW_HANDLE_DURATION );
@@ -63,6 +65,7 @@ void EwingsEsp8266Stack::initialize(){
  * enable napt feature
  */
 void EwingsEsp8266Stack::enable_napt_service(){
+
   // Initialize the NAT feature
   ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
   // Enable NAT on the AP interface
@@ -70,7 +73,8 @@ void EwingsEsp8266Stack::enable_napt_service(){
   // Set the DNS server for clients of the AP to the one we also use for the STA interface
   dhcps_set_DNS(this->wifi->dnsIP());
   #ifdef EW_SERIAL_LOG
-    Logln(F("NAPT initialization done"));
+    Log(F("NAPT(lwip "));Log(LWIP_VERSION_MAJOR);
+    Logln(F(") initialization done"));
   #endif
 }
 #elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
@@ -79,14 +83,15 @@ void EwingsEsp8266Stack::enable_napt_service(){
  */
 void EwingsEsp8266Stack::enable_napt_service(){
 
-  // Initialize the NAT feature
+  // Initialize the NAPT feature
   err_t ret = ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
   if (ret == ERR_OK) {
     // Enable NAT on the AP interface
     ret = ip_napt_enable_no(SOFTAP_IF, 1);
     if (ret == ERR_OK) {
       #ifdef EW_SERIAL_LOG
-        Logln(F("NAPT initialization done"));
+        Log(F("NAPT(lwip "));Log(LWIP_VERSION_MAJOR);
+        Logln(F(") initialization done"));
       #endif
       // Set the DNS server for clients of the AP to the one we also use for the STA interface
       dhcps_set_dns(0, this->wifi->dnsIP(0));

@@ -12,9 +12,10 @@ created Date    : 1st June 2019
 #define __EWINGS_LOG_UTILITY_H__
 
 #include <Arduino.h>
+#include <config/Config.h>
 
 #define EW_SERIAL_LOG
-#define EW_DEFAULT_LOG_DURATION	5000
+#define EW_DEFAULT_LOG_DURATION	MILLISECOND_DURATION_5000
 
 #ifdef EW_SERIAL_LOG
 
