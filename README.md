@@ -5,7 +5,11 @@ Basically it is designed on the top of arduino-esp8266 layer to make things easy
 
 **Ewings Esp8266 Framework Structure**
 
-![Ewings Esp8266 Framework Structure](doc/ewings_stack.jpg)
+
+<p align="center">
+  <img width="500" src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/ewings_stack.jpg">
+</p>
+
 
 ESP8266 Wi-Fi SoC offers a complete and self-contained Wi-Fi networking solution. When the ESP8266 hosts application, it boots up directly from an external flash.
 It has an integrated cache to improve the performance of system’s running applications.
@@ -44,7 +48,10 @@ Restart the arduino ide and navigate to File->Examples->esp8266-framework->EwSta
 * you will directed to login screen, enter default username and password **( username: esp8266Stack, password: espStack@8266 )**
 * now you will able to see below menu options
 
-![Local Portal](doc/portal_home_menu.jpg)
+<p align="center">
+  <img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/portal_home_menu.jpg">
+</p>
+
 
 you can play with all settings. you can modify configs by making changes in files of src/config folder. Go to wifi settings and change the default station ssid, password to connect to your station. you can also change ssid and password for access point. device will reset once after you submit wifi settings, i.e. you have to reconnect device.
 
