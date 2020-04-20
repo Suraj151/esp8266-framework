@@ -183,3 +183,7 @@ As name clears the purpose of this utility. It just used to convert the data typ
 
 * **Logger :**
 Logger enables log on uart0 pins at 115200 baud rate. This is useful in case of debugging application flow.
+
+
+#### Detailed Documentation
+Detailed documentations are ongoing in wiki page of repo....
