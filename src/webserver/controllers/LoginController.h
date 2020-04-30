@@ -33,7 +33,7 @@ class LoginController : public Controller {
 		/**
 		 * LoginController constructor
 		 */
-		LoginController(){
+		LoginController():Controller("login"){
 		}
 
 		/**

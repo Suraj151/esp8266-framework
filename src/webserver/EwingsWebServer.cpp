@@ -23,20 +23,12 @@ void WebServer::start_server( ESP8266WiFiClass* _wifi ){
   this->wifi = _wifi;
   __web_resource.collect_resource( &this->server, this->wifi );
 
-  this->home_controller.boot();
-  this->login_controller.boot();
-  this->dashboard_controller.boot();
-  this->ota_controller.boot();
-  this->wificonfig_controller.boot();
-  #ifdef ENABLE_GPIO_SERVICE
-  this->gpio_controller.boot();
-  #endif
-  #ifdef ENABLE_MQTT_SERVICE
-  this->mqtt_controller.boot();
-  #endif
-  #ifdef ENABLE_EMAIL_SERVICE
-  this->emailconfig_controller.boot();
-  #endif
+  for (int i = 0; i < Controller::controllers.size(); i++) {
+    #ifdef EW_SERIAL_LOG
+    Log(F("booting :"));Log(Controller::controllers[i].controller->controller_name);Logln(F(" controller"));
+    #endif
+    Controller::controllers[i].controller->boot();
+  }
 
   //here the list of headers to be recorded
   // const char * headerkeys[] = {"User-Agent", "Cookie"} ;
@@ -46,7 +38,7 @@ void WebServer::start_server( ESP8266WiFiClass* _wifi ){
   this->server.collectHeaders(headerkeys, headerkeyssize);
   this->server.begin();
   #ifdef EW_SERIAL_LOG
-  Logln(F("HTTP server started"));
+  Logln(F("HTTP server started !"));
   #endif
 }
 

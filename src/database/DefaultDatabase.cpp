@@ -10,52 +10,72 @@ created Date    : 1st June 2019
 
 #include "DefaultDatabase.h"
 
-/**
- * initialize default database with size as input parameter.
- * defaults to eeprom max size as defined.
- *
- * @param uint16_t|EEPROM_MAX  _size
- */
-void DefaultDatabase::init_default_database(  uint16_t _size ){
 
-  this->init_database(_size);
-  this->register_table( &_global_config_defaults, GLOBAL_CONFIG_TABLE_ADDRESS );
-  this->register_table( &_login_credential_defaults, LOGIN_CREDENTIAL_TABLE_ADDRESS );
-  this->register_table( &_wifi_config_defaults, WIFI_CONFIG_TABLE_ADDRESS );
-  this->register_table( &_ota_config_defaults, OTA_CONFIG_TABLE_ADDRESS );
-  #ifdef ENABLE_GPIO_SERVICE
-  this->register_table( &_gpio_config_defaults, GPIO_CONFIG_TABLE_ADDRESS );
-  #endif
-  #ifdef ENABLE_MQTT_SERVICE
-  this->register_table( &_mqtt_general_config_defaults, MQTT_GENERAL_CONFIG_TABLE_ADDRESS );
-  this->register_table( &_mqtt_lwt_config_defaults, MQTT_LWT_CONFIG_TABLE_ADDRESS );
-  this->register_table( &_mqtt_pubsub_config_defaults, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS );
-  #endif
-  #ifdef ENABLE_EMAIL_SERVICE
-  this->register_table( &_email_config_defaults, EMAIL_CONFIG_TABLE_ADDRESS );
-  #endif
+
+/**
+ * @var	GlobalTable	__global_table
+ */
+GlobalTable	__global_table;
+
+/**
+ * @var	LoginTable	__login_table
+ */
+LoginTable	__login_table;
+
+/**
+ * @var	WiFiTable	__wifi_table
+ */
+WiFiTable	__wifi_table;
+
+/**
+ * @var	OtaTable	__ota_table
+ */
+OtaTable	__ota_table;
+
+
+#ifdef ENABLE_GPIO_SERVICE
+/**
+ * @var	GpioTable	__gpio_table
+ */
+GpioTable	__gpio_table;
+#endif
+
+#ifdef ENABLE_MQTT_SERVICE
+/**
+ * @var	MqttGeneralTable	__mqtt_general_table
+ */
+MqttGeneralTable	__mqtt_general_table;
+/**
+ * @var	MqttLwtTable	__mqtt_lwt_table
+ */
+MqttLwtTable	__mqtt_lwt_table;
+/**
+ * @var	MqttPubSubTable	__mqtt_pubsub_table
+ */
+MqttPubSubTable	__mqtt_pubsub_table;
+#endif
+
+#ifdef ENABLE_EMAIL_SERVICE
+/**
+ * @var	EmailTable	__email_table
+ */
+EmailTable	__email_table;
+#endif
+
+
+
+/**
+ * init all tables.
+ */
+void DefaultDatabase::init_default_database(){
+  __database.init_database();
 }
 
 /**
  * clear all tables to their defaults value.
  */
 void DefaultDatabase::clear_default_tables(){
-
-  this->clear_table_to_defaults( &_global_config_defaults, GLOBAL_CONFIG_TABLE_ADDRESS );
-  this->clear_table_to_defaults( &_login_credential_defaults, LOGIN_CREDENTIAL_TABLE_ADDRESS );
-  this->clear_table_to_defaults( &_wifi_config_defaults, WIFI_CONFIG_TABLE_ADDRESS );
-  this->clear_table_to_defaults( &_ota_config_defaults, OTA_CONFIG_TABLE_ADDRESS );
-  #ifdef ENABLE_GPIO_SERVICE
-  this->clear_table_to_defaults( &_gpio_config_defaults, GPIO_CONFIG_TABLE_ADDRESS );
-  #endif
-  #ifdef ENABLE_MQTT_SERVICE
-  this->clear_table_to_defaults( &_mqtt_general_config_defaults, MQTT_GENERAL_CONFIG_TABLE_ADDRESS );
-  this->clear_table_to_defaults( &_mqtt_lwt_config_defaults, MQTT_LWT_CONFIG_TABLE_ADDRESS );
-  this->clear_table_to_defaults( &_mqtt_pubsub_config_defaults, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS );
-  #endif
-  #ifdef ENABLE_EMAIL_SERVICE
-  this->clear_table_to_defaults( &_email_config_defaults, EMAIL_CONFIG_TABLE_ADDRESS );
-  #endif
+  __database.clear_all();
 }
 
 /**
@@ -64,7 +84,7 @@ void DefaultDatabase::clear_default_tables(){
  * @return global_config_table
  */
 global_config_table DefaultDatabase::get_global_config_table(){
-  return this->get_table_by_address<global_config_table>(GLOBAL_CONFIG_TABLE_ADDRESS);
+  return __global_table.get();
 }
 
 /**
@@ -73,7 +93,7 @@ global_config_table DefaultDatabase::get_global_config_table(){
  * @return login_credential_table
  */
 login_credential_table DefaultDatabase::get_login_credential_table(){
-  return this->get_table_by_address<login_credential_table>(LOGIN_CREDENTIAL_TABLE_ADDRESS);
+  return __login_table.get();
 }
 
 /**
@@ -82,7 +102,7 @@ login_credential_table DefaultDatabase::get_login_credential_table(){
  * @return wifi_config_table
  */
 wifi_config_table DefaultDatabase::get_wifi_config_table(){
-  return this->get_table_by_address<wifi_config_table>(WIFI_CONFIG_TABLE_ADDRESS);
+  return __wifi_table.get();
 }
 
 /**
@@ -91,7 +111,7 @@ wifi_config_table DefaultDatabase::get_wifi_config_table(){
  * @return ota_config_table
  */
 ota_config_table DefaultDatabase::get_ota_config_table(){
-  return this->get_table_by_address<ota_config_table>(OTA_CONFIG_TABLE_ADDRESS);
+  return __ota_table.get();
 }
 
 #ifdef ENABLE_GPIO_SERVICE
@@ -101,7 +121,7 @@ ota_config_table DefaultDatabase::get_ota_config_table(){
  * @return gpio_config_table
  */
 gpio_config_table DefaultDatabase::get_gpio_config_table(){
-  return this->get_table_by_address<gpio_config_table>(GPIO_CONFIG_TABLE_ADDRESS);
+  return __gpio_table.get();
 }
 #endif
 
@@ -112,7 +132,7 @@ gpio_config_table DefaultDatabase::get_gpio_config_table(){
  * @return mqtt_general_config_table
  */
 mqtt_general_config_table DefaultDatabase::get_mqtt_general_config_table(){
-  return this->get_table_by_address<mqtt_general_config_table>(MQTT_GENERAL_CONFIG_TABLE_ADDRESS);
+  return __mqtt_general_table.get();
 }
 
 /**
@@ -121,7 +141,7 @@ mqtt_general_config_table DefaultDatabase::get_mqtt_general_config_table(){
  * @return mqtt_lwt_config_table
  */
 mqtt_lwt_config_table DefaultDatabase::get_mqtt_lwt_config_table(){
-  return this->get_table_by_address<mqtt_lwt_config_table>(MQTT_LWT_CONFIG_TABLE_ADDRESS);
+  return __mqtt_lwt_table.get();
 }
 
 /**
@@ -130,7 +150,7 @@ mqtt_lwt_config_table DefaultDatabase::get_mqtt_lwt_config_table(){
  * @return mqtt_pubsub_config_table
  */
 mqtt_pubsub_config_table DefaultDatabase::get_mqtt_pubsub_config_table(){
-  return this->get_table_by_address<mqtt_pubsub_config_table>(MQTT_PUBSUB_CONFIG_TABLE_ADDRESS);
+  return __mqtt_pubsub_table.get();
 }
 #endif
 
@@ -141,7 +161,7 @@ mqtt_pubsub_config_table DefaultDatabase::get_mqtt_pubsub_config_table(){
  * @return email_config_table
  */
 email_config_table DefaultDatabase::get_email_config_table(){
-  return this->get_table_by_address<email_config_table>(EMAIL_CONFIG_TABLE_ADDRESS);
+  return __email_table.get();
 }
 #endif
 
@@ -151,7 +171,7 @@ email_config_table DefaultDatabase::get_email_config_table(){
  * @param global_config_table* _table
  */
 void DefaultDatabase::set_global_config_table( global_config_table* _table ){
-  this->set_table( _table, GLOBAL_CONFIG_TABLE_ADDRESS );
+  __global_table.set( _table );
 }
 
 /**
@@ -160,7 +180,7 @@ void DefaultDatabase::set_global_config_table( global_config_table* _table ){
  * @param login_credential_table* _table
  */
 void DefaultDatabase::set_login_credential_table( login_credential_table* _table ){
-  this->set_table( _table, LOGIN_CREDENTIAL_TABLE_ADDRESS );
+  __login_table.set( _table );
 }
 
 /**
@@ -169,7 +189,7 @@ void DefaultDatabase::set_login_credential_table( login_credential_table* _table
  * @param wifi_config_table* _table
  */
 void DefaultDatabase::set_wifi_config_table( wifi_config_table* _table ){
-  this->set_table( _table, WIFI_CONFIG_TABLE_ADDRESS );
+  __wifi_table.set( _table );
 }
 
 /**
@@ -178,7 +198,7 @@ void DefaultDatabase::set_wifi_config_table( wifi_config_table* _table ){
  * @param ota_config_table* _table
  */
 void DefaultDatabase::set_ota_config_table( ota_config_table* _table ){
-  this->set_table( _table, OTA_CONFIG_TABLE_ADDRESS );
+  __ota_table.set( _table );
 }
 
 #ifdef ENABLE_GPIO_SERVICE
@@ -188,7 +208,7 @@ void DefaultDatabase::set_ota_config_table( ota_config_table* _table ){
  * @param gpio_config_table* _table
  */
 void DefaultDatabase::set_gpio_config_table( gpio_config_table* _table ){
-  this->set_table( _table, GPIO_CONFIG_TABLE_ADDRESS );
+  __gpio_table.set( _table );
 }
 #endif
 
@@ -199,7 +219,7 @@ void DefaultDatabase::set_gpio_config_table( gpio_config_table* _table ){
  * @param mqtt_general_config_table* _table
  */
 void DefaultDatabase::set_mqtt_general_config_table( mqtt_general_config_table* _table ){
-  this->set_table( _table, MQTT_GENERAL_CONFIG_TABLE_ADDRESS );
+  __mqtt_general_table.set( _table );
 }
 
 /**
@@ -208,7 +228,7 @@ void DefaultDatabase::set_mqtt_general_config_table( mqtt_general_config_table* 
  * @param mqtt_lwt_config_table* _table
  */
 void DefaultDatabase::set_mqtt_lwt_config_table( mqtt_lwt_config_table* _table ){
-  this->set_table( _table, MQTT_LWT_CONFIG_TABLE_ADDRESS );
+  __mqtt_lwt_table.set( _table );
 }
 
 /**
@@ -217,7 +237,7 @@ void DefaultDatabase::set_mqtt_lwt_config_table( mqtt_lwt_config_table* _table )
  * @param mqtt_pubsub_config_table* _table
  */
 void DefaultDatabase::set_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _table ){
-  this->set_table( _table, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS );
+  __mqtt_pubsub_table.set( _table );
 }
 #endif
 
@@ -228,79 +248,9 @@ void DefaultDatabase::set_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _t
  * @param email_config_table* _table
  */
 void DefaultDatabase::set_email_config_table( email_config_table* _table ){
-  this->set_table( _table, EMAIL_CONFIG_TABLE_ADDRESS );
+  __email_table.set( _table );
 }
 #endif
 
-/**
- * template to return different type of tables in database by their
- * address.
- *
- * @param   uint16_t  _address
- * @return  type of database table
- */
-template <typename T> T DefaultDatabase::get_table_by_address( uint16_t _address ) {
-
-  T _t;
-
-  switch (_address) {
-    case GLOBAL_CONFIG_TABLE_ADDRESS:{
-
-      this->get_table( &_t, GLOBAL_CONFIG_TABLE_ADDRESS );
-      break;
-    }
-    case LOGIN_CREDENTIAL_TABLE_ADDRESS:{
-
-      this->get_table( &_t, LOGIN_CREDENTIAL_TABLE_ADDRESS );
-      break;
-    }
-    case WIFI_CONFIG_TABLE_ADDRESS:{
-
-      this->get_table( &_t, WIFI_CONFIG_TABLE_ADDRESS );
-      break;
-    }
-    case OTA_CONFIG_TABLE_ADDRESS:{
-
-      this->get_table( &_t, OTA_CONFIG_TABLE_ADDRESS );
-      break;
-    }
-    #ifdef ENABLE_GPIO_SERVICE
-    case GPIO_CONFIG_TABLE_ADDRESS:{
-
-      this->get_table( &_t, GPIO_CONFIG_TABLE_ADDRESS );
-      break;
-    }
-    #endif
-    #ifdef ENABLE_MQTT_SERVICE
-    case MQTT_GENERAL_CONFIG_TABLE_ADDRESS:{
-
-      this->get_table( &_t, MQTT_GENERAL_CONFIG_TABLE_ADDRESS );
-      break;
-    }
-    case MQTT_LWT_CONFIG_TABLE_ADDRESS:{
-
-      this->get_table( &_t, MQTT_LWT_CONFIG_TABLE_ADDRESS );
-      break;
-    }
-    case MQTT_PUBSUB_CONFIG_TABLE_ADDRESS:{
-
-      this->get_table( &_t, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS );
-      break;
-    }
-    #endif
-    #ifdef ENABLE_EMAIL_SERVICE
-    case EMAIL_CONFIG_TABLE_ADDRESS:{
-
-      this->get_table( &_t, EMAIL_CONFIG_TABLE_ADDRESS );
-      break;
-    }
-    #endif
-    default: {
-      // _t = NULL;
-      break;
-    }
-  }
-  return _t;
-}
 
 DefaultDatabase __database_service;

@@ -34,7 +34,7 @@ class EmailConfigController : public Controller {
 		/**
 		 * EmailConfigController constructor
 		 */
-		EmailConfigController(){
+		EmailConfigController():Controller("email"){
 		}
 
 		/**

@@ -37,7 +37,7 @@ class GpioController : public Controller {
 		/**
 		 * GpioController constructor
 		 */
-		GpioController(){
+		GpioController():Controller("gpio"){
 		}
 
 		/**

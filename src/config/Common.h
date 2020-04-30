@@ -34,6 +34,11 @@ extern "C" {
 #define ENABLE_EMAIL_SERVICE
 
 /**
+ * enable/disable serial log
+ */
+#define EW_SERIAL_LOG
+
+/**
  * enable/disable exception notifier
  */
 // #define ENABLE_EXCEPTION_NOTIFIER

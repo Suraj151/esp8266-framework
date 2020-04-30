@@ -24,7 +24,7 @@ class HomeController : public Controller {
 		/**
 		 * HomeController constructor
 		 */
-		HomeController(){
+		HomeController():Controller("home"){
 		}
 
 		/**

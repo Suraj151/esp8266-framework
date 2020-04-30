@@ -24,7 +24,7 @@ class DashboardController : public Controller {
 		/**
 		 * DashboardController constructor
 		 */
-		DashboardController(){
+		DashboardController():Controller("dashboard"){
 		}
 
 		/**

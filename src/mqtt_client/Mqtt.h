@@ -44,7 +44,7 @@ typedef enum {
 } tConnState;
 
 #ifndef MQTT_DEFAULT_KEEPALIVE
-#define MQTT_DEFAULT_KEEPALIVE  120     /*second*/
+#define MQTT_DEFAULT_KEEPALIVE  60     /*second*/
 #endif
 
 #ifndef MQTT_HOST_CONNECT_TIMEOUT

@@ -153,7 +153,7 @@ Network address translation (NAT) is a method of remapping one IP address space 
     from v2.6.^ arduino has provided initial support example of NAT with lwip v2 variant (IPv4 only).
 
     before that lwip 1.4 is used to enable napt ( network address & port transform ) feature but with some customizations in lwip1.4.
-    
+
     **you can test lwip 1.4** just rename "...esp8266/tools/sdk/lwip" with "...esp8266/tools/sdk/lwip.org" and copy lwip folder ( in this repo ) there. do not forget to select lwip 1.4 compile from source variant in arduino tools option while building.
 
     By default this feature is active based on what lwip variant from ide tool option is selected.
@@ -185,5 +185,5 @@ As name clears the purpose of this utility. It just used to convert the data typ
 Logger enables log on uart0 pins at 115200 baud rate. This is useful in case of debugging application flow.
 
 
-#### Detailed Documentation
-Detailed documentations are ongoing in wiki page of repo....
+## Detailed Documentation
+Detailed documentation is ongoing at wiki page, please visit [wiki page](https://github.com/Suraj151/esp8266-framework/wiki)....

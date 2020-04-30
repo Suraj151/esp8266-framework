@@ -197,7 +197,13 @@ bool TaskScheduler::remove_task( int _id ){
 	for ( uint16_t i = 0; i < this->_tasks.size(); i++) {
 
 		if( this->_tasks[i]._task_id == _id ){
-			this->_tasks.erase( this->_tasks.begin() + i );
+			// removing task create bug if this function will call inside another task
+			// hence making its max attempts to 0 which will considered as expired task
+			// this->_tasks.erase( this->_tasks.begin() + i );
+			this->_tasks[i]._duration = 10;
+			this->_tasks[i]._task_priority = 0;
+			this->_tasks[i]._max_attempts = 0;
+			this->_tasks[i]._task = nullptr;
 			_removed = true;
     }
 	}return _removed;

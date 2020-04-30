@@ -14,7 +14,6 @@ created Date    : 1st June 2019
 #include <Arduino.h>
 #include <config/Config.h>
 
-#define EW_SERIAL_LOG
 #define EW_DEFAULT_LOG_DURATION	MILLISECOND_DURATION_5000
 
 #ifdef EW_SERIAL_LOG

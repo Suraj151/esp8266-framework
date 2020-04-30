@@ -12,12 +12,26 @@ created Date    : 1st June 2019
 #define _DEFAULT_DATABASE_H_
 
 #include <config/Config.h>
-#include "EepromDatabase.h"
+#include "DatabaseTable.h"
+#include "GlobalTable.h"
+#include "LoginTable.h"
+#include "WiFiTable.h"
+#include "OtaTable.h"
+#ifdef ENABLE_GPIO_SERVICE
+#include "GpioTable.h"
+#endif
+#ifdef ENABLE_MQTT_SERVICE
+#include "MqttTables.h"
+#endif
+#ifdef ENABLE_EMAIL_SERVICE
+#include "EmailTable.h"
+#endif
+
 
 /**
- * DefaultDatabase class extends public EepromDatabase as its base/parent class
+ * DefaultDatabase class
  */
-class DefaultDatabase : public EepromDatabase {
+class DefaultDatabase {
 
   public:
 
@@ -33,7 +47,7 @@ class DefaultDatabase : public EepromDatabase {
     ~DefaultDatabase(){
     }
 
-    void init_default_database(  uint16_t _size = EEPROM_MAX );
+    void init_default_database();
     void clear_default_tables();
 
     global_config_table get_global_config_table();
@@ -73,8 +87,6 @@ class DefaultDatabase : public EepromDatabase {
     #ifdef ENABLE_EMAIL_SERVICE
     void set_email_config_table( email_config_table* _table );
     #endif
-
-    template <typename T> T get_table_by_address( uint16_t _address );
 
 };
 

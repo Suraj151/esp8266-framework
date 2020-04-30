@@ -25,7 +25,7 @@ class MqttController : public Controller {
 		/**
 		 * MqttController constructor
 		 */
-		MqttController(){
+		MqttController():Controller("mqtt"){
 		}
 
 		/**

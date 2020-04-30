@@ -31,7 +31,7 @@ class WiFiConfigController : public Controller {
 		/**
 		 * WiFiConfigController constructor
 		 */
-		WiFiConfigController(){
+		WiFiConfigController():Controller("wifi"){
 		}
 
 		/**
@@ -181,7 +181,7 @@ class WiFiConfigController : public Controller {
 
 				#ifdef ALLOW_WIFI_CONFIG_MODIFICATION
           && _ap_ssid.length() <= WIFI_CONFIGS_BUF_SIZE && _ap_pswd.length() <= WIFI_CONFIGS_BUF_SIZE &&
-          _sta_ssid.length() > MIN_ACCEPTED_ARG_SIZE && _sta_pswd.length() > MIN_ACCEPTED_ARG_SIZE &&
+          _sta_ssid.length() > MIN_ACCEPTED_ARG_SIZE &&
           _ap_ssid.length() > MIN_ACCEPTED_ARG_SIZE && _ap_pswd.length() > MIN_ACCEPTED_ARG_SIZE
 				#endif
 

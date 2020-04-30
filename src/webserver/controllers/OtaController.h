@@ -25,7 +25,7 @@ class OtaController : public Controller {
 		/**
 		 * OtaController constructor
 		 */
-		OtaController(){
+		OtaController():Controller("ota"){
 		}
 
 		/**
