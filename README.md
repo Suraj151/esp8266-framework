@@ -11,20 +11,13 @@ Basically it is designed on the top of arduino-esp8266 layer to make things easy
 </p>
 
 
-ESP8266 Wi-Fi SoC offers a complete and self-contained Wi-Fi networking solution. When the ESP8266 hosts application, it boots up directly from an external flash.
-It has an integrated cache to improve the performance of system’s running applications.
-
-ESP8266EX also integrates an enhanced version of Tensilica’s L106 Diamond series 32-bit processor, with on-chip SRAM, on top of its Wi-Fi functionalities.
-It is integrated with external sensors and other application specific devices through its GPIOs. Codes for such applications are provided as examples in the SDK.
-
-The non-OS SDK provides a set of application programming interfaces (APIs) for core ESP8266 functionalities such as data reception/transmission over Wi-Fi, TCP/IP stack functions, hardware interface functions and basic system management functions.
-Thus, the SDK APIs allow programmers to focus on the application under development at a higher level. Users can access all core capabilities of ESP8266 without studying its chip architecture in detail.
+ESP8266EX integrates an enhanced version of Tensilica’s L106 Diamond series 32-bit processor, with on-chip SRAM, on top of its Wi-Fi functionalities. Its non-OS SDK provides a set of application programming interfaces (APIs) for core ESP8266 functionalities such as data reception/transmission over Wi-Fi, TCP/IP stack functions, hardware interface functions and basic system management functions.
 
 Arduino has provided user-friendly libraries that use these SDK APIs at bottom. Since arduino has made its easy iot development environment impact over developers, it's easy for them to develop applications with Arduino ide.
 
 Ewings framework sits on the top of these Arduino libraries. So the whole structure looks as shown in the above figure of Ewings Esp8266 Structure.
 
-## Installation
+# Installation
 
 **install from arduino ide**
 
@@ -34,7 +27,7 @@ Goto Tools->Manage Libraries... then in library manager window type esp8266-fram
 
 To install manually clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.2\libraries...).
 
-## Usage
+# Usage
 
 Restart the arduino ide and navigate to File->Examples->esp8266-framework->EwStack example compile and upload.
 
@@ -58,7 +51,7 @@ you can play with all settings. you can modify configs by making changes in file
 **Note** that by default session will active for 300 seconds once login, you can change its timeout in server config file.
 
 
-## Services
+# Services
 
 Ewings provides some basic services that required to develop simple iot application. All services are available globally to each other. The services are
 
@@ -113,7 +106,7 @@ GPIO alerts are provided to get notified on specific condition met. from local s
 
 
 
-## Ewings Local Server
+# Ewings Local Server
 
 Esp8266 has built in WiFi feature that work in both station as well as access point mode. Station mode is mode using which we can connect to other wifi network. Access point mode is mode using which Esp8266 create its own network. Ewings stack comes with a local http server facility using access point mode of esp8266. By default this server has setting, monitor pages added.
 
@@ -143,7 +136,7 @@ These are static html pages that split into header, middle and footer sections. 
 * **Web Resources :**
 These are required resources to server framework components.
 
-## Features
+# Features
 
 Esp8266 has many built in features that will be useful in network applications. Those features are added with Ewings Framework structure.
 
@@ -162,7 +155,7 @@ Network address translation (NAT) is a method of remapping one IP address space 
 This feature easily possible with esp8266 esponow feature. Ewings stack provided basic espnow service to make this available in application where mesh network is required. The basic motive to bring this feature is connectivity.
 
 
-## Utilities
+# Utilities
 
 This common section is made to support/help all other section in their operations. This section consists of some most vital libraries that enable services to run in background/periodically. This section is the base for all other section hence all other services are dependent on this section.
 
@@ -185,5 +178,5 @@ As name clears the purpose of this utility. It just used to convert the data typ
 Logger enables log on uart0 pins at 115200 baud rate. This is useful in case of debugging application flow.
 
 
-## Detailed Documentation
+# Detailed Documentation
 Detailed documentation is ongoing at wiki page, please visit [wiki page](https://github.com/Suraj151/esp8266-framework/wiki)....
