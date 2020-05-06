@@ -20,6 +20,11 @@ created Date    : 1st June 2019
 void MqttServiceProvider::begin( ESP8266WiFiClass* _wifi ){
 
   this->wifi = _wifi;
+  this->_mqtt_payload = new char[ MQTT_PAYLOAD_BUF_SIZE ];
+  memset( this->_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
+  this->mqtt_client.mqttDataCallbackArgs = (uint32_t*)this;
+  this->mqtt_client.OnData( MqttServiceProvider::handleMqttDataCb );
+
   this->handleMqttConfigChange();
 }
 
@@ -47,53 +52,37 @@ void MqttServiceProvider::handleMqttPublish(){
     #endif
     if( strlen(_mqtt_pubsub_configs.publish_topics[i].topic) > 0 ){
 
-      String _payload = "";
+      #ifdef ENABLE_MQTT_DEFAULT_PAYLOAD
 
-      #ifdef ENABLE_GPIO_SERVICE
+        String _payload = "";
 
-      _payload += "{\"data\":{";
-      for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
+        #ifdef ENABLE_GPIO_SERVICE
 
-        if( !__gpio_service.is_exceptional_gpio_pin(_pin) ){
+          __gpio_service.appendGpioJsonPayload( _payload );
+        #else
 
-          _payload += "\"D";
-          _payload += _pin;
-          _payload += "\":{\"mode\":";
-          _payload += __gpio_service.virtual_gpio_configs.gpio_mode[_pin];
-          _payload += ",\"val\":";
-          _payload += __gpio_service.virtual_gpio_configs.gpio_readings[_pin];
-          _payload += "},";
-        }
-      }
-      _payload += "\"A0\":{\"mode\":";
-      _payload += __gpio_service.virtual_gpio_configs.gpio_mode[MAX_NO_OF_GPIO_PINS];
-      _payload += ",\"val\":";
-      _payload += __gpio_service.virtual_gpio_configs.gpio_readings[MAX_NO_OF_GPIO_PINS];
-      _payload += "}}}";
+          _payload += "Hello from Esp Client : ";
+          _payload += ESP.getChipId();
+        #endif
+
+        memset( this->_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
+        _payload.toCharArray( this->_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
 
       #else
 
-      _payload += "Hello from Esp Client : ";
-      _payload += ESP.getChipId();
       #endif
 
-      int _size = _payload.length() + 20;
-      char* _pload = new char[ _size ];
-      memset( _pload, 0, _size );
-      _payload.toCharArray( _pload, _size );
-      __find_and_replace( _pload, "[mac]", macStr, 2 );
-      _size = strlen( _pload );
+      if( this->_mqtt_publish_data_cb ) this->_mqtt_publish_data_cb( this->_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
+      __find_and_replace( this->_mqtt_payload, "[mac]", macStr, 2 );
 
       this->mqtt_client.Publish(
-
         _mqtt_pubsub_configs.publish_topics[i].topic,
-        _pload,
-        _size,
+        this->_mqtt_payload,
+        strlen( this->_mqtt_payload ),
         _mqtt_pubsub_configs.publish_topics[i].qos < MQTT_MAX_QOS_LEVEL ?
         _mqtt_pubsub_configs.publish_topics[i].qos : MQTT_MAX_QOS_LEVEL,
         _mqtt_pubsub_configs.publish_topics[i].retain
       );
-      delete[] _pload;
     }
   }
 }
@@ -218,6 +207,55 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
     this->_mqtt_subscribe_cb_id = 0;
   }
 
+}
+
+/**
+ * set publish data callback. used to set data before send
+ *
+ * @param   MqttPublishDataCallback _cb
+ */
+void MqttServiceProvider::setMqttPublishDataCallback( MqttPublishDataCallback _cb ){
+
+  this->_mqtt_publish_data_cb = _cb;
+}
+
+/**
+ * set subscribe data callback. used to get data before received
+ *
+ * @param   MqttSubscribeDataCallback _cb
+ */
+void MqttServiceProvider::setMqttSubscribeDataCallback( MqttSubscribeDataCallback _cb ){
+
+  this->_mqtt_subscribe_data_cb = _cb;
+}
+
+/**
+ * handle subscribed topics data
+ *
+ */
+void MqttServiceProvider::handleMqttDataCb( uint32_t *args, const char* topic, uint32_t topic_len, const char *data, uint32_t data_len ){
+
+    if( __mqtt_service._mqtt_subscribe_data_cb ) __mqtt_service._mqtt_subscribe_data_cb(
+      args, topic, topic_len, data, data_len
+    );
+
+    char *topicBuf = new char[topic_len+1], *dataBuf = new char[data_len+1];
+
+    memcpy(topicBuf, topic, topic_len);
+    topicBuf[topic_len] = 0;
+
+    memcpy(dataBuf, data, data_len);
+    dataBuf[data_len] = 0;
+
+    // #ifdef EW_SERIAL_LOG
+    // Logln(F("\n\nMQTT: service data callback"));
+    // Serial.printf("MQTT: service Receive topic: %s, data: %s \n\n", topicBuf, dataBuf);
+    // #endif
+
+    #if defined( ENABLE_MQTT_DEFAULT_PAYLOAD ) && defined( ENABLE_GPIO_SERVICE )
+    __gpio_service.applyGpioJsonPayload( dataBuf, data_len );
+    #endif
+    delete[] topicBuf; delete[] dataBuf;
 }
 
 #ifdef EW_SERIAL_LOG

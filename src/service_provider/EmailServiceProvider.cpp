@@ -64,24 +64,7 @@ void EmailServiceProvider::handleEmail(){
 
       #ifdef ENABLE_GPIO_SERVICE
 
-      for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
-
-        if( !__gpio_service.is_exceptional_gpio_pin(_pin) ){
-
-          _payload += "D";
-          _payload += _pin;
-          _payload += " ( mode : ";
-          _payload += __gpio_service.virtual_gpio_configs.gpio_mode[_pin];
-          _payload += ", val : ";
-          _payload += __gpio_service.virtual_gpio_configs.gpio_readings[_pin];
-          _payload += ")\n";
-        }
-      }
-      _payload += "A0 ( mode : ";
-      _payload += __gpio_service.virtual_gpio_configs.gpio_mode[MAX_NO_OF_GPIO_PINS];
-      _payload += ", val : ";
-      _payload += __gpio_service.virtual_gpio_configs.gpio_readings[MAX_NO_OF_GPIO_PINS];
-      _payload += ")";
+      __gpio_service.appendGpioJsonPayload( _payload );
       #endif
 
       _payload += "\n\nHello from Esp\n";

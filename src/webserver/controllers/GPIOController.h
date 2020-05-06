@@ -73,7 +73,7 @@ class GpioController : public Controller {
 
       int y1 = this->_last_monitor_point.y,
       y2 = map(
-        __gpio_service.virtual_gpio_configs.gpio_readings[MAX_NO_OF_GPIO_PINS], 0, ANALOG_GPIO_RESOLUTION,
+        __gpio_service.gpio_config_copy.gpio_readings[MAX_NO_OF_GPIO_PINS], 0, ANALOG_GPIO_RESOLUTION,
         GPIO_GRAPH_TOP_MARGIN, GPIO_MAX_GRAPH_HEIGHT - GPIO_GRAPH_BOTTOM_MARGIN
       ),
       x1 = this->_last_monitor_point.x < GPIO_MAX_GRAPH_WIDTH ?

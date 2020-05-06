@@ -22,6 +22,7 @@ created Date    : 1st June 2019
 
 void beginConfigs(  uint16_t _size );
 void cleanAllConfigs( void );
+bool isValidConfigs( void );
 
 /**
  * template to save table in database by their address from table object
@@ -62,9 +63,7 @@ template <typename T> void clearConfigs( const T * _object, uint16_t _address ) 
  * @param   uint16_t  	configStart
  */
 template <typename T> void loadConfig ( T * _object, uint16_t configStart ) {
-  if (EEPROM.read(CONFIG_START + 0) == CONFIG_VERSION[0] &&
-      EEPROM.read(CONFIG_START + 1) == CONFIG_VERSION[1] &&
-      EEPROM.read(CONFIG_START + 2) == CONFIG_VERSION[2])
+  if ( isValidConfigs() )
     for (unsigned int i = 0; i < sizeof((*_object)); i++)
       *((char*) & (*_object) + i) = EEPROM.read(configStart + i);
 }

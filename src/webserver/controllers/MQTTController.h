@@ -204,7 +204,7 @@ class MqttController : public Controller {
 
 			concat_tr_input_html_tags( _page, PSTR("Will Topic:"), PSTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("Will Message:"), PSTR("wmsg"), _mqtt_lwt_configs.will_message, MQTT_TOPIC_BUF_SIZE-1 );
-      concat_tr_select_html_tags( _page, PSTR("Will QoS:"), PSTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos+1 );
+      concat_tr_select_html_tags( _page, PSTR("Will QoS:"), PSTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos );
       concat_tr_input_html_tags( _page, PSTR("Will Retain:"), PSTR("wrtn"), "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_lwt_configs.will_retain != 0 );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
@@ -213,7 +213,7 @@ class MqttController : public Controller {
 
 			concat_tr_input_html_tags( _page, PSTR("Will Topic:"), PSTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
       concat_tr_input_html_tags( _page, PSTR("Will Message:"), PSTR("wmsg"), _mqtt_lwt_configs.will_message, MQTT_TOPIC_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
-      concat_tr_select_html_tags( _page, PSTR("Will QoS:"), PSTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos+1, 0, true );
+      concat_tr_select_html_tags( _page, PSTR("Will QoS:"), PSTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos, 0, true );
       concat_tr_input_html_tags( _page, PSTR("Will Retain:"), PSTR("wrtn"), "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE,_mqtt_lwt_configs.will_retain != 0, true );
 
 			#endif
@@ -255,7 +255,7 @@ class MqttController : public Controller {
 
         _will_topic.toCharArray( _mqtt_lwt_configs->will_topic, _will_topic.length()+1 );
         _will_message.toCharArray( _mqtt_lwt_configs->will_message, _will_message.length()+1 );
-        _mqtt_lwt_configs->will_qos = (int)_will_qos.toInt() - 1;
+        _mqtt_lwt_configs->will_qos = (int)_will_qos.toInt() ;
         _mqtt_lwt_configs->will_retain = (int)( _will_retain == "retain" );
 
         this->web_resource->db_conn->set_mqtt_lwt_config_table( _mqtt_lwt_configs );
@@ -310,13 +310,13 @@ class MqttController : public Controller {
 				#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
 
 				concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.publish_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1 );
-        concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.publish_topics[i].qos+1 );
+        concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.publish_topics[i].qos );
         concat_tr_input_html_tags( _page, _retain_label, _retain_name, "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0 );
 
 				#else
 
 				concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.publish_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
-        concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.publish_topics[i].qos+1, 0, true );
+        concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.publish_topics[i].qos, 0, true );
         concat_tr_input_html_tags( _page, _retain_label, _retain_name, "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0, true );
 
 				#endif
@@ -342,12 +342,12 @@ class MqttController : public Controller {
 				#ifdef ALLOW_MQTT_CONFIG_MODIFICATION
 
 				concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.subscribe_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1 );
-        concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.subscribe_topics[i].qos+1 );
+        concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.subscribe_topics[i].qos );
 
 				#else
 
 				concat_tr_input_html_tags( _page, _topic_label, _topic_name, _mqtt_pubsub_configs.subscribe_topics[i].topic, MQTT_TOPIC_BUF_SIZE-1, HTML_INPUT_TEXT_TAG_TYPE, false, true );
-        concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.subscribe_topics[i].qos+1, 0, true );
+        concat_tr_select_html_tags( _page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.subscribe_topics[i].qos, 0, true );
 
 				#endif
       }
@@ -395,7 +395,7 @@ class MqttController : public Controller {
           String _retain = this->web_resource->server->arg(_retain_name);
 
           _topic.toCharArray( _mqtt_pubsub_configs->publish_topics[i].topic, _topic.length()+1 );
-          _mqtt_pubsub_configs->publish_topics[i].qos = (int)_qos.toInt() - 1;
+          _mqtt_pubsub_configs->publish_topics[i].qos = (int)_qos.toInt() ;
           _mqtt_pubsub_configs->publish_topics[i].retain = (int)( _retain == "retain" );
 
           #ifdef EW_SERIAL_LOG
@@ -418,7 +418,7 @@ class MqttController : public Controller {
           String _qos = this->web_resource->server->arg(_qos_name);
 
           _topic.toCharArray( _mqtt_pubsub_configs->subscribe_topics[i].topic, _topic.length()+1 );
-          _mqtt_pubsub_configs->subscribe_topics[i].qos = (int)_qos.toInt() - 1;
+          _mqtt_pubsub_configs->subscribe_topics[i].qos = (int)_qos.toInt() ;
 
           #ifdef EW_SERIAL_LOG
             Log(F("Topic")); Log(i); Log(F(" : ")); Logln(_topic);

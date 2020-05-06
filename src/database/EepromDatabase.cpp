@@ -28,3 +28,14 @@ void cleanAllConfigs( void ){
   }
   EEPROM.end();
 }
+
+/**
+ * check whether database configs are valid
+ *
+ * @return bool
+ */
+bool isValidConfigs( void ){
+  return (EEPROM.read(CONFIG_START + 0) == CONFIG_VERSION[0] &&
+      EEPROM.read(CONFIG_START + 1) == CONFIG_VERSION[1] &&
+      EEPROM.read(CONFIG_START + 2) == CONFIG_VERSION[2]);
+}

@@ -18,6 +18,10 @@ created Date    : 1st June 2019
 #endif
 #include <mqtt_client/Mqtt.h>
 
+#define MQTT_PAYLOAD_BUF_SIZE 400
+
+typedef std::function<void(char*, uint16_t)> MqttPublishDataCallback;
+typedef MqttDataCallback MqttSubscribeDataCallback;
 
 /**
  * MqttServiceProvider class
@@ -36,6 +40,8 @@ class MqttServiceProvider : public ServiceProvider {
 		 * MqttServiceProvider destructor
 		 */
     ~MqttServiceProvider(){
+      this->stop();
+      delete[] this->_mqtt_payload;
     }
 
     /**
@@ -50,11 +56,32 @@ class MqttServiceProvider : public ServiceProvider {
 		 * @var	int|0 _mqtt_subscribe_cb_id
 		 */
     int _mqtt_subscribe_cb_id=0;
+    /**
+		 * @array	char  _mqtt_payload
+		 */
+    char* _mqtt_payload;
+    /**
+		 * @var	MqttPublishDataCallback  _mqtt_publish_data_cb
+		 */
+    MqttPublishDataCallback _mqtt_publish_data_cb = nullptr;
+    /**
+		 * @var	MqttSubscribeDataCallback  _mqtt_subscribe_data_cb
+		 */
+    MqttSubscribeDataCallback _mqtt_subscribe_data_cb = nullptr;
+
+
+    /**
+		 * @var	MQTTClient  mqtt_client
+		 */
+    MQTTClient mqtt_client;
 
     void begin( ESP8266WiFiClass* _wifi );
     void handleMqttPublish( void );
     void handleMqttSubScribe( void );
     void handleMqttConfigChange( int _mqtt_config_type=MQTT_GENERAL_CONFIG );
+    static void handleMqttDataCb( uint32_t *args, const char* topic, uint32_t topic_len, const char *data, uint32_t data_len);
+    void setMqttPublishDataCallback( MqttPublishDataCallback _cb );
+    void setMqttSubscribeDataCallback( MqttSubscribeDataCallback _cb );
     void stop( void );
 
     #ifdef EW_SERIAL_LOG
@@ -67,10 +94,6 @@ class MqttServiceProvider : public ServiceProvider {
 		 * @var	ESP8266WiFiClass*|&WiFi wifi
 		 */
     ESP8266WiFiClass* wifi;
-    /**
-		 * @var	MQTTClient  mqtt_client
-		 */
-    MQTTClient mqtt_client;
 };
 
 extern MqttServiceProvider __mqtt_service;

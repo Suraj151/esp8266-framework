@@ -26,6 +26,22 @@ void Database::init_database(  uint16_t _size ){
   for (size_t i = 0; i < DatabaseTableAbstractLayer::_total_instances; i++) {
     DatabaseTableAbstractLayer::_instances[i]->boot();
   }
+
+  #ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
+
+  __task_scheduler.setInterval( [&]() {
+
+    if ( !isValidConfigs() ){
+
+      #ifdef EW_SERIAL_LOG
+      Log( F("\n\nFound invalid configs.. starting factory reset..!\n\n") );
+      #endif
+      __factory_reset.factory_reset();
+    }
+
+   }, MILLISECOND_DURATION_5000 );
+
+  #endif
 }
 
 /**

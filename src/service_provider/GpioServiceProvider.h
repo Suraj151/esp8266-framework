@@ -17,6 +17,9 @@ created Date    : 1st June 2019
 #include <service_provider/EmailServiceProvider.h>
 #include <WiFiClient.h>
 
+#define GPIO_PAYLOAD_DATA_KEY   "data"
+#define GPIO_PAYLOAD_MODE_KEY   "mode"
+#define GPIO_PAYLOAD_VALUE_KEY  "val"
 
 /**
  * GpioServiceProvider class
@@ -38,21 +41,23 @@ class GpioServiceProvider : public ServiceProvider {
     }
 
     /**
-		 * @var gpio_config_table virtual_gpio_configs
+		 * @var gpio_config_table gpio_config_copy
 		 */
-    gpio_config_table virtual_gpio_configs;
+    gpio_config_table gpio_config_copy;
     /**
 		 * @var	int|0 _gpio_http_request_cb_id
 		 */
     int _gpio_http_request_cb_id=0;
     /**
-		 * @var	bool|true update_gpio_table_from_virtual
+		 * @var	bool|true update_gpio_table_from_copy
 		 */
-    bool update_gpio_table_from_virtual=true;
+    bool update_gpio_table_from_copy=true;
 
 
     void begin( ESP8266WiFiClass* _wifi, WiFiClient* _wifi_client );
-    void enable_update_gpio_table_from_virtual( void );
+    void enable_update_gpio_table_from_copy( void );
+    void appendGpioJsonPayload( String& _payload );
+    void applyGpioJsonPayload( char* _payload, uint16_t _payload_length );
     #ifdef ENABLE_EMAIL_SERVICE
     bool handleGpioEmailAlert( void );
     #endif

@@ -29,6 +29,10 @@ created Date    : 1st June 2019
 #define MQTT_INITIALIZE_DURATION   MILLISECOND_DURATION_5000
 
 /**
+ * enable/disable mqtt default payload for publish if user not assigned explicitely
+ */
+#define ENABLE_MQTT_DEFAULT_PAYLOAD
+/**
  * enable/disable mqtt config modification here
  */
 #define ALLOW_MQTT_CONFIG_MODIFICATION

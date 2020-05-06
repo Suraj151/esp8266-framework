@@ -39,6 +39,11 @@ extern "C" {
 #define EW_SERIAL_LOG
 
 /**
+ * enable/disable auto factory reset on invalid database config found
+ */
+#define AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
+
+/**
  * enable/disable exception notifier
  */
 // #define ENABLE_EXCEPTION_NOTIFIER
