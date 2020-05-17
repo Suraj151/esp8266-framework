@@ -13,6 +13,7 @@ created Date    : 1st June 2019
 
 #include "Controller.h"
 #include <webserver/pages/Dashboard.h>
+#include <service_provider/NtpServiceProvider.h>
 
 /**
  * DashboardController class
@@ -67,6 +68,8 @@ class DashboardController : public Controller {
       _response += this->web_resource->wifi->status();
 			_response += ",\"nt\":";
       _response += __status_wifi.internet_available;
+			_response += ",\"nwt\":";
+      _response += __nw_time_service.get_ntp_time();
 			_response += ",\"dl\":\"";
 
 			while (stat_info != NULL) {

@@ -31,7 +31,14 @@ var rq=new XMLHttpRequest();\
 function rql(){\
 var r=JSON.parse(this.responseText);\
 var sv=document.getElementById('svga0');\
-var ln = document.createElementNS('http://www.w3.org/2000/svg','line');\
+var ln=document.createElementNS('http://www.w3.org/2000/svg','line');\
+if(r.d.data){\
+var ks=Object.keys(r.d.data);\
+for(var i=0;i<ks.length;i++){\
+document.getElementsByTagName('table')[0].rows[i+1].innerHTML=\
+`<td class='btnd'>${ks[i]}</td><td class='btnd'>${r.md[r.d.data[ks[i]].mode]}</td><td class='btnd'>${r.d.data[ks[i]].val}</td>`;\
+}\
+}\
 if(r.r)location.href='/';\
 ln.setAttribute('x1',r.x1);\
 ln.setAttribute('y1',r.y1);\
@@ -71,6 +78,7 @@ document.getElementById('strs').innerHTML=r.rs;\
 document.getElementById('stst').innerHTML=r.st;\
 document.getElementById('stmc').innerHTML=r.mc;\
 document.getElementById('inet').innerHTML=r.nt;\
+document.getElementById('nwt').innerHTML=r.nwt;\
 document.getElementById('cndl').innerHTML=r.dl;\
 if(r.r)location.href='/';\
 }\

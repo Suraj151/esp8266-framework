@@ -52,7 +52,7 @@ class NTPServiceProvider : public ServiceProvider {
     }
 
     void init_ntp_time( void );
-    bool is_ntp_in_sync( void );
+    bool is_valid_ntptime( void );
     time_t get_ntp_time( void );
 };
 

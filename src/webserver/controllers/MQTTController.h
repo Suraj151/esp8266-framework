@@ -300,7 +300,7 @@ class MqttController : public Controller {
       strcpy( _qos_label, "QoS0:" );strcpy( _qos_name, "pqos0" );
       strcpy( _retain_label, "Retain0:" );strcpy( _retain_name, "prtn0" );
 
-      concat_tr_header_html_tags( _page, PSTR("Publish Topics") );
+      concat_tr_heading_html_tags( _page, PSTR("Publish Topics"), 3, PSTR("2") );
       for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++) {
 
         _topic_label[5] = (0x30 + i );_topic_name[4] = (0x30 + i );
@@ -333,7 +333,7 @@ class MqttController : public Controller {
 			#endif
 
       _topic_name[0] = 's'; _qos_name[0] = 's';
-      concat_tr_header_html_tags( _page, PSTR("Subscribe Topics") );
+      concat_tr_heading_html_tags( _page, PSTR("Subscribe Topics"), 3, PSTR("2") );
       for (uint8_t i = 0; i < MQTT_MAX_SUBSCRIBE_TOPIC; i++) {
 
         _topic_label[5] = (0x30 + i );_topic_name[4] = (0x30 + i );

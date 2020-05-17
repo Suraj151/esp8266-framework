@@ -11,6 +11,14 @@ created Date    : 1st June 2019
 #include "NtpServiceProvider.h"
 
 /**
+ * Set sntp update delay by defining weak function in lwip arduino build
+ * default delay of 1hour is used we can change it here and should be > 15 seconds
+ */
+uint32_t sntp_update_delay_MS_rfc_not_less_than_15000(){
+   return 120000; // 120 seconds
+}
+
+/**
  * initialize network time
  */
 void NTPServiceProvider::init_ntp_time(){
@@ -20,13 +28,11 @@ void NTPServiceProvider::init_ntp_time(){
 }
 
 /**
- * check whether dhcp server started and time is valid
+ * check whether ntp time is valid
  */
-bool NTPServiceProvider::is_ntp_in_sync(){
+bool NTPServiceProvider::is_valid_ntptime(){
 
-  return (
-    wifi_station_dhcpc_status()==DHCP_STARTED && time(nullptr) > LAUNCH_UNIX_TIME
-  );
+  return ( time(nullptr) > LAUNCH_UNIX_TIME );
 }
 
 /**

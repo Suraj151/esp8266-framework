@@ -25,9 +25,9 @@ static const char EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM[] PROGMEM = "\
 <button class='btn' type='submit'>\
 Submit\
 </button>\
-<a href='/logout'>\
+<a href='/'>\
 <button class='btn' type='button'>\
-Logout\
+Home\
 </button>\
 </a>\
 </td>\

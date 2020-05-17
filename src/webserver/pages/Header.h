@@ -69,7 +69,7 @@ padding:10px 0px;\
 border:1px solid #d0d0d0;\
 border-radius:4px;\
 }\
-.btn{\
+.btn,.btnd{\
 padding:6px;\
 border-radius:5px;\
 border:1px solid #ccc;\
@@ -77,6 +77,11 @@ color:white;\
 background:#337ab7;\
 margin:0px 2px;\
 cursor:pointer;\
+text-align:center;\
+}\
+.btnd{\
+background:none;\
+color:black;\
 }\
 </style>\
 </head>\

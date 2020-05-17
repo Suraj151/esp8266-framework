@@ -79,7 +79,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
     __status_wifi.internet_available = ping_ret && ping_resp;
 
     #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
-    if( !__status_wifi.internet_available && ((millis()-__status_wifi.last_internet_millis)/INTERNET_CONNECTIVITY_CHECK_DURATION) >= 6 ){
+    if( !__status_wifi.internet_available && (millis()-__status_wifi.last_internet_millis) >= SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION ){
 
       memcpy( __status_wifi.ignore_bssid, this->wifi->BSSID(), 6 );
       this->wifi->disconnect(false);

@@ -32,7 +32,7 @@ void publish_callback( char* _payload, uint16_t _length ){
 
   memset( _payload, 0, _length );
 
-  string _data_to_publish = "";
+  String _data_to_publish = "";
   _data_to_publish += "{\"device_id\":[mac], \"value\":";
   _data_to_publish += random(0, 100);
   _data_to_publish += "}";

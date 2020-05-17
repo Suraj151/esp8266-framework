@@ -83,9 +83,17 @@ extern "C" {
 /**
  * @define wifi & internet connectivity check cycle durations
  */
-#define WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT 5  // will try to connect within this seconds
-#define WIFI_CONNECTIVITY_CHECK_DURATION MILLISECOND_DURATION_10000
-#define INTERNET_CONNECTIVITY_CHECK_DURATION WIFI_CONNECTIVITY_CHECK_DURATION
+#define WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT  5  // will try to connect within this seconds
+#define WIFI_CONNECTIVITY_CHECK_DURATION      MILLISECOND_DURATION_10000
+#define INTERNET_CONNECTIVITY_CHECK_DURATION  WIFI_CONNECTIVITY_CHECK_DURATION
+
+/**
+ * define connection switch duration once device recognise internet unavailability on current network
+ * it should be multiple of INTERNET_CONNECTIVITY_CHECK_DURATION
+ */
+#ifdef ENABLE_INTERNET_BASED_CONNECTIONS
+#define SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION INTERNET_CONNECTIVITY_CHECK_DURATION*6
+#endif
 
 /**
  * @define network address & port translation feature

@@ -14,7 +14,7 @@ created Date    : 1st June 2019
 #include <Arduino.h>
 #include <config/Config.h>
 
-static const char EW_SERVER_HOME_MENU_TITLE_LOGIN     [] PROGMEM = "login settings";
+static const char EW_SERVER_HOME_MENU_TITLE_LOGIN     [] PROGMEM = "login credential";
 static const char EW_SERVER_HOME_MENU_TITLE_WIFI      [] PROGMEM = "wifi settings";
 static const char EW_SERVER_HOME_MENU_TITLE_OTA       [] PROGMEM = "ota update";
 #ifdef ENABLE_MQTT_SERVICE

@@ -126,7 +126,7 @@ This handles routing operations of the server. It registers a specific controlle
 Esp8266 has software eeprom library that actually uses space in flash memory to store Ewings framework related config data. Server uses this database to fetch and view settings and control panel of device.
 
 * **View Helpers :**
-These helpers help to dynamically creates html tags.
+These helpers help to dynamically creates html elements.
 
 * **Views :**
 These are static html pages that split into header, middle and footer sections. At the time of sending http response we gathers them to form a complete html page.
@@ -177,4 +177,4 @@ Logger enables log on uart0 pins at 115200 baud rate. This is useful in case of 
 
 
 # Detailed Documentation
-Detailed documentation is ongoing at wiki page, please visit [wiki page](https://github.com/Suraj151/esp8266-framework/wiki)....
+Detailed documentation is ongoing..., please visit [wiki page](https://github.com/Suraj151/esp8266-framework/wiki)....

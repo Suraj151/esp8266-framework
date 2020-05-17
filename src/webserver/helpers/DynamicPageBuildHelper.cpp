@@ -12,6 +12,149 @@ created Date    : 1st June 2019
 
 
 /**
+ * append style attribute
+ *
+ * @param	char*	_page
+ * @param	PGM_P _style
+ */
+void concat_style_attribute( char* _page, PGM_P _style ){
+
+  if( _style ){
+    strcat_P( _page, HTML_STYLE_ATTR );
+    strcat( _page, "'" );
+    strcat_P( _page, _style );
+    strcat( _page, "'" );
+  }
+}
+
+/**
+ * append style attribute
+ *
+ * @param	char*	_page
+ * @param	char* _style
+ */
+void concat_style_attribute( char* _page, char* _style ){
+
+  if( _style ){
+    strcat_P( _page, HTML_STYLE_ATTR );
+    strcat( _page, "'" );
+    strcat( _page, _style );
+    strcat( _page, "'" );
+  }
+}
+
+/**
+ * append class attribute
+ *
+ * @param	char*	_page
+ * @param	PGM_P _class
+ */
+void concat_class_attribute( char* _page, PGM_P _class ){
+
+  if( _class ){
+    strcat_P( _page, HTML_CLASS_ATTR );
+    strcat( _page, "'" );
+    strcat_P( _page, _class );
+    strcat( _page, "'" );
+  }
+}
+
+/**
+ * append class attribute
+ *
+ * @param	char*	_page
+ * @param	char* _class
+ */
+void concat_class_attribute( char* _page, char* _class ){
+
+  if( _class ){
+    strcat_P( _page, HTML_CLASS_ATTR );
+    strcat( _page, "'" );
+    strcat( _page, _class );
+    strcat( _page, "'" );
+  }
+}
+
+/**
+ * append id attribute
+ *
+ * @param	char*	_page
+ * @param	PGM_P _id
+ */
+void concat_id_attribute( char* _page, PGM_P _id ){
+
+  if( _id ){
+    strcat_P( _page, HTML_ID_ATTR );
+    strcat( _page, "'" );
+    strcat_P( _page, _id );
+    strcat( _page, "'" );
+  }
+}
+
+/**
+ * append id attribute
+ *
+ * @param	char*	_page
+ * @param	char* _id
+ */
+void concat_id_attribute( char* _page, char* _id ){
+
+  if( _id ){
+    strcat_P( _page, HTML_ID_ATTR );
+    strcat( _page, "'" );
+    strcat( _page, _id );
+    strcat( _page, "'" );
+  }
+}
+
+/**
+ * append colspan attribute
+ *
+ * @param	char*	_page
+ * @param	PGM_P _colspan
+ */
+void concat_colspan_attribute( char* _page, PGM_P _colspan ){
+
+  if( _colspan ){
+    strcat_P( _page, HTML_COLSPAN_ATTR );
+    strcat( _page, "'" );
+    strcat_P( _page, _colspan );
+    strcat( _page, "'" );
+  }
+}
+
+
+/**
+ * build and append heading html tag to html page.
+ * this function uses program memory arguments to optimise ram
+ *
+ * @param	char*	_page
+ * @param	PGM_P _header
+ * @param	uint8_t	_header_level|1
+ * @param	PGM_P _class_attr|nullptr
+ * @param	PGM_P _style_attr|nullptr
+ */
+void concat_heading_html_tag( char* _page, PGM_P _heading, uint8_t _heading_level, PGM_P _class_attr, PGM_P _style_attr ){
+
+  strcat_P( _page,
+    _heading_level == 1 ? HTML_H1_OPEN_TAG :
+    _heading_level == 2 ? HTML_H2_OPEN_TAG :
+    _heading_level == 3 ? HTML_H3_OPEN_TAG :
+    HTML_H4_OPEN_TAG
+  );
+  concat_class_attribute( _page, _class_attr );
+  concat_style_attribute( _page, _style_attr );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_P( _page, _heading );
+  strcat_P( _page,
+    _heading_level == 1 ? HTML_H1_CLOSE_TAG :
+    _heading_level == 2 ? HTML_H2_CLOSE_TAG :
+    _heading_level == 3 ? HTML_H3_CLOSE_TAG :
+    HTML_H4_CLOSE_TAG
+  );
+}
+
+/**
  * build and append input html tag to html page.
  * given type, name, value etc. attributes.
  * this function uses program memory arguments to optimise ram
@@ -391,26 +534,27 @@ void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** 
 }
 
 /**
- * build and append tr header html tag to html page. It build html tr/header tag with
+ * build and append tr heading html tag to html page. It build html tr/header tag with
  * inner html attributes
  * this function uses program memory arguments to optimise ram
  *
  * @param	char*	_page
- * @param	PGM_P _header
+ * @param	PGM_P _heading
+ * @param	uint8_t	_header_level|1
+ * @param	PGM_P _colspan_attr|nullptr
+ * @param	PGM_P _class_attr|nullptr
+ * @param	PGM_P _style_attr|nullptr
  */
-void concat_tr_header_html_tags( char* _page, PGM_P _header ){
+void concat_tr_heading_html_tags( char* _page, PGM_P _heading, uint8_t	_header_level, PGM_P _colspan_attr, PGM_P _class_attr, PGM_P _style_attr ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
   strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
   strcat_P( _page, HTML_TD_OPEN_TAG );
+  concat_colspan_attribute( _page, _colspan_attr );
+  concat_class_attribute( _page, _class_attr );
+  concat_style_attribute( _page, _style_attr );
   strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
-  strcat_P( _page, HTML_H2_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
-  strcat_P( _page, _header );
-  strcat_P( _page, HTML_H2_CLOSE_TAG );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  concat_heading_html_tag( _page, _heading, _header_level );
   strcat_P( _page, HTML_TD_CLOSE_TAG );
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
@@ -537,4 +681,64 @@ void concat_svg_menu_card( char* _page, PGM_P _menu_title, PGM_P _svg_path, char
 
   strcat_P( _page, HTML_LINK_CLOSE_TAG );
   strcat_P( _page, HTML_DIV_CLOSE_TAG );
+}
+
+/**
+ * build and append table heading row
+ *
+ * @param	char*	_page
+ * @param	char**	_headings
+ * @param	int   _size
+ * @param	PGM_P _row_class
+ * @param	PGM_P _row_style
+ * @param	PGM_P _head_class
+ * @param	PGM_P _head_style
+ */
+void concat_table_heading_row( char* _page, char** _headings, int _size, PGM_P _row_class, PGM_P _row_style, PGM_P _head_class, PGM_P _head_style ){
+
+  strcat_P( _page, HTML_TR_OPEN_TAG );
+  concat_class_attribute( _page, _row_class );
+  concat_style_attribute( _page, _row_style );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+
+  for (int i = 0; i < _size; i++) {
+    strcat_P( _page, HTML_TH_OPEN_TAG );
+    concat_class_attribute( _page, _head_class );
+    concat_style_attribute( _page, _head_style );
+    strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+    strcat( _page, _headings[i] );
+    strcat_P( _page, HTML_TH_CLOSE_TAG );
+  }
+
+  strcat_P( _page, HTML_TR_CLOSE_TAG );
+}
+
+/**
+ * build and append table data row
+ *
+ * @param	char*	_page
+ * @param	char**	_data_items
+ * @param	int   _size
+ * @param	PGM_P _row_class
+ * @param	PGM_P _row_style
+ * @param	PGM_P _data_class
+ * @param	PGM_P _data_style
+ */
+void concat_table_data_row( char* _page, char** _data_items, int _size, PGM_P _row_class, PGM_P _row_style, PGM_P _data_class, PGM_P _data_style ){
+
+  strcat_P( _page, HTML_TR_OPEN_TAG );
+  concat_class_attribute( _page, _row_class );
+  concat_style_attribute( _page, _row_style );
+  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+
+  for (int i = 0; i < _size; i++) {
+    strcat_P( _page, HTML_TD_OPEN_TAG );
+    concat_class_attribute( _page, _data_class );
+    concat_style_attribute( _page, _data_style );
+    strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+    strcat( _page, _data_items[i] );
+    strcat_P( _page, HTML_TD_CLOSE_TAG );
+  }
+
+  strcat_P( _page, HTML_TR_CLOSE_TAG );
 }

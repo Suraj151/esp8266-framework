@@ -92,6 +92,9 @@ class GpioController : public Controller {
       _response += y2;
       _response += ",\"r\":";
       _response += !this->route_handler->has_active_session();
+			_response += ",\"d\":";
+			__gpio_service.appendGpioJsonPayload(_response);
+			_response += ",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"AOUT\", \"AIN\"]";
       _response += "}";
 
       this->_last_monitor_point.x = x2;
@@ -139,10 +142,31 @@ class GpioController : public Controller {
       memset( _page, 0, _max_size );
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_GPIO_MONITOR_PAGE_TOP );
-      strcat_P( _page, PSTR("<div style='display:inline-flex;'>") );
+
+			char* _gpio_monitor_table_heading[] = {"Pin", "Mode", "value"};
+			strcat_P( _page, HTML_TABLE_OPEN_TAG );
+			concat_style_attribute( _page, PSTR("width:92%") );
+			strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+			concat_table_heading_row( _page, _gpio_monitor_table_heading, 3, nullptr, nullptr, PSTR("btn"), nullptr );
+			char _name[3]; memset(_name, 0, 3); strcpy( _name, "D0" );
+			char* _gpio_monitor_table_data[] = {_name, "", ""};
+      for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
+        if( !__gpio_service.is_exceptional_gpio_pin(_pin) ){
+
+					_name[1] = (0x30 + _pin );
+					concat_table_data_row( _page, _gpio_monitor_table_data, 3, nullptr, nullptr, PSTR("btnd"), nullptr );
+				}
+      }
+			memset(_name, 0, 3); strcpy( _name, "A0" );
+			concat_table_data_row( _page, _gpio_monitor_table_data, 3, nullptr, nullptr, PSTR("btnd"), nullptr );
+			strcat_P( _page, HTML_TABLE_CLOSE_TAG );
+
+			strcat_P( _page, HTML_DIV_OPEN_TAG );
+			concat_style_attribute( _page, PSTR("display:inline-flex;margin-top:25px;") );
+			strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
       concat_graph_axis_title_div( _page, (char*)"A0 ( 0 - 1024 )", (char*)"writing-mode:vertical-lr" );
       strcat_P( _page, EW_SERVER_GPIO_MONITOR_SVG_ELEMENT );
-      strcat_P( _page, PSTR("</div>") );
+			strcat_P( _page, HTML_DIV_CLOSE_TAG );
       concat_graph_axis_title_div( _page, (char*)"Time" );
       strcat_P( _page, EW_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML );
     }

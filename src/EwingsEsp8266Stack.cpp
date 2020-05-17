@@ -136,7 +136,7 @@ void EwingsEsp8266Stack::handleLogPrints(){
   #endif
   __task_scheduler.printTaskSchedulerLogs();
   Log( F("\nNTP Validity : ") );
-  Logln( __nw_time_service.is_ntp_in_sync() );
+  Logln( __nw_time_service.is_valid_ntptime() );
   Log( F("NTP Time : ") );
   Logln( __nw_time_service.get_ntp_time() );
 }

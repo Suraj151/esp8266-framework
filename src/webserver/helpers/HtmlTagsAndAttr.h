@@ -19,6 +19,10 @@ created Date    : 1st June 2019
  */
 static const char HTML_TAG_OPEN_BRACKET   []PROGMEM = "<";
 static const char HTML_TAG_CLOSE_BRACKET  []PROGMEM = ">";
+static const char HTML_TABLE_OPEN_TAG   []PROGMEM = "<table ";
+static const char HTML_TABLE_CLOSE_TAG  []PROGMEM = "</table>";
+static const char HTML_TH_OPEN_TAG   []PROGMEM = "<th ";
+static const char HTML_TH_CLOSE_TAG  []PROGMEM = "</th>";
 static const char HTML_TR_OPEN_TAG   []PROGMEM = "<tr ";
 static const char HTML_TR_CLOSE_TAG  []PROGMEM = "</tr>";
 static const char HTML_TD_OPEN_TAG   []PROGMEM = "<td ";
@@ -30,8 +34,16 @@ static const char HTML_OPTION_OPEN   []PROGMEM = "<option ";
 static const char HTML_OPTION_CLOSE  []PROGMEM = "</option>";
 static const char HTML_DIV_OPEN_TAG  []PROGMEM =  "<div";
 static const char HTML_DIV_CLOSE_TAG []PROGMEM =  "</div>";
+
+static const char HTML_H1_OPEN_TAG   []PROGMEM = "<h1 ";
+static const char HTML_H1_CLOSE_TAG  []PROGMEM = "</h1>";
 static const char HTML_H2_OPEN_TAG   []PROGMEM = "<h2 ";
 static const char HTML_H2_CLOSE_TAG  []PROGMEM = "</h2>";
+static const char HTML_H3_OPEN_TAG   []PROGMEM = "<h3 ";
+static const char HTML_H3_CLOSE_TAG  []PROGMEM = "</h3>";
+static const char HTML_H4_OPEN_TAG   []PROGMEM = "<h4 ";
+static const char HTML_H4_CLOSE_TAG  []PROGMEM = "</h4>";
+
 static const char HTML_SVG_OPEN_TAG   []PROGMEM = "<svg ";
 static const char HTML_SVG_CLOSE_TAG  []PROGMEM = "</svg>";
 static const char HTML_LINK_OPEN_TAG  []PROGMEM = "<a ";
@@ -46,7 +58,9 @@ static const char HTML_MAXLEN_ATTR   []PROGMEM = " maxlength=";
 static const char HTML_TYPE_ATTR     []PROGMEM = " type=";
 static const char HTML_NAME_ATTR     []PROGMEM = " name=";
 static const char HTML_VALUE_ATTR    []PROGMEM = " value=";
+static const char HTML_ID_ATTR       []PROGMEM = " id=";
 static const char HTML_STYLE_ATTR    []PROGMEM = " style=";
+static const char HTML_COLSPAN_ATTR  []PROGMEM = " colspan=";
 static const char HTML_CLASS_ATTR    []PROGMEM = " class=";
 static const char HTML_SELECTED_ATTR []PROGMEM =  " selected='selected' ";
 static const char HTML_CHECKED_ATTR  []PROGMEM =  " checked='checked' ";

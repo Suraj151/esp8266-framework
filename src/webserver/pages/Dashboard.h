@@ -52,6 +52,10 @@ min-width:100px;\
 <td>internet</td>\
 <td id='inet'></td>\
 </tr>\
+<tr>\
+<td>n/w time</td>\
+<td id='nwt'></td>\
+</tr>\
 </table>\
 \
 <h2>Connected Devices</h2>\
