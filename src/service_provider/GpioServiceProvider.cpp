@@ -144,7 +144,8 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
             uint16_t _value_limit = _mode == ANALOG_WRITE ? ANALOG_GPIO_RESOLUTION : 2;
             this->gpio_config_copy.gpio_mode[_pin] = _mode < ANALOG_READ ? _mode : this->gpio_config_copy.gpio_mode[_pin];
             this->gpio_config_copy.gpio_readings[_pin] = _value < _value_limit ? _value : this->gpio_config_copy.gpio_readings[_pin];
-            this->enable_update_gpio_table_from_copy();
+            __database_service.set_gpio_config_table(&this->gpio_config_copy);
+            this->handleGpioModes();
           }
         }
       }
