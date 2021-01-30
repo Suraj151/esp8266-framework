@@ -45,8 +45,11 @@ class EwSessionHandler{
 
       char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
       this->build_session_cookie( _session_cookie, false, EW_COOKIE_BUFF_MAX_SIZE, true, 0 );
-      __web_resource.server->sendHeader("Cache-Control", "no-cache");
-      __web_resource.server->sendHeader("Set-Cookie", _session_cookie);
+
+      if( nullptr != __web_resource.m_server ){
+        __web_resource.m_server->sendHeader("Cache-Control", "no-cache");
+        __web_resource.m_server->sendHeader("Set-Cookie", _session_cookie);
+			}
     }
 
     /**
@@ -60,7 +63,11 @@ class EwSessionHandler{
 		 */
     void build_session_cookie( char* _str, bool _stat, int _max_size, bool _enable_max_age=false, uint32_t _max_age=EW_COOKIE_MAX_AGE ){
 
-      login_credential_table _login_credentials = __web_resource.db_conn->get_login_credential_table();
+      if( nullptr == __web_resource.m_db_conn ){
+        return;
+			}
+
+      login_credential_table _login_credentials = __web_resource.m_db_conn->get_login_credential_table();
       memset( _str, 0, _max_size );
       strcat( _str, _login_credentials.session_name );
       strcat( _str, _stat ? "=1": "=0" );
@@ -81,9 +88,13 @@ class EwSessionHandler{
       Logln(F("checking active session"));
       #endif
 
-      if ( __web_resource.server->hasHeader("Cookie") ) {
+      if( nullptr == __web_resource.m_server ){
+        false;
+			}
 
-        String cookie = __web_resource.server->header("Cookie");
+      if ( __web_resource.m_server->hasHeader("Cookie") ) {
+
+        String cookie = __web_resource.m_server->header("Cookie");
         char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
         this->build_session_cookie( _session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE );
 
@@ -116,8 +127,12 @@ class EwSessionHandler{
       Logln(F("checking inactive session"));
       #endif
 
-      if ( __web_resource.server->hasHeader("Cookie") ) {
-        String cookie = __web_resource.server->header("Cookie");
+      if( nullptr == __web_resource.m_server ){
+        false;
+			}
+
+      if ( __web_resource.m_server->hasHeader("Cookie") ) {
+        String cookie = __web_resource.m_server->header("Cookie");
         char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
         this->build_session_cookie( _session_cookie, false, EW_COOKIE_BUFF_MAX_SIZE );
 

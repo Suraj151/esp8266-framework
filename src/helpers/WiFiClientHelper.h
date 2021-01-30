@@ -18,10 +18,10 @@ created Date    : 1st June 2019
 
 /*   WiFi client support functions */
 
-bool connectToServer( WiFiClient* client, char*host, uint16_t port, uint16_t timeout=500 );
-bool disconnect( WiFiClient* client );
-bool isConnected( WiFiClient* client );
-bool sendPacket( WiFiClient* client, uint8_t *buffer, uint16_t len );
-uint16_t readPacket( WiFiClient* client, uint8_t *buffer, uint16_t maxlen, int16_t timeout );
+bool connectToServer( WiFiClient *client, char *host, uint16_t port, uint16_t timeout=500 );
+bool disconnect( WiFiClient *client );
+bool isConnected( WiFiClient *client );
+bool sendPacket( WiFiClient *client, uint8_t *buffer, uint16_t len );
+uint16_t readPacket( WiFiClient *client, uint8_t *buffer, uint16_t maxlen, int16_t timeout );
 
 #endif

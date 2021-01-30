@@ -14,6 +14,25 @@ created Date    : 1st June 2019
 
 #include "EmailServiceProvider.h"
 
+/**
+ * EmailServiceProvider constructor.
+ */
+EmailServiceProvider::EmailServiceProvider():
+  m_mail_handler_cb_id(0),
+  m_wifi(nullptr),
+  m_wifi_client(nullptr)
+{
+}
+
+/**
+ * EmailServiceProvider destructor
+ */
+EmailServiceProvider::~EmailServiceProvider(){
+
+  this->m_wifi_client = nullptr;
+  this->m_wifi = nullptr;
+  this->m_smtp.end();
+}
 
 /**
  * begin email service with wifi and client
@@ -21,11 +40,11 @@ created Date    : 1st June 2019
  * @param ESP8266WiFiClass*	_wifi
  * @param WiFiClient*	      _wifi_client
  */
-void EmailServiceProvider::begin( ESP8266WiFiClass* _wifi, WiFiClient* _wifi_client ){
+void EmailServiceProvider::begin( ESP8266WiFiClass *_wifi, WiFiClient *_wifi_client ){
 
-  this->wifi = _wifi;
-  this->wifi_client = _wifi_client;
-  this->_mail_handler_cb_id = 0;
+  this->m_wifi = _wifi;
+  this->m_wifi_client = _wifi_client;
+  this->m_mail_handler_cb_id = 0;
 }
 
 /**
@@ -34,8 +53,8 @@ void EmailServiceProvider::begin( ESP8266WiFiClass* _wifi, WiFiClient* _wifi_cli
  */
 void EmailServiceProvider::handleEmail(){
 
-  this->_mail_handler_cb_id = __task_scheduler.updateInterval(
-    this->_mail_handler_cb_id,
+  this->m_mail_handler_cb_id = __task_scheduler.updateInterval(
+    this->m_mail_handler_cb_id,
     [&]() {
 
       #ifdef EW_SERIAL_LOG
@@ -68,11 +87,13 @@ void EmailServiceProvider::handleEmail(){
       #endif
 
       _payload += "\n\nHello from Esp\n";
-      _payload += this->wifi->macAddress();
+      if( nullptr != this->m_wifi ){
+        _payload += this->m_wifi->macAddress();
+      }
 
       if( this->sendMail( _payload ) ){
-        __task_scheduler.clearInterval(this->_mail_handler_cb_id);
-        this->_mail_handler_cb_id = 0;
+        __task_scheduler.clearInterval(this->m_mail_handler_cb_id);
+        this->m_mail_handler_cb_id = 0;
       }
     },
     180000
@@ -97,31 +118,31 @@ void EmailServiceProvider::handleEmail(){
 //     strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0
 //   ){
 //
-//     ret = this->smtp.begin( this->wifi_client, _email_config.mail_host, _email_config.mail_port );
+//     ret = this->m_smtp.begin( this->m_wifi_client, _email_config.mail_host, _email_config.mail_port );
 //     if( ret ){
-//       ret = this->smtp.sendHello( _email_config.sending_domain );
+//       ret = this->m_smtp.sendHello( _email_config.sending_domain );
 //     }
 //     if( ret ){
-//       ret = this->smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
+//       ret = this->m_smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
 //     }
 //     if( ret ){
-//       ret = this->smtp.sendFrom( _email_config.mail_from );
+//       ret = this->m_smtp.sendFrom( _email_config.mail_from );
 //     }
 //     if( ret ){
-//       ret = this->smtp.sendTo( _email_config.mail_to );
+//       ret = this->m_smtp.sendTo( _email_config.mail_to );
 //     }
 //     if( ret ){
-//       ret = this->smtp.sendDataCommand();
+//       ret = this->m_smtp.sendDataCommand();
 //     }
 //     if( ret ){
-//       this->smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
-//       ret = this->smtp.sendDataBody( mail_body );
+//       this->m_smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
+//       ret = this->m_smtp.sendDataBody( mail_body );
 //     }
 //     if( ret ){
-//       ret = this->smtp.sendQuit();
+//       ret = this->m_smtp.sendQuit();
 //     }
 //
-//     this->smtp.end();
+//     this->m_smtp.end();
 //   }
 //
 //   _ClearObject(&_email_config);
@@ -134,7 +155,7 @@ void EmailServiceProvider::handleEmail(){
  * @param	  String*	mail_body
  * @return  bool
  */
-bool EmailServiceProvider::sendMail( String mail_body ){
+bool EmailServiceProvider::sendMail( String &mail_body ){
 
   email_config_table _email_config = __database_service.get_email_config_table();
 
@@ -145,31 +166,31 @@ bool EmailServiceProvider::sendMail( String mail_body ){
     strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0
   ){
 
-    ret = this->smtp.begin( this->wifi_client, _email_config.mail_host, _email_config.mail_port );
+    ret = this->m_smtp.begin( this->m_wifi_client, _email_config.mail_host, _email_config.mail_port );
     if( ret ){
-      ret = this->smtp.sendHello( _email_config.sending_domain );
+      ret = this->m_smtp.sendHello( _email_config.sending_domain );
     }
     if( ret ){
-      ret = this->smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
+      ret = this->m_smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
     }
     if( ret ){
-      ret = this->smtp.sendFrom( _email_config.mail_from );
+      ret = this->m_smtp.sendFrom( _email_config.mail_from );
     }
     if( ret ){
-      ret = this->smtp.sendTo( _email_config.mail_to );
+      ret = this->m_smtp.sendTo( _email_config.mail_to );
     }
     if( ret ){
-      ret = this->smtp.sendDataCommand();
+      ret = this->m_smtp.sendDataCommand();
     }
     if( ret ){
-      this->smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
-      ret = this->smtp.sendDataBody( mail_body );
+      this->m_smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
+      ret = this->m_smtp.sendDataBody( mail_body );
     }
     if( ret ){
-      ret = this->smtp.sendQuit();
+      ret = this->m_smtp.sendQuit();
     }
 
-    this->smtp.end();
+    this->m_smtp.end();
   }
 
   _ClearObject(&_email_config);
@@ -182,7 +203,7 @@ bool EmailServiceProvider::sendMail( String mail_body ){
  * @param	  char*	mail_body
  * @return  bool
  */
-bool EmailServiceProvider::sendMail( char* mail_body ){
+bool EmailServiceProvider::sendMail( char *mail_body ){
 
   email_config_table _email_config = __database_service.get_email_config_table();
 
@@ -193,31 +214,31 @@ bool EmailServiceProvider::sendMail( char* mail_body ){
     strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0
   ){
 
-    ret = this->smtp.begin( this->wifi_client, _email_config.mail_host, _email_config.mail_port );
+    ret = this->m_smtp.begin( this->m_wifi_client, _email_config.mail_host, _email_config.mail_port );
     if( ret ){
-      ret = this->smtp.sendHello( _email_config.sending_domain );
+      ret = this->m_smtp.sendHello( _email_config.sending_domain );
     }
     if( ret ){
-      ret = this->smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
+      ret = this->m_smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
     }
     if( ret ){
-      ret = this->smtp.sendFrom( _email_config.mail_from );
+      ret = this->m_smtp.sendFrom( _email_config.mail_from );
     }
     if( ret ){
-      ret = this->smtp.sendTo( _email_config.mail_to );
+      ret = this->m_smtp.sendTo( _email_config.mail_to );
     }
     if( ret ){
-      ret = this->smtp.sendDataCommand();
+      ret = this->m_smtp.sendDataCommand();
     }
     if( ret ){
-      this->smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
-      ret = this->smtp.sendDataBody( mail_body );
+      this->m_smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
+      ret = this->m_smtp.sendDataBody( mail_body );
     }
     if( ret ){
-      ret = this->smtp.sendQuit();
+      ret = this->m_smtp.sendQuit();
     }
 
-    this->smtp.end();
+    this->m_smtp.end();
   }
 
   _ClearObject(&_email_config);
@@ -238,31 +259,31 @@ bool EmailServiceProvider::sendMail( PGM_P mail_body ){
 
   if( __status_wifi.wifi_connected && __status_wifi.internet_available ){
 
-    ret = this->smtp.begin( this->wifi_client, _email_config.mail_host, _email_config.mail_port );
+    ret = this->m_smtp.begin( this->m_wifi_client, _email_config.mail_host, _email_config.mail_port );
     if( ret ){
-      ret = this->smtp.sendHello( _email_config.sending_domain );
+      ret = this->m_smtp.sendHello( _email_config.sending_domain );
     }
     if( ret ){
-      ret = this->smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
+      ret = this->m_smtp.sendAuthLogin( _email_config.mail_username, _email_config.mail_password );
     }
     if( ret ){
-      ret = this->smtp.sendFrom( _email_config.mail_from );
+      ret = this->m_smtp.sendFrom( _email_config.mail_from );
     }
     if( ret ){
-      ret = this->smtp.sendTo( _email_config.mail_to );
+      ret = this->m_smtp.sendTo( _email_config.mail_to );
     }
     if( ret ){
-      ret = this->smtp.sendDataCommand();
+      ret = this->m_smtp.sendDataCommand();
     }
     if( ret ){
-      this->smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
-      ret = this->smtp.sendDataBody( mail_body );
+      this->m_smtp.sendDataHeader( _email_config.mail_from_name, _email_config.mail_to, _email_config.mail_subject );
+      ret = this->m_smtp.sendDataBody( mail_body );
     }
     if( ret ){
-      ret = this->smtp.sendQuit();
+      ret = this->m_smtp.sendQuit();
     }
 
-    this->smtp.end();
+    this->m_smtp.end();
   }
 
   _ClearObject(&_email_config);

@@ -24,31 +24,29 @@ class HttpServiceProvider : public ServiceProvider {
     /**
      * HttpServiceProvider constructor.
      */
-    HttpServiceProvider(){
-    }
+    HttpServiceProvider();
 
     /**
 		 * HttpServiceProvider destructor
 		 */
-    ~HttpServiceProvider(){
-    }
+    ~HttpServiceProvider();
 
     /**
 		 * @var	HTTPClient  http_service
 		 */
-    HTTPClient client;
+    HTTPClient  m_client;
     /**
-		 * @var	char array host
+		 * @var	char array m_host
 		 */
-    char host[HTTP_HOST_ADDR_MAX_SIZE];
+    char        m_host[HTTP_HOST_ADDR_MAX_SIZE];
     /**
-		 * @var	int|80  port
+		 * @var	int|80  m_port
 		 */
-    int port=80;
+    int         m_port;
     /**
-		 * @var	int|HTTP_REQUEST_RETRY  retry
+		 * @var	int|HTTP_REQUEST_RETRY  m_retry
 		 */
-    int retry=HTTP_REQUEST_RETRY;
+    int         m_retry;
 
 
     bool followHttpRequest( int _httpCode );

@@ -49,8 +49,12 @@ class EmailConfigController : public Controller {
 		 */
 		void boot( void ){
 
-			this->email_configs = this->web_resource->db_conn->get_email_config_table();
-			this->route_handler->register_route( EW_SERVER_EMAIL_CONFIG_ROUTE, [&]() { this->handleEmailConfigRoute(); }, AUTH_MIDDLEWARE );
+			if( nullptr != this->m_web_resource && nullptr != this->m_web_resource->m_db_conn ){
+				this->email_configs = this->m_web_resource->m_db_conn->get_email_config_table();
+			}
+			if( nullptr != this->m_route_handler ){
+				this->m_route_handler->register_route( EW_SERVER_EMAIL_CONFIG_ROUTE, [&]() { this->handleEmailConfigRoute(); }, AUTH_MIDDLEWARE );
+			}
 		}
 
 		/**
@@ -101,7 +105,14 @@ class EmailConfigController : public Controller {
 		 */
     void handleEmailConfigRoute( void ) {
 
-			this->email_configs = this->web_resource->db_conn->get_email_config_table();
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_db_conn ||
+					nullptr == this->m_web_resource->m_server ||
+					nullptr == this->m_route_handler ){
+				return;
+			}
+
+			this->email_configs = this->m_web_resource->m_db_conn->get_email_config_table();
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling Email Config route"));
       #endif
@@ -109,19 +120,19 @@ class EmailConfigController : public Controller {
 			bool _is_test_mail = false;
       bool _is_error = true;
 
-      if ( this->web_resource->server->hasArg("ml_dmn") && this->web_resource->server->hasArg("ml_srvr") ) {
+      if ( this->m_web_resource->m_server->hasArg("ml_dmn") && this->m_web_resource->m_server->hasArg("ml_srvr") ) {
 
-        String _mail_domain = this->web_resource->server->arg("ml_dmn");
-				String _mail_server = this->web_resource->server->arg("ml_srvr");
-				String _mail_port = this->web_resource->server->arg("ml_prt");
-				String _mail_username = this->web_resource->server->arg("ml_usr");
-				String _mail_password = this->web_resource->server->arg("ml_psw");
-				String _mail_from = this->web_resource->server->arg("ml_frm");
-				String _mail_from_name = this->web_resource->server->arg("ml_frnm");
-				String _mail_to = this->web_resource->server->arg("ml_to");
-				String _mail_subject = this->web_resource->server->arg("ml_sub");
-				// String _mail_frequency = this->web_resource->server->arg("ml_freq");
-				String _test_mail = this->web_resource->server->arg("tstml");
+        String _mail_domain = this->m_web_resource->m_server->arg("ml_dmn");
+				String _mail_server = this->m_web_resource->m_server->arg("ml_srvr");
+				String _mail_port = this->m_web_resource->m_server->arg("ml_prt");
+				String _mail_username = this->m_web_resource->m_server->arg("ml_usr");
+				String _mail_password = this->m_web_resource->m_server->arg("ml_psw");
+				String _mail_from = this->m_web_resource->m_server->arg("ml_frm");
+				String _mail_from_name = this->m_web_resource->m_server->arg("ml_frnm");
+				String _mail_to = this->m_web_resource->m_server->arg("ml_to");
+				String _mail_subject = this->m_web_resource->m_server->arg("ml_sub");
+				// String _mail_frequency = this->m_web_resource->m_server->arg("ml_freq");
+				String _test_mail = this->m_web_resource->m_server->arg("tstml");
 
         #ifdef EW_SERIAL_LOG
           Logln(F("\nSubmitted info :\n"));
@@ -159,7 +170,7 @@ class EmailConfigController : public Controller {
 					// this->email_configs.mail_frequency = (uint16_t)_mail_frequency.toInt();
 					_is_test_mail = (bool)( _test_mail == "test" );
 
-          this->web_resource->db_conn->set_email_config_table( &this->email_configs );
+          this->m_web_resource->m_db_conn->set_email_config_table( &this->email_configs );
           _is_error = false;
         }
         _is_posted = true;
@@ -168,7 +179,7 @@ class EmailConfigController : public Controller {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_email_config_html( _page, _is_error, _is_posted, _is_test_mail );
 
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
 
 			if( _is_posted && !_is_error && _is_test_mail ){

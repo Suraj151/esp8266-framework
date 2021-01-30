@@ -29,30 +29,15 @@ class EmailServiceProvider : public ServiceProvider {
     /**
      * EmailServiceProvider constructor.
      */
-    EmailServiceProvider(){
-
-      this->wifi_client = NULL;
-      this->wifi = NULL;
-    }
-
+    EmailServiceProvider();
     /**
 		 * EmailServiceProvider destructor
 		 */
-    ~EmailServiceProvider(){
+    ~EmailServiceProvider();
 
-      this->wifi_client = NULL;
-      this->wifi = NULL;
-      this->smtp.end();
-    }
-
-    /**
-		 * @var	int|0 _mail_handler_cb_id
-		 */
-    int _mail_handler_cb_id=0;
-
-    void begin( ESP8266WiFiClass* _wifi, WiFiClient* _wifi_client );
-    bool sendMail( String mail_body );
-    bool sendMail( char* mail_body );
+    void begin( ESP8266WiFiClass *_wifi, WiFiClient *_wifi_client );
+    bool sendMail( String &mail_body );
+    bool sendMail( char *mail_body );
     bool sendMail( PGM_P mail_body );
     // template <typename T> bool sendMail( T mail_body );
     void handleEmail( void );
@@ -61,11 +46,16 @@ class EmailServiceProvider : public ServiceProvider {
     void printEmailConfigLogs( void );
     #endif
 
+    /**
+		 * @var	int|0 m_mail_handler_cb_id
+		 */
+    int                 m_mail_handler_cb_id;
+
   protected:
 
-    WiFiClient* wifi_client;
-    ESP8266WiFiClass* wifi;
-    SMTPdriver smtp;
+    WiFiClient          *m_wifi_client;
+    ESP8266WiFiClass    *m_wifi;
+    SMTPdriver          m_smtp;
 };
 
 extern EmailServiceProvider __email_service;

@@ -27,20 +27,14 @@ class PingServiceProvider : public ServiceProvider {
 
   public:
 
-    ping_option _opt;
-    // bool host_resp;
-
     /**
      * PingServiceProvider constructor.
      */
-    PingServiceProvider(){
-    }
-
+    PingServiceProvider();
     /**
 		 * PingServiceProvider destructor
 		 */
-    ~PingServiceProvider(){
-    }
+    ~PingServiceProvider();
 
     /**
      * initialize ping
@@ -49,11 +43,14 @@ class PingServiceProvider : public ServiceProvider {
     bool ping( void );
     bool isHostRespondingToPing( void );
 
+    ping_option m_opt;
+    // bool host_resp;
+
   protected:
     /**
 		 * @var	ESP8266WiFiClass*|&WiFi wifi
 		 */
-    ESP8266WiFiClass* wifi;
+    ESP8266WiFiClass  *m_wifi;
 };
 
 extern PingServiceProvider __ping_service;

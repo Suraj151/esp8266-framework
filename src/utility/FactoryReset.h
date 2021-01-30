@@ -30,8 +30,11 @@ class DeviceFactoryReset{
 		/**
 		 * DeviceFactoryReset constructor
 		 */
-		DeviceFactoryReset(){
-		}
+		DeviceFactoryReset();
+		/**
+		 * DeviceFactoryReset destructor
+		 */
+		~DeviceFactoryReset();
 
 		void factory_reset( void );
 		bool run_while_factory_reset( CallBackVoidArgFn _fn );
@@ -42,13 +45,13 @@ class DeviceFactoryReset{
 	protected:
 
 		/**
-		 * @var	uint8_t|0 flash_key_pressed
+		 * @var	uint8_t|0 m_flash_key_pressed
 		 */
-    uint8_t flash_key_pressed=0;
+    uint8_t m_flash_key_pressed;
 		/**
-		 * @var	std::vector<factory_reset_cb_>	_factory_reset_cbs
+		 * @var	std::vector<factory_reset_cb_>	m_factory_reset_cbs
 		 */
-		std::vector<factory_reset_cb_> _factory_reset_cbs;
+		std::vector<factory_reset_cb_> m_factory_reset_cbs;
 };
 
 extern DeviceFactoryReset __factory_reset;

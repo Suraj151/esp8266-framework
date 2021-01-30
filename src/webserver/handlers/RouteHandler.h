@@ -23,14 +23,11 @@ class RouteHandler : public Middleware{
     /**
 		 * RouteHandler constructor
 		 */
-    RouteHandler(){
-    }
-
+    RouteHandler();
     /**
 		 * RouteHandler destructor
 		 */
-    ~RouteHandler(){
-    }
+    ~RouteHandler();
 
     void register_route( const char* _uri, CallBackVoidArgFn _fn, middlwares _middleware_level=NO_MIDDLEWARE, const char* _redirect_uri=EW_SERVER_LOGIN_ROUTE );
     void register_not_found_fn( CallBackVoidArgFn _fn );

@@ -10,15 +10,31 @@ created Date    : 1st June 2019
 #include "FactoryReset.h"
 
 /**
+ * DeviceFactoryReset constructor
+ */
+DeviceFactoryReset::DeviceFactoryReset():
+	m_flash_key_pressed(0)
+{
+}
+
+/**
+ * DeviceFactoryReset destructor
+ */
+DeviceFactoryReset::~DeviceFactoryReset(){
+}
+
+/**
  * this function perform the factory reset operation.
  * it also performs the essential functionality registered as to be done
  * before device reset
  */
 void DeviceFactoryReset::factory_reset(){
 
-	for ( uint16_t i = 0; i < this->_factory_reset_cbs.size(); i++ ) {
+	for ( uint16_t i = 0; i < this->m_factory_reset_cbs.size(); i++ ) {
 
-		if( this->_factory_reset_cbs[i]._cb ) this->_factory_reset_cbs[i]._cb();
+		if( nullptr != this->m_factory_reset_cbs[i]._cb ){
+			this->m_factory_reset_cbs[i]._cb();
+		}
 	}
 	this->reset_device(200);
 }
@@ -31,12 +47,13 @@ void DeviceFactoryReset::factory_reset(){
  */
 bool DeviceFactoryReset::run_while_factory_reset( CallBackVoidArgFn _fn ){
 
-	if( this->_factory_reset_cbs.size() < MAX_FACTORY_RESET_CALLBACKS ){
+	if( this->m_factory_reset_cbs.size() < MAX_FACTORY_RESET_CALLBACKS ){
 		factory_reset_cb_ _new_factory_reset_cb;
 		_new_factory_reset_cb._cb = _fn;
-		this->_factory_reset_cbs.push_back(_new_factory_reset_cb);
+		this->m_factory_reset_cbs.push_back(_new_factory_reset_cb);
 		return true;
-	}return false;
+	}
+	return false;
 }
 
 /**
@@ -62,16 +79,16 @@ void DeviceFactoryReset::restart_device( int _timeout ){
 void DeviceFactoryReset::handleFlashKeyPress(){
 
   if( digitalRead(FLASH_KEY_PIN) == LOW ){
-    this->flash_key_pressed++;
+    this->m_flash_key_pressed++;
     #ifdef EW_SERIAL_LOG
     Log( F("Flash Key pressed : ") );
-    Logln( this->flash_key_pressed );
+    Logln( this->m_flash_key_pressed );
     #endif
   }else{
-    this->flash_key_pressed=0;
+    this->m_flash_key_pressed=0;
   }
 
-  if( this->flash_key_pressed > FLASH_KEY_PRESS_COUNT_THR ){
+  if( this->m_flash_key_pressed > FLASH_KEY_PRESS_COUNT_THR ){
     #ifdef EW_SERIAL_LOG
     Logln( F("requested factory reset !") );
     #endif

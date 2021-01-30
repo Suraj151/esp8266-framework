@@ -52,14 +52,16 @@ class GpioController : public Controller {
 		 */
 		void boot( void ){
 
-			// this->gpio_configs = this->web_resource->db_conn->get_gpio_config_table();
-			this->route_handler->register_route( EW_SERVER_GPIO_MANAGE_CONFIG_ROUTE, [&]() { this->handleGpioManageRoute(); }, AUTH_MIDDLEWARE );
-      this->route_handler->register_route( EW_SERVER_GPIO_SERVER_CONFIG_ROUTE, [&]() { this->handleGpioServerConfigRoute(); }, AUTH_MIDDLEWARE );
-      this->route_handler->register_route( EW_SERVER_GPIO_MODE_CONFIG_ROUTE, [&]() { this->handleGpioModeConfigRoute(); }, AUTH_MIDDLEWARE );
-      this->route_handler->register_route( EW_SERVER_GPIO_WRITE_CONFIG_ROUTE, [&]() { this->handleGpioWriteConfigRoute(); }, AUTH_MIDDLEWARE );
-			this->route_handler->register_route( EW_SERVER_GPIO_ALERT_CONFIG_ROUTE, [&]() { this->handleGpioAlertConfigRoute(); }, AUTH_MIDDLEWARE );
-      this->route_handler->register_route( EW_SERVER_GPIO_MONITOR_ROUTE, [&]() { this->handleGpioMonitorRoute(); }, AUTH_MIDDLEWARE );
-      this->route_handler->register_route( EW_SERVER_GPIO_ANALOG_MONITOR_ROUTE, [&]() { this->handleAnalogMonitor(); } );
+			if( nullptr != this->m_route_handler ){
+				this->m_route_handler->register_route( EW_SERVER_GPIO_MANAGE_CONFIG_ROUTE, [&]() { this->handleGpioManageRoute(); }, AUTH_MIDDLEWARE );
+	      this->m_route_handler->register_route( EW_SERVER_GPIO_SERVER_CONFIG_ROUTE, [&]() { this->handleGpioServerConfigRoute(); }, AUTH_MIDDLEWARE );
+	      this->m_route_handler->register_route( EW_SERVER_GPIO_MODE_CONFIG_ROUTE, [&]() { this->handleGpioModeConfigRoute(); }, AUTH_MIDDLEWARE );
+	      this->m_route_handler->register_route( EW_SERVER_GPIO_WRITE_CONFIG_ROUTE, [&]() { this->handleGpioWriteConfigRoute(); }, AUTH_MIDDLEWARE );
+				this->m_route_handler->register_route( EW_SERVER_GPIO_ALERT_CONFIG_ROUTE, [&]() { this->handleGpioAlertConfigRoute(); }, AUTH_MIDDLEWARE );
+	      this->m_route_handler->register_route( EW_SERVER_GPIO_MONITOR_ROUTE, [&]() { this->handleGpioMonitorRoute(); }, AUTH_MIDDLEWARE );
+	      this->m_route_handler->register_route( EW_SERVER_GPIO_ANALOG_MONITOR_ROUTE, [&]() { this->handleAnalogMonitor(); } );
+			}
+			// this->gpio_configs = this->m_web_resource->m_db_conn->get_gpio_config_table();
 		}
 
 		/**
@@ -71,9 +73,15 @@ class GpioController : public Controller {
       Logln(F("Handling analog monitor route"));
       #endif
 
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_server ||
+					nullptr == this->m_route_handler ){
+				return;
+			}
+
       int y1 = this->_last_monitor_point.y,
       y2 = map(
-        __gpio_service.gpio_config_copy.gpio_readings[MAX_NO_OF_GPIO_PINS], 0, ANALOG_GPIO_RESOLUTION,
+        __gpio_service.m_gpio_config_copy.gpio_readings[MAX_NO_OF_GPIO_PINS], 0, ANALOG_GPIO_RESOLUTION,
         GPIO_GRAPH_TOP_MARGIN, GPIO_MAX_GRAPH_HEIGHT - GPIO_GRAPH_BOTTOM_MARGIN
       ),
       x1 = this->_last_monitor_point.x < GPIO_MAX_GRAPH_WIDTH ?
@@ -91,7 +99,7 @@ class GpioController : public Controller {
       _response += ",\"y2\":";
       _response += y2;
       _response += ",\"r\":";
-      _response += !this->route_handler->has_active_session();
+      _response += !this->m_route_handler->has_active_session();
 			_response += ",\"d\":";
 			__gpio_service.appendGpioJsonPayload(_response);
 			_response += ",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"AOUT\", \"AIN\"]";
@@ -99,8 +107,8 @@ class GpioController : public Controller {
 
       this->_last_monitor_point.x = x2;
       this->_last_monitor_point.y = y2;
-      this->web_resource->server->sendHeader("Cache-Control", "no-cache");
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _response );
+      this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _response );
     }
 
 		/**
@@ -111,6 +119,11 @@ class GpioController : public Controller {
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling Gpio Manage route"));
       #endif
+
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_server ){
+				return;
+			}
 
       char* _page = new char[EW_HTML_MAX_SIZE];
 			memset( _page, 0, EW_HTML_MAX_SIZE );
@@ -127,7 +140,7 @@ class GpioController : public Controller {
 			strcat_P( _page, EW_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM );
 			strcat_P( _page, EW_SERVER_FOOTER_HTML );
 
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 
@@ -179,12 +192,17 @@ class GpioController : public Controller {
       Logln(F("Handling Gpio Monitor Config route"));
       #endif
 
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_server ){
+				return;
+			}
+
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_gpio_monitor_html( _page );
 
       this->_last_monitor_point.x = 0;
       this->_last_monitor_point.y = GPIO_MAX_GRAPH_HEIGHT - GPIO_GRAPH_BOTTOM_MARGIN;
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 
@@ -202,10 +220,10 @@ class GpioController : public Controller {
       strcat_P( _page, EW_SERVER_GPIO_SERVER_PAGE_TOP );
 
       char _port[10],_freq[10];memset( _port, 0, 10 );memset( _freq, 0, 10 );
-      __appendUintToBuff( _port, "%d", __gpio_service.gpio_config_copy.gpio_port, 8 );
-      __appendUintToBuff( _freq, "%d", __gpio_service.gpio_config_copy.gpio_post_frequency, 8 );
+      __appendUintToBuff( _port, "%d", __gpio_service.m_gpio_config_copy.gpio_port, 8 );
+      __appendUintToBuff( _freq, "%d", __gpio_service.m_gpio_config_copy.gpio_post_frequency, 8 );
 
-      concat_tr_input_html_tags( _page, PSTR("Host Address:"), PSTR("hst"), __gpio_service.gpio_config_copy.gpio_host, GPIO_HOST_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, PSTR("Host Address:"), PSTR("hst"), __gpio_service.m_gpio_config_copy.gpio_host, GPIO_HOST_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, PSTR("Host Port:"), PSTR("prt"), _port );
       concat_tr_input_html_tags( _page, PSTR("Post Frequency:"), PSTR("frq"), _freq );
 
@@ -225,13 +243,20 @@ class GpioController : public Controller {
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling Gpio Server Config route"));
       #endif
+
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_db_conn ||
+					nullptr == this->m_web_resource->m_server ){
+				return;
+			}
+
       bool _is_posted = false;
 
-      if ( this->web_resource->server->hasArg("hst") && this->web_resource->server->hasArg("prt") ) {
+      if ( this->m_web_resource->m_server->hasArg("hst") && this->m_web_resource->m_server->hasArg("prt") ) {
 
-        String _gpio_host = this->web_resource->server->arg("hst");
-        String _gpio_port = this->web_resource->server->arg("prt");
-        String _post_freq = this->web_resource->server->arg("frq");
+        String _gpio_host = this->m_web_resource->m_server->arg("hst");
+        String _gpio_port = this->m_web_resource->m_server->arg("prt");
+        String _post_freq = this->m_web_resource->m_server->arg("frq");
 
         #ifdef EW_SERIAL_LOG
           Logln(F("\nSubmitted info :\n"));
@@ -241,10 +266,10 @@ class GpioController : public Controller {
           Logln();
         #endif
 
-        _gpio_host.toCharArray( __gpio_service.gpio_config_copy.gpio_host, _gpio_host.length()+1 );
-        __gpio_service.gpio_config_copy.gpio_port = (int)_gpio_port.toInt();
-        __gpio_service.gpio_config_copy.gpio_post_frequency = (int)_post_freq.toInt() < 0 ? GPIO_DATA_POST_FREQ : (int)_post_freq.toInt();
-        this->web_resource->db_conn->set_gpio_config_table( &__gpio_service.gpio_config_copy );
+        _gpio_host.toCharArray( __gpio_service.m_gpio_config_copy.gpio_host, _gpio_host.length()+1 );
+        __gpio_service.m_gpio_config_copy.gpio_port = (int)_gpio_port.toInt();
+        __gpio_service.m_gpio_config_copy.gpio_post_frequency = (int)_post_freq.toInt() < 0 ? GPIO_DATA_POST_FREQ : (int)_post_freq.toInt();
+        this->m_web_resource->m_db_conn->set_gpio_config_table( &__gpio_service.m_gpio_config_copy );
 
         _is_posted = true;
       }
@@ -252,7 +277,7 @@ class GpioController : public Controller {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_gpio_server_config_html( _page, _is_posted );
 
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
 			if( _is_posted ){
 				__gpio_service.handleGpioModes(GPIO_SERVER_CONFIG);
@@ -282,9 +307,9 @@ class GpioController : public Controller {
         _name[1] = (0x30 + _pin );_label[1] = (0x30 + _pin );
         _exception = _pin == 0 ? 3:-1;
         if( !__gpio_service.is_exceptional_gpio_pin(_pin) )
-        concat_tr_select_html_tags( _page, _name, _label, _gpio_mode_general_options, 4, (int)__gpio_service.gpio_config_copy.gpio_mode[_pin], _exception );
+        concat_tr_select_html_tags( _page, _name, _label, _gpio_mode_general_options, 4, (int)__gpio_service.m_gpio_config_copy.gpio_mode[_pin], _exception );
       }
-      concat_tr_select_html_tags( _page, (char*)"A0:", (char*)"a0", _gpio_mode_analog_options, 5, (int)__gpio_service.gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] );
+      concat_tr_select_html_tags( _page, (char*)"A0:", (char*)"a0", _gpio_mode_analog_options, 5, (int)__gpio_service.m_gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
       if( _enable_flash )
@@ -300,9 +325,16 @@ class GpioController : public Controller {
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling Gpio Mode Config route"));
       #endif
+
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_db_conn ||
+					nullptr == this->m_web_resource->m_server ){
+				return;
+			}
+
       bool _is_posted = false;
 
-      if ( this->web_resource->server->hasArg("d0") && this->web_resource->server->hasArg("a0") ) {
+      if ( this->m_web_resource->m_server->hasArg("d0") && this->m_web_resource->m_server->hasArg("a0") ) {
 
         #ifdef EW_SERIAL_LOG
           Logln(F("\nSubmitted info :\n"));
@@ -310,29 +342,29 @@ class GpioController : public Controller {
         char _label[6]; memset(_label, 0, 6); strcpy( _label, "d0" );
         for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
           _label[1] = (0x30 + _pin );
-          __gpio_service.gpio_config_copy.gpio_mode[_pin] = !__gpio_service.is_exceptional_gpio_pin(_pin) ? (int)this->web_resource->server->arg(_label).toInt():0;
+          __gpio_service.m_gpio_config_copy.gpio_mode[_pin] = !__gpio_service.is_exceptional_gpio_pin(_pin) ? (int)this->m_web_resource->m_server->arg(_label).toInt():0;
           #ifdef EW_SERIAL_LOG
-            Log(F("Pin ")); Log( _pin ); Log(F(" : ")); Logln( (int)this->web_resource->server->arg(_label).toInt() );
+            Log(F("Pin ")); Log( _pin ); Log(F(" : ")); Logln( (int)this->m_web_resource->m_server->arg(_label).toInt() );
           #endif
-					if( __gpio_service.gpio_config_copy.gpio_mode[_pin] == OFF || __gpio_service.gpio_config_copy.gpio_mode[_pin] == DIGITAL_WRITE || __gpio_service.gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE ){
-			      __gpio_service.gpio_config_copy.gpio_alert_comparator[_pin] = EQUAL;
-						__gpio_service.gpio_config_copy.gpio_alert_channel[_pin] = NO_ALERT;
-						__gpio_service.gpio_config_copy.gpio_alert_values[_pin] = OFF;
+					if( __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == OFF || __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_WRITE || __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE ){
+			      __gpio_service.m_gpio_config_copy.gpio_alert_comparator[_pin] = EQUAL;
+						__gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin] = NO_ALERT;
+						__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin] = OFF;
 			    }
         }
-        __gpio_service.gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] = (int)this->web_resource->server->arg("a0").toInt();
-				if( __gpio_service.gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] == OFF ){
-					__gpio_service.gpio_config_copy.gpio_alert_comparator[MAX_NO_OF_GPIO_PINS] = EQUAL;
-					__gpio_service.gpio_config_copy.gpio_alert_channel[MAX_NO_OF_GPIO_PINS] = NO_ALERT;
-					__gpio_service.gpio_config_copy.gpio_alert_values[MAX_NO_OF_GPIO_PINS] = OFF;
+        __gpio_service.m_gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] = (int)this->m_web_resource->m_server->arg("a0").toInt();
+				if( __gpio_service.m_gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] == OFF ){
+					__gpio_service.m_gpio_config_copy.gpio_alert_comparator[MAX_NO_OF_GPIO_PINS] = EQUAL;
+					__gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_NO_OF_GPIO_PINS] = NO_ALERT;
+					__gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_NO_OF_GPIO_PINS] = OFF;
 				}
 
         #ifdef EW_SERIAL_LOG
-          Log(F("Pin A: ")); Logln( __gpio_service.gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] );
+          Log(F("Pin A: ")); Logln( __gpio_service.m_gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] );
           Logln();
         #endif
 
-        this->web_resource->db_conn->set_gpio_config_table( &__gpio_service.gpio_config_copy );
+        this->m_web_resource->m_db_conn->set_gpio_config_table( &__gpio_service.m_gpio_config_copy );
 
         _is_posted = true;
       }
@@ -340,7 +372,7 @@ class GpioController : public Controller {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_gpio_mode_config_html( _page, _is_posted );
 
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
 			if( _is_posted ){
 				__gpio_service.handleGpioModes(GPIO_MODE_CONFIG);
@@ -370,14 +402,14 @@ class GpioController : public Controller {
 
         if( !__gpio_service.is_exceptional_gpio_pin(_pin) ){
 
-          if( __gpio_service.gpio_config_copy.gpio_mode[_pin] == DIGITAL_WRITE ){
+          if( __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_WRITE ){
             _added_options = true;
-            concat_tr_select_html_tags( _page, _name, _label, _gpio_digital_write_options, 2, (int)__gpio_service.gpio_config_copy.gpio_readings[_pin] );
+            concat_tr_select_html_tags( _page, _name, _label, _gpio_digital_write_options, 2, (int)__gpio_service.m_gpio_config_copy.gpio_readings[_pin] );
           }
-          if( __gpio_service.gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE ){
+          if( __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE ){
             _added_options = true;
             memset( _analog_value, 0, 10 );
-            __appendUintToBuff( _analog_value, "%d", __gpio_service.gpio_config_copy.gpio_readings[_pin], 8 );
+            __appendUintToBuff( _analog_value, "%d", __gpio_service.m_gpio_config_copy.gpio_readings[_pin], 8 );
 						concat_tr_input_html_tags( _page, _name, _label, _analog_value, 0, HTML_INPUT_RANGE_TAG_TYPE, false, false );
           }
         }
@@ -401,6 +433,13 @@ class GpioController : public Controller {
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling Gpio Write Config route"));
       #endif
+
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_db_conn ||
+					nullptr == this->m_web_resource->m_server ){
+				return;
+			}
+
       bool _is_posted = false;
 
       if ( true ) {
@@ -411,24 +450,24 @@ class GpioController : public Controller {
         char _label[6]; memset(_label, 0, 6); strcpy( _label, "d0" );
         for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
           _label[1] = (0x30 + _pin );
-          if( this->web_resource->server->hasArg(_label) ){
-            __gpio_service.gpio_config_copy.gpio_readings[_pin] = __gpio_service.is_exceptional_gpio_pin(_pin) ? 0 : __gpio_service.gpio_config_copy.gpio_mode[_pin] == DIGITAL_WRITE ?
-            (int)this->web_resource->server->arg(_label).toInt() : (int)this->web_resource->server->arg(_label).toInt();
+          if( this->m_web_resource->m_server->hasArg(_label) ){
+            __gpio_service.m_gpio_config_copy.gpio_readings[_pin] = __gpio_service.is_exceptional_gpio_pin(_pin) ? 0 : __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_WRITE ?
+            (int)this->m_web_resource->m_server->arg(_label).toInt() : (int)this->m_web_resource->m_server->arg(_label).toInt();
             #ifdef EW_SERIAL_LOG
-              Log(F("Pin ")); Log( _pin ); Log(F(" : ")); Logln( (int)this->web_resource->server->arg(_label).toInt() );
+              Log(F("Pin ")); Log( _pin ); Log(F(" : ")); Logln( (int)this->m_web_resource->m_server->arg(_label).toInt() );
             #endif
             _is_posted = true;
           }
         }
 
         if( _is_posted )
-        this->web_resource->db_conn->set_gpio_config_table( &__gpio_service.gpio_config_copy );
+        this->m_web_resource->m_db_conn->set_gpio_config_table( &__gpio_service.m_gpio_config_copy );
       }
 
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_gpio_write_config_html( _page, _is_posted );
 
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
 			if( _is_posted ){
 				__gpio_service.handleGpioModes(GPIO_WRITE_CONFIG);
@@ -465,21 +504,21 @@ class GpioController : public Controller {
       for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
         _name[1] = (0x30 + _pin );_label[1] = (0x30 + _pin );_alert_label[2] = (0x30 + _pin );
 
-        if( !__gpio_service.is_exceptional_gpio_pin(_pin) && __gpio_service.gpio_config_copy.gpio_mode[_pin] == DIGITAL_READ ){
+        if( !__gpio_service.is_exceptional_gpio_pin(_pin) && __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_READ ){
 
           _added_options = true;
 					strcat_P( _page, HTML_TR_OPEN_TAG );
 					strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
-					concat_td_select_html_tags( _page, _name, _label, _gpio_digital_alert_options, 2, (int)__gpio_service.gpio_config_copy.gpio_alert_values[_pin] );
-					concat_td_select_html_tags( _page, (char*)" ? ", _alert_label, _gpio_alert_channels, 2, (int)__gpio_service.gpio_config_copy.gpio_alert_channel[_pin] );
+					concat_td_select_html_tags( _page, _name, _label, _gpio_digital_alert_options, 2, (int)__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin] );
+					concat_td_select_html_tags( _page, (char*)" ? ", _alert_label, _gpio_alert_channels, 2, (int)__gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin] );
 				  strcat_P( _page, HTML_TR_CLOSE_TAG );
         }
       }
 
-			if( __gpio_service.gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] == ANALOG_READ ){
+			if( __gpio_service.m_gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] == ANALOG_READ ){
 				_added_options = true;
 				memset( _analog_value, 0, 10 );
-				__appendUintToBuff( _analog_value, "%d", __gpio_service.gpio_config_copy.gpio_alert_values[MAX_NO_OF_GPIO_PINS], 8 );
+				__appendUintToBuff( _analog_value, "%d", __gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_NO_OF_GPIO_PINS], 8 );
 				strcat_P( _page, HTML_TR_OPEN_TAG );
 				strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
 				strcat_P( _page, HTML_TD_OPEN_TAG );
@@ -490,10 +529,10 @@ class GpioController : public Controller {
 				strcat_P( _page, HTML_STYLE_ATTR );
 				strcat( _page, (char*)"'display:flex;'" );
 				strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
-				concat_select_html_tag( _page, PSTR("a0"), _gpio_analog_alert_comparators, 3, (int)__gpio_service.gpio_config_copy.gpio_alert_comparator[MAX_NO_OF_GPIO_PINS] );
+				concat_select_html_tag( _page, PSTR("a0"), _gpio_analog_alert_comparators, 3, (int)__gpio_service.m_gpio_config_copy.gpio_alert_comparator[MAX_NO_OF_GPIO_PINS] );
 			  concat_input_html_tag( _page, PSTR("aval"), _analog_value );
 			  strcat_P( _page, HTML_TD_CLOSE_TAG );
-				concat_td_select_html_tags( _page, (char*)" ? ", (char*)"anlt0", _gpio_alert_channels, 2, (int)__gpio_service.gpio_config_copy.gpio_alert_channel[MAX_NO_OF_GPIO_PINS] );
+				concat_td_select_html_tags( _page, (char*)" ? ", (char*)"anlt0", _gpio_alert_channels, 2, (int)__gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_NO_OF_GPIO_PINS] );
 				strcat_P( _page, HTML_TR_CLOSE_TAG );
 			}
 
@@ -515,6 +554,13 @@ class GpioController : public Controller {
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling Gpio Alert Config route"));
       #endif
+
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_db_conn ||
+					nullptr == this->m_web_resource->m_server ){
+				return;
+			}
+
       bool _is_posted = false;
 
       if ( true ) {
@@ -523,41 +569,41 @@ class GpioController : public Controller {
 				char _alert_label[6]; memset(_alert_label, 0, 6); strcpy( _alert_label, "al0" );
         for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
           _label[1] = (0x30 + _pin ); _alert_label[2] = (0x30 + _pin );
-          if( this->web_resource->server->hasArg(_label) && this->web_resource->server->hasArg(_alert_label) ){
+          if( this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_alert_label) ){
 
-						__gpio_service.gpio_config_copy.gpio_alert_comparator[_pin] = EQUAL;
-						__gpio_service.gpio_config_copy.gpio_alert_values[_pin] = (int)this->web_resource->server->arg(_label).toInt();
-						__gpio_service.gpio_config_copy.gpio_alert_channel[_pin] = (int)this->web_resource->server->arg(_alert_label).toInt();
+						__gpio_service.m_gpio_config_copy.gpio_alert_comparator[_pin] = EQUAL;
+						__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin] = (int)this->m_web_resource->m_server->arg(_label).toInt();
+						__gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin] = (int)this->m_web_resource->m_server->arg(_alert_label).toInt();
             #ifdef EW_SERIAL_LOG
               Log(F("Pin ")); Log( _pin );
-							Log(F(" : ")); Log( __gpio_service.gpio_config_copy.gpio_alert_values[_pin] );
-							Log(F(" : ")); Logln( __gpio_service.gpio_config_copy.gpio_alert_channel[_pin] );
+							Log(F(" : ")); Log( __gpio_service.m_gpio_config_copy.gpio_alert_values[_pin] );
+							Log(F(" : ")); Logln( __gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin] );
             #endif
             _is_posted = true;
           }
         }
 
-				if( this->web_resource->server->hasArg("a0") && this->web_resource->server->hasArg("aval") && this->web_resource->server->hasArg("anlt0") ){
+				if( this->m_web_resource->m_server->hasArg("a0") && this->m_web_resource->m_server->hasArg("aval") && this->m_web_resource->m_server->hasArg("anlt0") ){
 
-					__gpio_service.gpio_config_copy.gpio_alert_comparator[MAX_NO_OF_GPIO_PINS] = (int)this->web_resource->server->arg("a0").toInt();
-					__gpio_service.gpio_config_copy.gpio_alert_values[MAX_NO_OF_GPIO_PINS] = (int)this->web_resource->server->arg("aval").toInt();
-					__gpio_service.gpio_config_copy.gpio_alert_channel[MAX_NO_OF_GPIO_PINS] = (int)this->web_resource->server->arg("anlt0").toInt();
+					__gpio_service.m_gpio_config_copy.gpio_alert_comparator[MAX_NO_OF_GPIO_PINS] = (int)this->m_web_resource->m_server->arg("a0").toInt();
+					__gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_NO_OF_GPIO_PINS] = (int)this->m_web_resource->m_server->arg("aval").toInt();
+					__gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_NO_OF_GPIO_PINS] = (int)this->m_web_resource->m_server->arg("anlt0").toInt();
 					#ifdef EW_SERIAL_LOG
 						Log(F("Pin A0"));
-						Log(F(" : ")); Log( __gpio_service.gpio_config_copy.gpio_alert_values[MAX_NO_OF_GPIO_PINS] );
-						Log(F(" : ")); Logln( __gpio_service.gpio_config_copy.gpio_alert_channel[MAX_NO_OF_GPIO_PINS] );
+						Log(F(" : ")); Log( __gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_NO_OF_GPIO_PINS] );
+						Log(F(" : ")); Logln( __gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_NO_OF_GPIO_PINS] );
 					#endif
 					_is_posted = true;
 				}
 
         if( _is_posted )
-        this->web_resource->db_conn->set_gpio_config_table( &__gpio_service.gpio_config_copy );
+        this->m_web_resource->m_db_conn->set_gpio_config_table( &__gpio_service.m_gpio_config_copy );
       }
 
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_gpio_alert_config_html( _page, _is_posted );
 
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
 			if( _is_posted ){
 				__gpio_service.handleGpioModes(GPIO_ALERT_CONFIG);

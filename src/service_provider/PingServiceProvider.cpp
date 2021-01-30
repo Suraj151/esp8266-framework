@@ -40,31 +40,49 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
   }
 }
 
+/**
+ * PingServiceProvider constructor.
+ */
+PingServiceProvider::PingServiceProvider():
+  m_wifi(nullptr)
+{
+}
+
+/**
+ * PingServiceProvider destructor
+ */
+PingServiceProvider::~PingServiceProvider(){
+  this->m_wifi = nullptr;
+}
+
 void PingServiceProvider::init_ping( ESP8266WiFiClass* _wifi ){
 
-  this->wifi = _wifi;
-  memset(&this->_opt, 0, sizeof(struct ping_option));
-  this->_opt.count = 1;
-  this->_opt.ip = _pinghostip;
-  this->_opt.coarse_time = 0;
-  // _opt.sent_function = NULL;
-  // _opt.recv_function = NULL;
-  // _opt.reverse = NULL;
-  ping_regist_sent(&this->_opt, NULL);
-  // ping_regist_recv(&this->_opt, reinterpret_cast<ping_recv_function>(&PingServiceProvider::ping_recv));
-  ping_regist_recv(&this->_opt, ping_recv_cb);
+  this->m_wifi = _wifi;
+  memset(&this->m_opt, 0, sizeof(struct ping_option));
+  this->m_opt.count = 1;
+  this->m_opt.ip = _pinghostip;
+  this->m_opt.coarse_time = 0;
+  // m_opt.sent_function = NULL;
+  // m_opt.recv_function = NULL;
+  // m_opt.reverse = NULL;
+  ping_regist_sent(&this->m_opt, NULL);
+  // ping_regist_recv(&this->m_opt, reinterpret_cast<ping_recv_function>(&PingServiceProvider::ping_recv));
+  ping_regist_recv(&this->m_opt, ping_recv_cb);
 }
 
 bool PingServiceProvider::ping(){
 
-  IPAddress _ip;
-  this->wifi->hostByName(_pinghostname, _ip, 1500);
-  this->_opt.ip = (uint32_t)_ip;
+  IPAddress _ip(this->m_opt.ip);
+
+  if( nullptr != this->m_wifi ){
+    this->m_wifi->hostByName(_pinghostname, _ip, 1500);
+    this->m_opt.ip = (uint32_t)_ip;
+  }
   #ifdef EW_SERIAL_LOG
   Log(F("\nPing ip: "));
   Logln(_ip);
   #endif
-  return _ip.isSet() ? ping_start(&this->_opt) : false;
+  return _ip.isSet() ? ping_start(&this->m_opt) : false;
 }
 
 bool PingServiceProvider::isHostRespondingToPing(){

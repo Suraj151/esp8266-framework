@@ -42,19 +42,11 @@ class ESPNOWServiceProvider : public ServiceProvider{
     /**
      * ESPNOWServiceProvider constructor.
      */
-    ESPNOWServiceProvider(){
-
-      this->flushPeersToDefaults();
-    }
-
+    ESPNOWServiceProvider();
     /**
      * ESPNOWServiceProvider destructor.
      */
-    ~ESPNOWServiceProvider(){
-
-      this->closeAll();
-      this->wifi = NULL;
-    }
+    ~ESPNOWServiceProvider();
 
     void beginEspNow( ESP8266WiFiClass* _wifi );
     void handlePeers(void);
@@ -64,17 +56,17 @@ class ESPNOWServiceProvider : public ServiceProvider{
     void registerCallbacks(void);
     void unregisterCallbacks(void);
 
-    bool isPeerExist(uint8_t* mac_addr);
-    bool isApPeer(uint8_t* mac_addr);
-    bool setPeerRole(uint8_t* mac_addr, uint8_t role=ESP_NOW_ROLE_COMBO);
-    bool addPeer(uint8_t* mac_addr, uint8_t role=ESP_NOW_ROLE_COMBO, uint8_t channel=ESP_NOW_CHANNEL, uint8_t* key=(uint8_t*)ESP_NOW_KEY, uint8_t key_len=ESP_NOW_KEY_LENGTH);
-    bool addInPeers(uint8_t* mac_addr, uint8_t role=ESP_NOW_ROLE_COMBO, uint8_t channel=ESP_NOW_CHANNEL);
+    bool isPeerExist(uint8_t *mac_addr);
+    bool isApPeer(uint8_t *mac_addr);
+    bool setPeerRole(uint8_t *mac_addr, uint8_t role=ESP_NOW_ROLE_COMBO);
+    bool addPeer(uint8_t *mac_addr, uint8_t role=ESP_NOW_ROLE_COMBO, uint8_t channel=ESP_NOW_CHANNEL, uint8_t *key=(uint8_t *)ESP_NOW_KEY, uint8_t key_len=ESP_NOW_KEY_LENGTH);
+    bool addInPeers(uint8_t *mac_addr, uint8_t role=ESP_NOW_ROLE_COMBO, uint8_t channel=ESP_NOW_CHANNEL);
     void freePeers(void);
 
-    bool sendToPeer(uint8_t* mac_addr, uint8_t* packet, uint8_t len);
+    bool sendToPeer(uint8_t *mac_addr, uint8_t *packet, uint8_t len);
     void receiveFromPeers(void);
-    bool broadcastToPeers(uint8_t* packet, uint8_t len);
-    bool broadcastToAll(uint8_t* packet, uint8_t len);
+    bool broadcastToPeers(uint8_t *packet, uint8_t len);
+    bool broadcastToAll(uint8_t *packet, uint8_t len);
     void broadcastConfigData(void);
 
     void closeAll(void);
@@ -85,9 +77,9 @@ class ESPNOWServiceProvider : public ServiceProvider{
   protected:
 
     /**
-		 * @var	ESP8266WiFiClass*  wifi
+		 * @var	ESP8266WiFiClass*  m_wifi
 		 */
-    ESP8266WiFiClass* wifi;
+    ESP8266WiFiClass  *m_wifi;
 
 };
 

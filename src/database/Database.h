@@ -32,9 +32,9 @@ class DatabaseTableAbstractLayer{
 		 */
 		DatabaseTableAbstractLayer(){
 
-			if( DatabaseTableAbstractLayer::_total_instances < MAX_TABLES ){
-				DatabaseTableAbstractLayer::_instances[DatabaseTableAbstractLayer::_total_instances] = this;
-				DatabaseTableAbstractLayer::_total_instances++;
+			if( DatabaseTableAbstractLayer::m_total_instances < MAX_TABLES ){
+				DatabaseTableAbstractLayer::m_instances[DatabaseTableAbstractLayer::m_total_instances] = this;
+				DatabaseTableAbstractLayer::m_total_instances++;
 			}
 		}
 
@@ -54,23 +54,23 @@ class DatabaseTableAbstractLayer{
 		virtual void clear() = 0;
 
 		/**
-     * @array	DatabaseTableAbstractLayer* _instances
+     * @array	DatabaseTableAbstractLayer* m_instances
      */
-		static DatabaseTableAbstractLayer* _instances[MAX_TABLES];
+		static DatabaseTableAbstractLayer* 	m_instances[MAX_TABLES];
 		/**
-     * @var	int _total_instances
+     * @var	int m_total_instances
      */
-		static int _total_instances;
+		static int 													m_total_instances;
 };
 
 /**
  * define table structure here
  */
 struct struct_tables {
-	uint16_t _table_address;
-  uint16_t _table_size;
-  void* _default_table;
-	DatabaseTableAbstractLayer* _instance;
+	uint16_t m_table_address;
+  uint16_t m_table_size;
+  void* m_default_table;
+	DatabaseTableAbstractLayer* m_instance;
 };
 
 
@@ -81,7 +81,7 @@ class Database {
 
 	public:
 
-		std::vector<struct_tables> _database_tables;
+		std::vector<struct_tables> m_database_tables;
 
 
 		Database(){

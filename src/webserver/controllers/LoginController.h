@@ -48,10 +48,14 @@ class LoginController : public Controller {
 		 */
 		void boot( void ){
 
-			this->login_credentials = this->web_resource->db_conn->get_login_credential_table();
-			this->route_handler->register_route( EW_SERVER_LOGIN_ROUTE, [&]() { this->handleLoginRoute(); } );
-			this->route_handler->register_route( EW_SERVER_LOGOUT_ROUTE, [&]() { this->handleLogoutRoute(); } );
-      this->route_handler->register_route( EW_SERVER_LOGIN_CONFIG_ROUTE, [&]() { this->handleLoginConfigRoute(); }, AUTH_MIDDLEWARE );
+			if( nullptr != this->m_web_resource && nullptr != this->m_web_resource->m_db_conn ){
+				this->login_credentials = this->m_web_resource->m_db_conn->get_login_credential_table();
+			}
+			if( nullptr != this->m_route_handler ){
+				this->m_route_handler->register_route( EW_SERVER_LOGIN_ROUTE, [&]() { this->handleLoginRoute(); } );
+				this->m_route_handler->register_route( EW_SERVER_LOGOUT_ROUTE, [&]() { this->handleLogoutRoute(); } );
+	      this->m_route_handler->register_route( EW_SERVER_LOGIN_CONFIG_ROUTE, [&]() { this->handleLoginConfigRoute(); }, AUTH_MIDDLEWARE );
+			}
 		}
 
 		/**
@@ -113,17 +117,26 @@ class LoginController : public Controller {
 		 */
     void handleLoginConfigRoute( void ) {
 
-			this->login_credentials = this->web_resource->db_conn->get_login_credential_table();
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling Login Config route"));
       #endif
+
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_db_conn ||
+					nullptr == this->m_web_resource->m_server ||
+					nullptr == this->m_route_handler ){
+				return;
+			}
+
       bool _is_posted = false;
       bool _is_error = true;
 
-      if ( this->web_resource->server->hasArg("usrnm") && this->web_resource->server->hasArg("pswd") ) {
+			this->login_credentials = this->m_web_resource->m_db_conn->get_login_credential_table();
 
-        String _username = this->web_resource->server->arg("usrnm");
-        String _password = this->web_resource->server->arg("pswd");
+      if ( this->m_web_resource->m_server->hasArg("usrnm") && this->m_web_resource->m_server->hasArg("pswd") ) {
+
+        String _username = this->m_web_resource->m_server->arg("usrnm");
+        String _password = this->m_web_resource->m_server->arg("pswd");
 
         #ifdef EW_SERIAL_LOG
           Logln(F("\nSubmitted info :\n"));
@@ -140,7 +153,7 @@ class LoginController : public Controller {
           memset( this->login_credentials.password, 0, LOGIN_CONFIGS_BUF_SIZE );
           _username.toCharArray( this->login_credentials.username, _username.length()+1 );
           _password.toCharArray( this->login_credentials.password, _password.length()+1 );
-          this->web_resource->db_conn->set_login_credential_table( &this->login_credentials );
+          this->m_web_resource->m_db_conn->set_login_credential_table( &this->login_credentials );
           // this->set_login_credential_table( &this->login_credentials );
 
           _is_error = false;
@@ -152,9 +165,9 @@ class LoginController : public Controller {
       this->build_login_config_html( _page, _is_error, _is_posted );
 
       if( _is_posted && !_is_error ){
-        this->route_handler->send_inactive_session_headers();
+        this->m_route_handler->send_inactive_session_headers();
       }
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 
@@ -166,12 +179,19 @@ class LoginController : public Controller {
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling logout route"));
       #endif
-      this->route_handler->send_inactive_session_headers();
+
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_server ||
+					nullptr == this->m_route_handler ){
+				return;
+			}
+
+      this->m_route_handler->send_inactive_session_headers();
 
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_html( _page, EW_SERVER_LOGOUT_PAGE );
 
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 
@@ -180,23 +200,29 @@ class LoginController : public Controller {
 		 */
     void handleLoginRoute( void ) {
 
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_server || 
+					nullptr == this->m_route_handler ){
+				return;
+			}
+
       bool _is_posted = false;
 
-      if( this->web_resource->server->hasArg("username") && this->web_resource->server->hasArg("password") ){
+      if( this->m_web_resource->m_server->hasArg("username") && this->m_web_resource->m_server->hasArg("password") ){
         _is_posted = true;
       }
 
-      if ( this->route_handler->has_active_session() || ( _is_posted && this->web_resource->server->arg("username") == this->login_credentials.username &&
-        this->web_resource->server->arg("password") == this->login_credentials.password
+      if ( this->m_route_handler->has_active_session() || ( _is_posted && this->m_web_resource->m_server->arg("username") == this->login_credentials.username &&
+        this->m_web_resource->m_server->arg("password") == this->login_credentials.password
       ) ) {
 
         char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
-        this->route_handler->build_session_cookie( _session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE, true, this->login_credentials.cookie_max_age );
+        this->m_route_handler->build_session_cookie( _session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE, true, this->login_credentials.cookie_max_age );
 
-        this->web_resource->server->sendHeader("Location", EW_SERVER_HOME_ROUTE);
-        this->web_resource->server->sendHeader("Cache-Control", "no-cache");
-        this->web_resource->server->sendHeader("Set-Cookie", _session_cookie);
-        this->web_resource->server->send(HTTP_REDIRECT);
+        this->m_web_resource->m_server->sendHeader("Location", EW_SERVER_HOME_ROUTE);
+        this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
+        this->m_web_resource->m_server->sendHeader("Set-Cookie", _session_cookie);
+        this->m_web_resource->m_server->send(HTTP_REDIRECT);
         #ifdef EW_SERIAL_LOG
         Logln(F("Log in Successful"));
         #endif
@@ -206,7 +232,7 @@ class LoginController : public Controller {
       char* _page = new char[EW_HTML_MAX_SIZE];
       this->build_html( _page, EW_SERVER_LOGIN_PAGE, _is_posted, (char*)"Wrong Credentials.", ALERT_DANGER );
 
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 

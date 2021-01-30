@@ -61,9 +61,12 @@ class Middleware  : public EwSessionHandler{
 
         if ( !this->has_active_session() ) {
 
-          __web_resource.server->sendHeader("Location", _redirect_uri);
-          __web_resource.server->sendHeader("Cache-Control", "no-cache");
-          __web_resource.server->send(HTTP_REDIRECT);
+          if( nullptr != __web_resource.m_server ){
+
+            __web_resource.m_server->sendHeader("Location", _redirect_uri);
+            __web_resource.m_server->sendHeader("Cache-Control", "no-cache");
+            __web_resource.m_server->send(HTTP_REDIRECT);
+          }
           return false;
         }
         return true;

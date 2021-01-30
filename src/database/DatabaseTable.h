@@ -37,16 +37,16 @@ class DatabaseTable : public DatabaseTableAbstractLayer{
 		/**
 		 * register table with address and default copy
 		 *
-		 * @param   uint16_t  _table_address
+		 * @param   uint16_t   _table_address
 		 * @param   const T *  _default_table_copy
 		 */
-		void register_table( uint16_t _table_address, const T * _default_table_copy) {
+		void register_table( uint16_t _table_address, const T *_default_table_copy) {
 
 				struct_tables _t;
-			  _t._table_address = _table_address;
-			  _t._table_size = sizeof(_default_table_copy);
-			  _t._default_table = (void*)_default_table_copy;
-			  _t._instance = this;
+			  _t.m_table_address = _table_address;
+			  _t.m_table_size = sizeof(_default_table_copy);
+			  _t.m_default_table = (void*)_default_table_copy;
+			  _t.m_instance = this;
 				__database.register_table( _t );
 		}
 
@@ -59,9 +59,9 @@ class DatabaseTable : public DatabaseTableAbstractLayer{
 		 */
 		T get_table( uint16_t _address ) {
 		  T _t;
-			for ( uint8_t i = 0; i < __database._database_tables.size(); i++) {
+			for ( uint8_t i = 0; i < __database.m_database_tables.size(); i++) {
 
-    		if( __database._database_tables[i]._table_address == _address ){
+    		if( __database.m_database_tables[i].m_table_address == _address ){
           loadConfig( &_t, _address );
           break;
         }
@@ -76,10 +76,10 @@ class DatabaseTable : public DatabaseTableAbstractLayer{
 		 */
 		bool clear_table( uint16_t _address ) {
 
-			for ( uint8_t i = 0; i < __database._database_tables.size(); i++) {
+			for ( uint8_t i = 0; i < __database.m_database_tables.size(); i++) {
 
-    		if( __database._database_tables[i]._table_address == _address ){
-          clearConfigs( (const T*)__database._database_tables[i]._default_table, _address );
+    		if( __database.m_database_tables[i].m_table_address == _address ){
+          clearConfigs( (const T*)__database.m_database_tables[i].m_default_table, _address );
           return true;
         }
 			}
@@ -93,11 +93,11 @@ class DatabaseTable : public DatabaseTableAbstractLayer{
 		 * @param   uint16_t  _address
      * @return  bool
      */
-    bool set_table( T * _object, uint16_t _address ) {
+    bool set_table( T *_object, uint16_t _address ) {
 
-      for ( uint8_t i = 0; i < __database._database_tables.size(); i++) {
+      for ( uint8_t i = 0; i < __database.m_database_tables.size(); i++) {
 
-    		if( __database._database_tables[i]._table_address == _address ){
+    		if( __database.m_database_tables[i].m_table_address == _address ){
           saveConfig( _object, _address );
           return true;
         }

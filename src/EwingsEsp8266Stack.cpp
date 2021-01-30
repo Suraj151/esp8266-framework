@@ -10,6 +10,22 @@ created Date    : 1st June 2019
 #include "EwingsEsp8266Stack.h"
 
 /**
+ * EwingsEsp8266Stack constructor.
+ */
+EwingsEsp8266Stack::EwingsEsp8266Stack():
+  m_wifi(&WiFi)
+{
+
+}
+
+/**
+ * EwingsEsp8266Stack destructor.
+ */
+EwingsEsp8266Stack::~EwingsEsp8266Stack(){
+  this->m_wifi = nullptr;
+}
+
+/**
  * initialize all required features/services/actions.
  */
 void EwingsEsp8266Stack::initialize(){
@@ -26,21 +42,21 @@ void EwingsEsp8266Stack::initialize(){
   } );
   #endif
 
-  __wifi_service.begin( this->wifi );
-  __ping_service.init_ping( this->wifi );
+  __wifi_service.begin( this->m_wifi );
+  __ping_service.init_ping( this->m_wifi );
   #ifdef ENABLE_EWING_HTTP_SERVER
-  __web_server.start_server( this->wifi );
+  __web_server.start_server( this->m_wifi );
   #endif
-  __ota_service.begin_ota( &this->wifi_client, &__http_service.client );
+  __ota_service.begin_ota( &this->m_wifi_client, &__http_service.m_client );
   #ifdef ENABLE_GPIO_SERVICE
-  __gpio_service.begin( this->wifi, &this->wifi_client );
+  __gpio_service.begin( this->m_wifi, &this->m_wifi_client );
   #endif
   #ifdef ENABLE_MQTT_SERVICE
-  __mqtt_service.begin( this->wifi );
+  __mqtt_service.begin( this->m_wifi );
   #endif
 
   #ifdef ENABLE_EMAIL_SERVICE
-  __email_service.begin( this->wifi, &this->wifi_client );
+  __email_service.begin( this->m_wifi, &this->m_wifi_client );
   #endif
 
   #ifdef EW_SERIAL_LOG
@@ -48,10 +64,10 @@ void EwingsEsp8266Stack::initialize(){
   #endif
 
   __task_scheduler.setInterval( [&]() { __factory_reset.handleFlashKeyPress(); }, FLASH_KEY_PRESS_DURATION );
-  __factory_reset.run_while_factory_reset( [&]() { __database_service.clear_default_tables(); this->wifi->disconnect(true); } );
+  __factory_reset.run_while_factory_reset( [&]() { __database_service.clear_default_tables(); this->m_wifi->disconnect(true); } );
 
   #ifdef ENABLE_ESP_NOW
-  __espnow_service.beginEspNow( this->wifi );
+  __espnow_service.beginEspNow( this->m_wifi );
   __task_scheduler.setInterval( [&]() { __espnow_service.handlePeers(); }, ESP_NOW_HANDLE_DURATION );
   #endif
 
@@ -71,7 +87,7 @@ void EwingsEsp8266Stack::enable_napt_service(){
   // Enable NAT on the AP interface
   ip_napt_enable_no(1, 1);
   // Set the DNS server for clients of the AP to the one we also use for the STA interface
-  dhcps_set_DNS(this->wifi->dnsIP());
+  dhcps_set_DNS(this->m_wifi->dnsIP());
   #ifdef EW_SERIAL_LOG
     Log(F("NAPT(lwip "));Log(LWIP_VERSION_MAJOR);
     Logln(F(") initialization done"));
@@ -94,8 +110,8 @@ void EwingsEsp8266Stack::enable_napt_service(){
         Logln(F(") initialization done"));
       #endif
       // Set the DNS server for clients of the AP to the one we also use for the STA interface
-      dhcps_set_dns(0, this->wifi->dnsIP(0));
-      dhcps_set_dns(1, this->wifi->dnsIP(1));
+      dhcps_set_dns(0, this->m_wifi->dnsIP(0));
+      dhcps_set_dns(1, this->m_wifi->dnsIP(1));
     }
   }
   if (ret != ERR_OK) {

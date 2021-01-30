@@ -10,8 +10,8 @@ created Date    : 1st June 2019
 
 #include "Database.h"
 
-int DatabaseTableAbstractLayer::_total_instances = 0;
-DatabaseTableAbstractLayer* DatabaseTableAbstractLayer::_instances[MAX_TABLES] = {nullptr};
+int DatabaseTableAbstractLayer::m_total_instances = 0;
+DatabaseTableAbstractLayer* DatabaseTableAbstractLayer::m_instances[MAX_TABLES] = {nullptr};
 
 /**
  * initialize database with size as input parameter.
@@ -21,10 +21,10 @@ DatabaseTableAbstractLayer* DatabaseTableAbstractLayer::_instances[MAX_TABLES] =
 void Database::init_database(  uint16_t _size ){
 
   beginConfigs(_size);
-  this->_database_tables.reserve(MAX_TABLES);
+  this->m_database_tables.reserve(MAX_TABLES);
 
-  for (size_t i = 0; i < DatabaseTableAbstractLayer::_total_instances; i++) {
-    DatabaseTableAbstractLayer::_instances[i]->boot();
+  for (size_t i = 0; i < DatabaseTableAbstractLayer::m_total_instances; i++) {
+    DatabaseTableAbstractLayer::m_instances[i]->boot();
   }
 
   #ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
@@ -52,9 +52,11 @@ void Database::init_database(  uint16_t _size ){
  */
 void Database::clear_all(){
 
-	for ( uint8_t i = 0; i < this->_database_tables.size(); i++) {
+	for ( uint8_t i = 0; i < this->m_database_tables.size(); i++) {
 
-		if( this->_database_tables[i]._instance ) this->_database_tables[i]._instance->clear();
+		if( nullptr != this->m_database_tables[i].m_instance ){
+      this->m_database_tables[i].m_instance->clear();
+    }
 	}
 }
 
@@ -64,14 +66,14 @@ void Database::clear_all(){
  * @param   struct_tables _table
  * @return  bool
  */
-bool Database::register_table( struct_tables& _table ) {
+bool Database::register_table( struct_tables &_table ) {
 
   struct_tables _last = this->get_last_table();
   if(
-    ( _last._table_address + _last._table_size + 2 ) < _table._table_address &&
-    ( _table._table_address + _table._table_size + 2 ) < DATABASE_MAX_SIZE
+    ( _last.m_table_address + _last.m_table_size + 2 ) < _table.m_table_address &&
+    ( _table.m_table_address + _table.m_table_size + 2 ) < DATABASE_MAX_SIZE
   ){
-    this->_database_tables.push_back(_table);
+    this->m_database_tables.push_back(_table);
     return true;
   }
   return false;
@@ -87,13 +89,13 @@ struct_tables Database::get_last_table(){
   struct_tables _last;
   uint8_t _last_add = 0;
   memset( &_last, 0, sizeof(struct_tables));
-  for ( uint8_t i = 1; i < this->_database_tables.size(); i++) {
+  for ( uint8_t i = 1; i < this->m_database_tables.size(); i++) {
 
-    if( this->_database_tables[_last_add]._table_address < this->_database_tables[i]._table_address ){
+    if( this->m_database_tables[_last_add].m_table_address < this->m_database_tables[i].m_table_address ){
       _last_add = i;
     }
   }
-  if( _last_add != 0 ) return this->_database_tables[_last_add]; return _last;
+  if( _last_add != 0 ) return this->m_database_tables[_last_add]; return _last;
 }
 
 Database __database;

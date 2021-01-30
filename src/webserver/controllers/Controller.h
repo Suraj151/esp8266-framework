@@ -27,47 +27,25 @@ struct struct_controllers {
  */
 class Controller {
 
-	protected:
-
-		/**
-		 * @var	WebResourceProvider*	web_resource
-		 */
-		WebResourceProvider* web_resource = &__web_resource;
-		/**
-		 * @var	RouteHandler*	route_handler
-		 */
-		RouteHandler* route_handler = &__web_route_handler;
-
 	public:
 
 		/**
 		 * Controller constructor
 		 */
-		Controller(){
-			this->register_controller(this);
-		}
-
+		Controller();
 		/**
 		 * Controller constructor
 		 */
-		Controller(const char* _controller_name){
-			this->controller_name = _controller_name;
-			this->register_controller(this);
-		}
-
+		Controller(const char* _controller_name);
 		/**
 		 * Controller destructor
 		 */
-		~Controller(){
-		}
+		~Controller();
 
 		/**
 		 * Register Controller
 		 */
-		void register_controller(Controller* that){
-			struct_controllers _c(that);
-			this->controllers.push_back(_c);
-		}
+		void register_controller(Controller* that);
 
 		/**
 		 * override boot
@@ -75,14 +53,25 @@ class Controller {
 		virtual void boot() = 0;
 
 		/**
-     * @var	std::vector<struct_controllers>	controllers
+     * @var	std::vector<struct_controllers>	m_controllers
      */
-    static std::vector<struct_controllers> controllers;
+    static std::vector<struct_controllers> m_controllers;
 
 		/**
-     * @var	const char*	controller_name
+     * @var	const char*	m_controller_name
      */
-    const char*	controller_name = "controller";
+    const char						*m_controller_name;
+
+	protected:
+
+		/**
+		 * @var	WebResourceProvider*	m_web_resource
+		 */
+		WebResourceProvider		*m_web_resource;
+		/**
+		 * @var	RouteHandler*	m_route_handler
+		 */
+		RouteHandler					*m_route_handler;
 };
 
 

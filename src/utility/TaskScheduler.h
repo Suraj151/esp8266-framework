@@ -40,15 +40,11 @@ class TaskScheduler{
 		/**
 		 * TaskScheduler constructor
 		 */
-		TaskScheduler(){
-		}
-
+		TaskScheduler();
 		/**
 		 * TaskScheduler destructor
 		 */
-    ~TaskScheduler(){
-    }
-
+    ~TaskScheduler();
 		/**
 		 * TaskScheduler constructor
 		 *
@@ -56,10 +52,7 @@ class TaskScheduler{
 		 * @param	uint32_t	_duration
 		 * @param	unsigned long|0	_last_millis
 		 */
-		TaskScheduler( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority=DEFAULT_TASK_PRIORITY, unsigned long _last_millis=0 ){
-
-			this->register_task( _task_fn, _duration, _task_priority, _last_millis );
-		}
+		TaskScheduler( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority=DEFAULT_TASK_PRIORITY, unsigned long _last_millis=0 );
 
 		int setTimeout( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority=DEFAULT_TASK_PRIORITY );
 		int setInterval( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority=DEFAULT_TASK_PRIORITY );
@@ -81,7 +74,7 @@ class TaskScheduler{
 		/**
 		 * @var	std::vector<task_t> vector
 		 */
-		std::vector<task_t> _tasks;
+		std::vector<task_t> m_tasks;
 };
 
 extern TaskScheduler __task_scheduler;

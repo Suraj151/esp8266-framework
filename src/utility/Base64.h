@@ -3,6 +3,6 @@
 
 #include <Arduino.h>
 
-char* base64Encode(char input_str[], int len_str);
+bool base64Encode(char input_str[], int len_str, char *res_str );
 
 #endif

@@ -20,33 +20,29 @@ created Date    : 1st June 2019
 class EventServiceProvider : public ServiceProvider {
 
   public:
-
-    int _last_event;
-    unsigned long _last_event_millis;
-
     /**
      * EventServiceProvider constructor.
      */
-    EventServiceProvider(){
-    }
-
+    EventServiceProvider();
     /**
 		 * EventServiceProvider destructor
 		 */
-    ~EventServiceProvider(){
-    }
+    ~EventServiceProvider();
 
     void begin(void);
     bool add_event_listener( event_name_t _event, CallBackVoidPointerArgFn _handler );
-    void execute_event( event_name_t _event, void* _arg=NULL );
+    void execute_event( event_name_t _event, void* _arg=nullptr );
     static void wifi_event_handler_cb( System_Event_t * _event );
+
+    int           m_last_event;
+    unsigned long m_last_event_millis;
 
   protected:
 
 		/**
 		 * @var	std::vector<event_listener_t> vector
 		 */
-		std::vector<event_listener_t> _event_listeners;
+		std::vector<event_listener_t> m_event_listeners;
 };
 
 extern EventServiceProvider __event_service;

@@ -61,25 +61,35 @@ created Date    : 1st June 2019
 class EwingsEsp8266Stack {
 
   public:
+
+    /**
+     * EwingsEsp8266Stack constructor.
+     */
+    EwingsEsp8266Stack();
+    /**
+     * EwingsEsp8266Stack destructor.
+     */
+    ~EwingsEsp8266Stack();
+
     void initialize( void );
     void serve( void );
 
   protected:
-    /**
-		 * @var	ESP8266WiFiClass*|&WiFi wifi
-		 */
-    ESP8266WiFiClass* wifi = &WiFi;
-    /**
-		 * @var	WiFiClient  wifi_client
-		 */
-    WiFiClient wifi_client;
-
     #ifdef EW_SERIAL_LOG
     static void handleLogPrints( void );
     #endif
     #if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
     void enable_napt_service( void );
     #endif
+
+    /**
+		 * @var	ESP8266WiFiClass*|&WiFi m_wifi
+		 */
+    ESP8266WiFiClass  *m_wifi;
+    /**
+		 * @var	WiFiClient  m_wifi_client
+		 */
+    WiFiClient        m_wifi_client;
 };
 
 extern EwingsEsp8266Stack EwStack;

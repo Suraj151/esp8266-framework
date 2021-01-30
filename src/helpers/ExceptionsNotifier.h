@@ -39,8 +39,8 @@ created Date    : 1st June 2019
 
 void beginCrashHandler( void );
 void handleCrashData( void );
-String readCrashFileToBuffer(String path, uint16_t &_size);
-void saveCrashToSpiffs(struct rst_info * rst_info, uint32_t stack, uint32_t stack_end, Print& outputDev );
+void readCrashFileToBuffer(String &_filepath, String &_filedata, uint16_t &_size);
+void saveCrashToSpiffs(struct rst_info *rst_info, uint32_t stack, uint32_t stack_end, Print& outputDev );
 void clearCrashFile( void );
 // #ifdef EW_SERIAL_LOG
 // void dummyCrash( void );

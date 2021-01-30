@@ -116,65 +116,10 @@ class MQTTClient{
 
 	public:
 
-		MQTTClient(){
+		MQTTClient();
+		~MQTTClient();
 
-		}
-
-		~MQTTClient(){
-
-			this->mqtt_client_delete();
-		}
-
-		bool begin( ESP8266WiFiClass* _wifi, mqtt_general_config_table* _mqtt_general_configs, mqtt_lwt_config_table* _mqtt_lwt_configs ){
-
-			this->wifi = _wifi;
-			if( strlen(_mqtt_general_configs->host) > 5 && _mqtt_general_configs->port > 0 ){
-
-				this->InitConnection( _mqtt_general_configs->host, _mqtt_general_configs->port, _mqtt_general_configs->security );
-			}else{
-				return false;
-			}
-
-			if( strlen(_mqtt_general_configs->client_id) > 0 && _mqtt_general_configs->keepalive > 5 ){
-
-				this->InitClient(
-					_mqtt_general_configs->client_id,
-					_mqtt_general_configs->username,
-					_mqtt_general_configs->password,
-					_mqtt_general_configs->keepalive,
-					_mqtt_general_configs->clean_session
-				);
-			}else{
-				this->mqtt_client_delete();
-				return false;
-			}
-
-			if( strlen(_mqtt_lwt_configs->will_topic) > 0 ){
-
-				this->InitLWT(
-					_mqtt_lwt_configs->will_topic,
-					_mqtt_lwt_configs->will_message,
-					_mqtt_lwt_configs->will_qos < MQTT_MAX_QOS_LEVEL ?_mqtt_lwt_configs->will_qos:MQTT_MAX_QOS_LEVEL,
-					_mqtt_lwt_configs->will_retain
-				);
-			}
-			#ifdef EW_SERIAL_LOG
-	    Logln( F("MQTT: Connecting") );
-			// Log( F("client_id: ") );	Logln( _mqtt_general_configs->client_id );
-			// Log( F("password: ") );	Logln( _mqtt_general_configs->password );
-			// Log( F("username: ") );	Logln( _mqtt_general_configs->username );
-	    #endif
-	    this->OnConnected( mqttConnectedCb );
-	    this->OnDisconnected( mqttDisconnectedCb );
-	    this->OnPublished( mqttPublishedCb );
-			this->OnSubscribed( mqttSubscribedCb );
-			this->OnUnsubscribed( mqttUnsubscribedCb );
-	    // this->OnData( mqttDataCb );
-
-			this->Connect();
-			return true;
-		}
-
+		bool begin( ESP8266WiFiClass* _wifi, mqtt_general_config_table* _mqtt_general_configs, mqtt_lwt_config_table* _mqtt_lwt_configs );
 		void InitConnection( char* host, int port=MQTT_DEFAULT_PORT, uint8_t security=0 );
 		void InitClient( char* client_id, char* client_user, char* client_pass, uint32_t keepAliveTime=MQTT_DEFAULT_KEEPALIVE, uint8_t cleanSession=1 );
 		void InitLWT( char* will_topic, char* will_msg, uint8_t will_qos, uint8_t will_retain );
@@ -197,31 +142,31 @@ class MQTTClient{
 		void mqtt_timer( void );
 		void MQTT_Task( void );
 
-		MQTT_Client mqttClient;
-		uint32_t *mqttDataCallbackArgs = (uint32_t*)this;
-
 		bool is_mqtt_connected( void );
 		bool is_topic_subscribed( char* _topic );
 		void clear_all_subscribed_topics( void );
 		void add_to_subscribed_topics( char* _topic, uint8_t _qos );
 		bool remove_from_subscribed_topics( char* _topic );
 
+		MQTT_Client 				m_mqttClient;
+		uint32_t 						*m_mqttDataCallbackArgs;
+
 	protected:
 
-		char* host;
-		int port;
-		uint8_t security;
+		char								*m_host;
+		int 								m_port;
+		uint8_t 						m_security;
 
-		WiFiClient* wifi_client;
-		ESP8266WiFiClass* wifi;
+		WiFiClient					*m_wifi_client;
+		ESP8266WiFiClass		*m_wifi;
 
-		MqttCallback connectedCb;
-		MqttCallback disconnectedCb;
-		MqttCallback publishedCb;
-		MqttCallback subscribedCb;
-		MqttCallback unsubscribedCb;
-		MqttCallback timeoutCb;
-		MqttDataCallback dataCb;
+		MqttCallback 				m_connectedCb;
+		MqttCallback 				m_disconnectedCb;
+		MqttCallback 				m_publishedCb;
+		MqttCallback 				m_subscribedCb;
+		MqttCallback 				m_unsubscribedCb;
+		MqttCallback 				m_timeoutCb;
+		MqttDataCallback 		m_dataCb;
 
 		bool connectServer( void );
 		bool disconnectServer( void );

@@ -20,6 +20,7 @@ created Date    : 1st June 2019
 
 class EW_EEPROMClass {
 public:
+
   EW_EEPROMClass(uint32_t sector);
   EW_EEPROMClass(void);
 
@@ -32,38 +33,18 @@ public:
   uint8_t * getDataPtr();
   uint8_t const * getConstDataPtr() const;
 
-  // template<typename T>
-  // T &get(int const address, T &t) {
-  //   if (address < 0 || address + sizeof(T) > _size)
-  //     return t;
-  //
-  //   memcpy((uint8_t*) &t, _data + address, sizeof(T));
-  //   return t;
-  // }
-  //
-  // template<typename T>
-  // const T &put(int const address, const T &t) {
-  //   if (address < 0 || address + sizeof(T) > _size)
-  //     return t;
-  //   if (memcmp(_data + address, (const uint8_t*)&t, sizeof(T)) != 0) {
-  //     _dirty = true;
-  //     memcpy(_data + address, (const uint8_t*)&t, sizeof(T));
-  //   }
-  //
-  //   return t;
-  // }
-
-  size_t length() {return _size;}
+  size_t length() {return m_size;}
 
   uint8_t& operator[](int const address) {return getDataPtr()[address];}
   uint8_t const & operator[](int const address) const {return getConstDataPtr()[address];}
 
-protected:
-  uint32_t _sector;
-  uint32_t _copy_sector=0;
-  uint8_t* _data;
-  size_t _size;
-  bool _dirty;
+private:
+
+  uint32_t  m_sector;
+  uint32_t  m_copy_sector;
+  uint8_t   *m_data;
+  size_t    m_size;
+  bool      m_dirty;
 };
 
 #if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_EEPROM)

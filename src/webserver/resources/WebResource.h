@@ -46,53 +46,31 @@ class WebResourceProvider {
 
   public:
 
-    // /**
-		//  * @friend all route controller classes should be friend of web resources
-		//  */
-    // friend class EwRouteHandler;
-    // friend class HomeController;
-    // friend class LoginController;
-    // #ifdef ENABLE_GPIO_SERVICE
-    // friend class GpioController;
-    // #endif
-    // #ifdef ENABLE_MQTT_SERVICE
-    // friend class MqttController;
-    // #endif
-    // friend class OtaController;
-    // friend class DashboardController;
-    // friend class WiFiConfigController;
-
     /**
 		 * WebResourceProvider constructor
 		 */
-    WebResourceProvider( void ){
-    }
-
+    WebResourceProvider();
     /**
 		 * WebResourceProvider destructor
 		 */
-    ~WebResourceProvider(){
-      this->server = NULL;
-      this->db_conn = NULL;
-      this->wifi = NULL;
-    }
+    ~WebResourceProvider();
 
     void collect_resource( ESP8266WebServer* _server, ESP8266WiFiClass* _wifi );
 
   // protected:
 
     /**
-		 * @var	ESP8266WiFiClass*  wifi
+		 * @var	ESP8266WiFiClass*  m_wifi
 		 */
-    ESP8266WiFiClass* wifi;
+    ESP8266WiFiClass    *m_wifi;
     /**
-		 * @var	ESP8266WebServer*	server
+		 * @var	ESP8266WebServer*	m_server
 		 */
-    ESP8266WebServer* server;
+    ESP8266WebServer    *m_server;
     /**
-		 * @var	DefaultDatabase*  db_conn
+		 * @var	DefaultDatabase*  m_db_conn
 		 */
-    DefaultDatabase* db_conn;
+    DefaultDatabase     *m_db_conn;
 
 };
 

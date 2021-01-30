@@ -21,8 +21,13 @@ created Date    : 1st June 2019
  * @return  int
  */
 int __strstr(char *str, char *substr, int _len){
+
+	if( nullptr == str || nullptr == substr || 0 == strlen(str) || 0 == strlen(substr) ){
+		return -1;
+	}
+
 	int n = 0;
-	if( strlen(str) ==0 || strlen(substr) ==0 ) return -1;
+
 	while (*str && n < _len){
 
 		char *Begin = str;
@@ -49,10 +54,18 @@ int __strstr(char *str, char *substr, int _len){
  * @return  char*
  */
 char* __strtrim(char *str, uint16_t _overflow_limit){
+
+	if( nullptr == str ){
+		return nullptr;
+	}
+
 	uint16_t n = 0;
 	uint16_t len = strlen(str);
 
-	if( len == 0 ) return NULL;
+	if( 0 == len ){
+		return nullptr;
+	}
+
 	while (*str && n < _overflow_limit){
 
 		char *_begin = str;
@@ -79,10 +92,18 @@ char* __strtrim(char *str, uint16_t _overflow_limit){
  * @return  char*
  */
 char* __strtrim_val(char *str, char _val, uint16_t _overflow_limit){
+
+	if( nullptr == str ){
+		return nullptr;
+	}
+
   uint16_t n = 0;
   uint16_t len = strlen(str);
 
-  if( len == 0 ) return NULL;
+	if( 0 == len ){
+		return nullptr;
+	}
+
   while (*str && n < _overflow_limit){
 
     char *_begin = str;
@@ -110,13 +131,22 @@ char* __strtrim_val(char *str, char _val, uint16_t _overflow_limit){
  */
 bool __are_str_equals(char *str1, char *str2, uint16_t _overflow_limit ){
 
+	if( nullptr == str1 || nullptr == str2 ){
+		return false;
+	}
+
 	uint16_t len = strlen( str1 );
-	if( len != strlen( str2 ) ) return false;
+	if( len != strlen( str2 ) ){
+		return false;
+	}
 
 	for ( uint16_t i = 0; i < len && i < _overflow_limit; i++ ) {
 
-		if( str1[i] != str2[i] ) return false;
-	} return true;
+		if( str1[i] != str2[i] ){
+			return false;
+		}
+	}
+	return true;
 }
 
 /**
@@ -129,10 +159,17 @@ bool __are_str_equals(char *str1, char *str2, uint16_t _overflow_limit ){
  */
 bool __are_arrays_equal(char *array1, char *array2, uint16_t len ){
 
+	if( nullptr == array1 || nullptr == array2 ){
+		return false;
+	}
+
 	for ( uint16_t i = 0; i < len; i++ ) {
 
-		if( array1[i] != array2[i] ) return false;
-	} return true;
+		if( array1[i] != array2[i] ){
+			return false;
+		}
+	}
+	return true;
 }
 
 /**
@@ -185,7 +222,9 @@ void __str_ip_to_int( char* _str, uint8_t* _ip, int _len, bool _clear_str_after_
 		}
 		// if( _buf_index < 4 ) _buf[_buf_index++] = _str[i];
 	}
-	if( _clear_str_after_done ) memset( _str, 0, _len );
+	if( _clear_str_after_done ){
+		memset( _str, 0, _len );
+	}
 }
 
 /**
@@ -198,12 +237,21 @@ void __str_ip_to_int( char* _str, uint8_t* _ip, int _len, bool _clear_str_after_
  */
 void __find_and_replace( char* _str, char* _find_str, char* _replace_with, int _occurence ){
 
+	if( nullptr == _str || nullptr == _find_str || nullptr == _replace_with ){
+		return;
+	}
+
   int _str_len = strlen( _str );
   int _find_str_len = strlen( _find_str );
   int _replace_str_len = strlen( _replace_with );
 
   int _total_len = _str_len + ( _replace_str_len * _occurence );
   char *_buf = new char[ _total_len ];
+
+	if( nullptr == _buf ){
+		return;
+	}
+
   memset( _buf, 0, _total_len );
 
 	int j = 0, o = 0;
@@ -242,10 +290,18 @@ void __find_and_replace( char* _str, char* _find_str, char* _replace_with, int _
  */
 bool __get_from_json( char* _str, char* _key, char* _value, int _max_value_len ){
 
+	if( nullptr == _str || nullptr == _key ){
+		return false;
+	}
+
   int _str_len = strlen( _str );
   int _key_str_len = strlen( _key );
 
   char *_str_buf = new char[ _str_len ];
+
+	if( nullptr == _str_buf ){
+		return false;
+	}
 
   memset( _str_buf, 0, _str_len );
 

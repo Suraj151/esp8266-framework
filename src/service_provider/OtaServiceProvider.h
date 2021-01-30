@@ -40,26 +40,13 @@ class OtaServiceProvider : public ServiceProvider{
   public:
 
     /**
-     * @var	WiFiClient*|NULL	wifi_client
-     */
-    WiFiClient* wifi_client=NULL;
-
-    /**
-     * @var	HTTPClient*|NULL	http_client
-     */
-    HTTPClient* http_client=NULL;
-
-    /**
      * OtaServiceProvider constructor.
      */
-    OtaServiceProvider(){
-    }
-
+    OtaServiceProvider();
     /**
      * OtaServiceProvider destructor.
      */
-    ~OtaServiceProvider(){
-    }
+    ~OtaServiceProvider();
 
     void begin_ota( WiFiClient* _wifi_client, HTTPClient* _http_client );
     void handleOta( void );
@@ -67,6 +54,16 @@ class OtaServiceProvider : public ServiceProvider{
     #ifdef EW_SERIAL_LOG
     void printOtaConfigLogs( void );
     #endif
+
+    /**
+     * @var	WiFiClient*|nullptr	m_wifi_client
+     */
+    WiFiClient  *m_wifi_client;
+
+    /**
+     * @var	HTTPClient*|nullptr	m_http_client
+     */
+    HTTPClient  *m_http_client;
 };
 
 extern OtaServiceProvider __ota_service;

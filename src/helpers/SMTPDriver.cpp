@@ -10,28 +10,58 @@ created Date    : 1st June 2019
 
 #include "SMTPDriver.h"
 
+/**
+ * SMTPdriver constructor.
+ */
+SMTPdriver::SMTPdriver() :
+  m_client(nullptr),
+  m_port(0),
+  m_lastResponseCode(-1),
+  m_responseBufferIndex(0),
+  m_lastReceive(0),
+  m_timeOut(0),
+  m_responseReaderStatus(SMTP_RESPONSE_MAX),
+  m_responseBuffer(nullptr),
+  m_host(nullptr)
+{
 
-bool SMTPdriver::begin( WiFiClient* _client, char*_host, uint16_t _port ){
+}
 
-  this->client = _client;
+/**
+ * SMTPdriver destructor
+ */
+SMTPdriver::~SMTPdriver(){
+  this->end();
+}
+
+bool SMTPdriver::begin( WiFiClient *_client, char *_host, uint16_t _port ){
+
+  this->m_client = _client;
 
   int _host_len = strlen(_host);
-  this->host = new char[_host_len + 1];
-  this->host[_host_len] = 0;
-  this->responseBuffer = new char[SMTP_RESPONSE_BUFFER_SIZE];
-  this->lastResponseCode = -1;
+  this->m_host = new char[_host_len + 1];
+  if( nullptr != this->m_host ){
 
-  memset( this->host, 0, _host_len + 1 );
-  memset( this->responseBuffer, 0, SMTP_RESPONSE_BUFFER_SIZE );
+    this->m_host[_host_len] = 0;
+    memset( this->m_host, 0, _host_len + 1 );
+    strcpy( this->m_host, _host );
+  }
+  this->m_port = _port;
 
-  strcpy( this->host, _host );
-  this->port = _port;
+  this->m_responseBuffer = new char[SMTP_RESPONSE_BUFFER_SIZE];
+  if( nullptr != this->m_responseBuffer ){
+
+    memset( this->m_responseBuffer, 0, SMTP_RESPONSE_BUFFER_SIZE );
+  }
 
   int respcode = SMTP_STATUS_SERVICE_UNAVAILABLE;
-  if( connectToServer( this->client, this->host, this->port, 3000 ) ){
-    respcode = this->sendCommandAndGetCode( (char*)"" );
+  if( nullptr != this->m_client && nullptr != this->m_host ){
+
+    if( connectToServer( this->m_client, this->m_host, this->m_port, 3000 ) ){
+      respcode = this->sendCommandAndGetCode( (char*)"" );
+    }
   }
-  return respcode == SMTP_STATUS_SERVER_READY;
+  return ( SMTP_STATUS_SERVER_READY == respcode );
 }
 
 void SMTPdriver::readResponse(){
@@ -40,72 +70,79 @@ void SMTPdriver::readResponse(){
 	char _crlfFound, crlfCount=1;
   bool _bufferFull = false;
 
-  if( this->responseReaderStatus == SMTP_RESPONSE_STARTING){
+  if( SMTP_RESPONSE_STARTING == this->m_responseReaderStatus ){
 		_crlfFound = 0;
 		memset(_crlfBuf, 0, 2);
-		this->responseReaderStatus = SMTP_RESPONSE_WAITING;
+		this->m_responseReaderStatus = SMTP_RESPONSE_WAITING;
 	}
 
-	if( millis() - this->lastReceive >= this->timeOut ){
-		this->responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
+	if( millis() - this->m_lastReceive >= this->m_timeOut ){
+		this->m_responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
 		return;
 	}
 
   if( _bufferFull ) {
-		this->responseReaderStatus = SMTP_RESPONSE_BUFFER_FULL;
+		this->m_responseReaderStatus = SMTP_RESPONSE_BUFFER_FULL;
 		return;
 	}
 
-	int availableBytes = this->client->available();
-	while(availableBytes) {
+  if( nullptr != this->m_client && nullptr != this->m_responseBuffer ){
 
-		char nextChar = (char)this->client->read();
-		--availableBytes;
-    if(this->responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE) {
-			this->responseBuffer[this->responseBufferIndex++] = nextChar;
-		}else{
-      _bufferFull = true;
-    }
+    int availableBytes = this->m_client->available();
+  	while(availableBytes) {
 
-		memmove(_crlfBuf, _crlfBuf + 1, 1);
-		_crlfBuf[1] = nextChar;
+  		char nextChar = (char)this->m_client->read();
+  		--availableBytes;
+      if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE) {
+  			this->m_responseBuffer[this->m_responseBufferIndex++] = nextChar;
+  		}else{
+        _bufferFull = true;
+      }
 
-		if(!strncmp(_crlfBuf, "\r\n", 2)) {
+  		memmove(_crlfBuf, _crlfBuf + 1, 1);
+  		_crlfBuf[1] = nextChar;
 
-			if(++_crlfFound == crlfCount) {
+  		if(!strncmp(_crlfBuf, "\r\n", 2)) {
 
-        while ( this->client->available() ) {
-          if(this->responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE) {
-      			this->responseBuffer[this->responseBufferIndex++] = (char)this->client->read();
+  			if(++_crlfFound == crlfCount) {
+
+          while ( this->m_client->available() ) {
+            if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE) {
+        			this->m_responseBuffer[this->m_responseBufferIndex++] = (char)this->m_client->read();
+            }
+            if( millis() - this->m_lastReceive >= this->m_timeOut ){
+          		this->m_responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
+          		return;
+          	}
+            delay(0);
           }
-          if( millis() - this->lastReceive >= this->timeOut ){
-        		this->responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
-        		return;
-        	}
-          delay(0);
-        }
-				this->responseReaderStatus = SMTP_RESPONSE_FINISHED;
-				return;
-			}
-		}
-    delay(0);
-	}
+  				this->m_responseReaderStatus = SMTP_RESPONSE_FINISHED;
+  				return;
+  			}
+  		}
+      delay(0);
+  	}
+  }
   delay(0);
 }
 
 void SMTPdriver::flushClient(){
-	this->client->flush();
-  uint32_t _now = millis();
-	while(this->client->read() > -1 && (millis()-_now) < SMTP_DEFAULT_TIMEOUT );
+  if( nullptr != this->m_client ){
+    this->m_client->flush();
+    uint32_t _now = millis();
+  	while(this->m_client->read() > -1 && (millis()-_now) < SMTP_DEFAULT_TIMEOUT );
+  }
 }
 
 void SMTPdriver::startReadResponse( uint16_t _timeOut ) {
 
-  this->responseBufferIndex = 0;
-	this->lastReceive = millis();
-	this->responseReaderStatus = SMTP_RESPONSE_STARTING;
-	this->timeOut = _timeOut;
-	memset(this->responseBuffer, 0, SMTP_RESPONSE_BUFFER_SIZE);
+  this->m_responseBufferIndex = 0;
+	this->m_lastReceive = millis();
+	this->m_responseReaderStatus = SMTP_RESPONSE_STARTING;
+	this->m_timeOut = _timeOut;
+  if( nullptr != this->m_responseBuffer ){
+    memset(this->m_responseBuffer, 0, SMTP_RESPONSE_BUFFER_SIZE);
+  }
 }
 
 void SMTPdriver::waitForResponse( uint16_t _timeOut ) {
@@ -113,17 +150,21 @@ void SMTPdriver::waitForResponse( uint16_t _timeOut ) {
 	this->startReadResponse( _timeOut );
 	do {
  		this->readResponse();
-	} while(this->responseReaderStatus == SMTP_RESPONSE_WAITING);
+	} while( SMTP_RESPONSE_WAITING == this->m_responseReaderStatus );
 
   #ifdef EW_SERIAL_LOG
   Log(F("SMTP status: "));
-	Logln(this->responseReaderStatus);
+	Logln(this->m_responseReaderStatus);
 	Log(F("SMTP response: "));
-	Logln(this->responseBuffer);
+  if( nullptr != this->m_responseBuffer ){
+    Logln(this->m_responseBuffer);
+  }
 	#endif
 }
 
-bool SMTPdriver::waitForExpectedResponse(	char* expectedResponse, uint16_t _timeOut ){
+bool SMTPdriver::waitForExpectedResponse(	char *expectedResponse, uint16_t _timeOut ){
+
+  bool status = false;
 
 	this->waitForResponse( _timeOut );
 
@@ -131,197 +172,259 @@ bool SMTPdriver::waitForExpectedResponse(	char* expectedResponse, uint16_t _time
   Log(F("SMTP espected response: "));
 	Logln(expectedResponse);
 	#endif
-	return (this->responseReaderStatus != SMTP_RESPONSE_TIMEOUT) && (__strstr( (char*)this->responseBuffer, expectedResponse ) > 0);
+
+  if( nullptr != this->m_responseBuffer ){
+    status = ( __strstr( (char*)this->m_responseBuffer, expectedResponse ) > 0 );
+  }
+
+	return ( SMTP_RESPONSE_TIMEOUT != this->m_responseReaderStatus ) && status ;
 }
 
-bool SMTPdriver::sendCommandAndExpect( char* command, char* expectedResponse, uint16_t _timeOut ){
+bool SMTPdriver::sendCommandAndExpect( char *command, char *expectedResponse, uint16_t _timeOut ){
+
+  bool status = false;
 
   #ifdef EW_SERIAL_LOG
   Log(F("SMTP sending command: "));
 	Logln(command);
 	#endif
-  if( !isConnected( this->client ) ){
-    this->responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
-    return false;
+
+  if( nullptr != this->m_client ){
+
+    if( !isConnected( this->m_client ) ){
+
+      this->m_responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
+    }else{
+
+      this->flushClient();
+      this->m_client->println( command );
+      status = this->waitForExpectedResponse( expectedResponse, _timeOut );
+    }
   }
-  this->flushClient();
-  this->client->println( command );
-	return this->waitForExpectedResponse( expectedResponse, _timeOut );
+	return status;
 }
 
 int SMTPdriver::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
 
-  int respcode = -1;
+  int respcode = SMTP_STATUS_MAX;
   #ifdef EW_SERIAL_LOG
   Log(F("SMTP sending command: "));
 	Logln(command);
 	#endif
-  if( isConnected( this->client ) ){
 
-    this->flushClient();
-    if( strlen_P(command) > 0 )
-    this->client->println( command );
-    this->waitForResponse( _timeOut );
-    respcode = (int)StringToUint16( this->responseBuffer );
-  }else{
-    this->responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
+  if( nullptr != this->m_client ){
+
+    if( isConnected( this->m_client ) ){
+
+      this->flushClient();
+      if( strlen_P(command) > 0 )
+      this->m_client->println( command );
+      this->waitForResponse( _timeOut );
+
+      if( nullptr != this->m_responseBuffer ){
+        respcode = (int)StringToUint16( this->m_responseBuffer );
+      }
+    }else{
+
+      this->m_responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
+    }
   }
-  this->lastResponseCode = respcode;
+  this->m_lastResponseCode = respcode;
 	return respcode;
 }
 
-int SMTPdriver::sendCommandAndGetCode( char* command, uint16_t _timeOut ){
+int SMTPdriver::sendCommandAndGetCode( char *command, uint16_t _timeOut ){
 
-  int respcode = -1;
+  int respcode = SMTP_STATUS_MAX;
   #ifdef EW_SERIAL_LOG
   Log(F("SMTP sending command: "));
 	Logln(command);
 	#endif
-  if( isConnected( this->client ) ){
+  if( nullptr != this->m_client ){
 
-    this->flushClient();
-    if( strlen(command) > 0 )
-    this->client->println( command );
-    this->waitForResponse( _timeOut );
-    respcode = (int)StringToUint16( this->responseBuffer );
-  }else{
-    this->responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
+    if( isConnected( this->m_client ) ){
+
+      this->flushClient();
+      if( strlen(command) > 0 )
+      this->m_client->println( command );
+      this->waitForResponse( _timeOut );
+
+      if( nullptr != this->m_responseBuffer ){
+        respcode = (int)StringToUint16( this->m_responseBuffer );
+      }
+    }else{
+
+      this->m_responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
+    }
   }
-  this->lastResponseCode = respcode;
+  this->m_lastResponseCode = respcode;
 	return respcode;
 }
 
-bool SMTPdriver::sendHello( char* domain ){
+bool SMTPdriver::sendHello( char *domain ){
 
-  char* cmd = new char[100];
+  int respcode = SMTP_STATUS_MAX;
+  char *cmd = new char[100];
 
-  memset( cmd, 0, 100 );
-  strcpy_P( cmd, SMTP_COMMAND_EHLO );
-  strcat( cmd, " " );
-  strcat( cmd, domain );
-  int respcode = this->sendCommandAndGetCode( cmd );
+  if( nullptr != cmd ){
 
-  delete[] cmd;
-	return respcode == SMTP_STATUS_ACTION_COMPLETED;
+    memset( cmd, 0, 100 );
+    strcpy_P( cmd, SMTP_COMMAND_EHLO );
+    strcat( cmd, " " );
+    strcat( cmd, domain );
+    respcode = this->sendCommandAndGetCode( cmd );
+
+    delete[] cmd;
+  }
+	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
 
-bool SMTPdriver::sendAuthLogin( char* username, char* password ){
+bool SMTPdriver::sendAuthLogin( char *username, char *password ){
 
-  char* _username = base64Encode( username, strlen(username) );
-  char* _password = base64Encode( password, strlen(password) );
+  char *_username = (char *) malloc(400  *sizeof(char));
+  char *_password = (char *) malloc(400  *sizeof(char));
+
+  base64Encode( username, strlen(username), _username );
+  base64Encode( password, strlen(password), _password );
 
   int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_AUTH );
 
-  if( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
-    int respcode = this->sendCommandAndGetCode( _username );
+  if( nullptr != _username && respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
+    respcode = this->sendCommandAndGetCode( _username );
+    free(_username);
   }
 
-  if( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
-    int respcode = this->sendCommandAndGetCode( _password );
+  if( nullptr != _password && respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
+    respcode = this->sendCommandAndGetCode( _password );
+    free(_password);
   }
 
-  free(_username); free(_password);
-	return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
+	return ( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE );
 }
 
-bool SMTPdriver::sendFrom( char* sender ){
+bool SMTPdriver::sendFrom( char *sender ){
 
-  char* cmd = new char[128];
+  int respcode = SMTP_STATUS_MAX;
+  char *cmd = new char[128];
 
-  memset( cmd, 0, 128 );
-  strcpy_P( cmd, SMTP_COMMAND_FROM );
-  strcat_P( cmd, SMTP_COMMAND_SEPARATOR );
-  strcat_P( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
-  strcat( cmd, sender );
-  strcat_P( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
-  int respcode = this->sendCommandAndGetCode( cmd );
+  if( nullptr != cmd ){
 
-  delete[] cmd;
-	return respcode == SMTP_STATUS_ACTION_COMPLETED;
+    memset( cmd, 0, 128 );
+    strcpy_P( cmd, SMTP_COMMAND_FROM );
+    strcat_P( cmd, SMTP_COMMAND_SEPARATOR );
+    strcat_P( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
+    strcat( cmd, sender );
+    strcat_P( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
+    respcode = this->sendCommandAndGetCode( cmd );
+
+    delete[] cmd;
+  }
+	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
 
-bool SMTPdriver::sendTo( char* recipient ){
+bool SMTPdriver::sendTo( char *recipient ){
 
-  char* cmd = new char[128];
+  int respcode = SMTP_STATUS_MAX;
+  char *cmd = new char[128];
 
-  memset( cmd, 0, 128 );
-  strcpy_P( cmd, SMTP_COMMAND_TO );
-  strcat_P( cmd, SMTP_COMMAND_SEPARATOR );
-  strcat_P( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
-  strcat( cmd, recipient );
-  strcat_P( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
-  int respcode = this->sendCommandAndGetCode( cmd );
+  if( nullptr != cmd ){
 
-  delete[] cmd;
-	return respcode == SMTP_STATUS_ACTION_COMPLETED;
+    memset( cmd, 0, 128 );
+    strcpy_P( cmd, SMTP_COMMAND_TO );
+    strcat_P( cmd, SMTP_COMMAND_SEPARATOR );
+    strcat_P( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
+    strcat( cmd, recipient );
+    strcat_P( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
+    respcode = this->sendCommandAndGetCode( cmd );
+
+    delete[] cmd;
+  }
+	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
 
 bool SMTPdriver::sendDataCommand(){
 
   int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA );
-	return respcode == SMTP_STATUS_START_MAIL_INPUT;
+  return ( SMTP_STATUS_START_MAIL_INPUT == respcode );
 }
 
-void SMTPdriver::sendDataHeader( char* sender, char* recipient, char* subject ){
+void SMTPdriver::sendDataHeader( char *sender, char *recipient, char *subject ){
 
-  this->client->print(SMTP_COMMAND_DATA_HEADER_TO);
-  this->client->println(recipient);
+  if( nullptr != this->m_client ){
+    this->m_client->print(SMTP_COMMAND_DATA_HEADER_TO);
+    this->m_client->println(recipient);
 
-  this->client->print(SMTP_COMMAND_DATA_HEADER_FROM);
-  this->client->println(sender);
+    this->m_client->print(SMTP_COMMAND_DATA_HEADER_FROM);
+    this->m_client->println(sender);
 
-  this->client->print(SMTP_COMMAND_DATA_HEADER_SUBJECT);
-  this->client->println(subject);
-  this->client->print(SMTP_COMMAND_CRLF);
+    this->m_client->print(SMTP_COMMAND_DATA_HEADER_SUBJECT);
+    this->m_client->println(subject);
+    this->m_client->print(SMTP_COMMAND_CRLF);
+  }
 }
 
-bool SMTPdriver::sendDataBody( String body ){
+bool SMTPdriver::sendDataBody( String &body ){
 
+  int respcode = SMTP_STATUS_MAX;
   #ifdef EW_SERIAL_LOG
   Log(F("SMTP sending data: "));
 	Logln(body);
 	#endif
-  // this->client->println( body );
-  sendPacket( this->client, (uint8_t*)body.c_str(), body.length()+1 );
-  this->client->println();
-  int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
+  if( nullptr != this->m_client ){
+    // this->m_client->println( body );
+    sendPacket( this->m_client, (uint8_t*)body.c_str(), body.length()+1 );
+    this->m_client->println();
+    respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
+  }
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
 }
 
-bool SMTPdriver::sendDataBody( char* body ){
+bool SMTPdriver::sendDataBody( char *body ){
 
+  int respcode = SMTP_STATUS_MAX;
   #ifdef EW_SERIAL_LOG
   Log(F("SMTP sending data: "));
 	Logln(body);
 	#endif
-  // this->client->println( body );
-  sendPacket( this->client, (uint8_t*)body, strlen(body) );
-  this->client->println();
-  int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
+  if( nullptr != this->m_client ){
+    // this->m_client->println( body );
+    sendPacket( this->m_client, (uint8_t*)body, strlen(body) );
+    this->m_client->println();
+    respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
+  }
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
 }
 
 bool SMTPdriver::sendDataBody( PGM_P body ){
 
+  int respcode = SMTP_STATUS_MAX;
   #ifdef EW_SERIAL_LOG
   Log(F("SMTP sending data: "));
 	Logln(body);
 	#endif
-  this->client->println( body );
-  int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
+  if( nullptr != this->m_client ){
+    this->m_client->println( body );
+    respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
+  }
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
 }
 
 bool SMTPdriver::sendQuit(){
 
   int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_QUIT );
-  return respcode == SMTP_STATUS_SERVER_ENDING_CON;
+  return ( SMTP_STATUS_SERVER_ENDING_CON == respcode );
 }
 
 void SMTPdriver::end(){
 
-  disconnect( this->client );
-  this->client = NULL;
-  if( this->host ) delete[] this->host;
-  if( this->responseBuffer ) delete[] this->responseBuffer;
+  if( nullptr != this->m_client ){
+    disconnect( this->m_client );
+    this->m_client = nullptr;
+  }
+  if(  nullptr != this->m_host ){
+    delete[] this->m_host;
+  }
+  if(  nullptr != this->m_responseBuffer ){
+    delete[] this->m_responseBuffer;
+  }
 }

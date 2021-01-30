@@ -40,8 +40,10 @@ class DashboardController : public Controller {
 		 */
 		void boot( void ){
 
-			this->route_handler->register_route( EW_SERVER_DASHBOARD_ROUTE, [&]() { this->handleDashboardRoute(); }, AUTH_MIDDLEWARE );
-      this->route_handler->register_route( EW_SERVER_DASHBOARD_MONITOR_ROUTE, [&]() { this->handleDashboardMonitor(); } );
+			if( nullptr != this->m_route_handler ){
+				this->m_route_handler->register_route( EW_SERVER_DASHBOARD_ROUTE, [&]() { this->handleDashboardRoute(); }, AUTH_MIDDLEWARE );
+	      this->m_route_handler->register_route( EW_SERVER_DASHBOARD_MONITOR_ROUTE, [&]() { this->handleDashboardMonitor(); } );
+			}
 		}
 
 		/**
@@ -53,26 +55,30 @@ class DashboardController : public Controller {
       Logln(F("Handling dashboard monitor route"));
       #endif
 
-			struct station_info * stat_info = wifi_softap_get_station_info();
+			if( nullptr == this->m_web_resource || nullptr == this->m_web_resource->m_wifi || nullptr == this->m_route_handler ){
+				return;
+			}
+
+			struct station_info *stat_info = wifi_softap_get_station_info();
 			int n = 1;
 
       String _response = "{\"nm\":\"";
-      _response += this->web_resource->wifi->SSID();
+      _response += this->m_web_resource->m_wifi->SSID();
 			_response += "\",\"ip\":\"";
-      _response += this->web_resource->wifi->localIP().toString();
+      _response += this->m_web_resource->m_wifi->localIP().toString();
       _response += "\",\"rs\":\"";
-      _response += this->web_resource->wifi->RSSI();
+      _response += this->m_web_resource->m_wifi->RSSI();
       _response += "\",\"mc\":\"";
-      _response += this->web_resource->wifi->macAddress();
+      _response += this->m_web_resource->m_wifi->macAddress();
       _response += "\",\"st\":";
-      _response += this->web_resource->wifi->status();
+      _response += this->m_web_resource->m_wifi->status();
 			_response += ",\"nt\":";
       _response += __status_wifi.internet_available;
 			_response += ",\"nwt\":";
       _response += __nw_time_service.get_ntp_time();
 			_response += ",\"dl\":\"";
 
-			while (stat_info != NULL) {
+			while ( nullptr != stat_info ) {
 				char macStr[30];
 				memset(macStr, 0, 30);
 			  sprintf(
@@ -94,11 +100,11 @@ class DashboardController : public Controller {
 				stat_info = STAILQ_NEXT(stat_info, next);
       }
       _response += "\",\"r\":";
-      _response += !this->route_handler->has_active_session();
+      _response += !this->m_route_handler->has_active_session();
       _response += "}";
 
-      this->web_resource->server->sendHeader("Cache-Control", "no-cache");
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _response );
+      this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _response );
     }
 
 		/**
@@ -117,7 +123,7 @@ class DashboardController : public Controller {
       strcat_P( _page, EW_SERVER_DASHBOARD_PAGE );
       strcat_P( _page, EW_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML );
 
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
 
     }

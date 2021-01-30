@@ -46,8 +46,12 @@ class WiFiConfigController : public Controller {
 		 */
 		void boot( void ){
 
-			this->wifi_configs = this->web_resource->db_conn->get_wifi_config_table();
-			this->route_handler->register_route( EW_SERVER_WIFI_CONFIG_ROUTE, [&]() { this->handleWiFiConfigRoute(); }, AUTH_MIDDLEWARE );
+			if( nullptr != this->m_web_resource && nullptr != this->m_web_resource->m_db_conn ){
+				this->wifi_configs = this->m_web_resource->m_db_conn->get_wifi_config_table();
+			}
+			if( nullptr != this->m_route_handler ){
+				this->m_route_handler->register_route( EW_SERVER_WIFI_CONFIG_ROUTE, [&]() { this->handleWiFiConfigRoute(); }, AUTH_MIDDLEWARE );
+			}
 		}
 
 		/**
@@ -140,27 +144,36 @@ class WiFiConfigController : public Controller {
 		 */
     void handleWiFiConfigRoute( void ) {
 
-			this->wifi_configs = this->web_resource->db_conn->get_wifi_config_table();
-      #ifdef EW_SERIAL_LOG
+			#ifdef EW_SERIAL_LOG
       Logln(F("Handling WiFi Config route"));
       #endif
+
+			if( nullptr == this->m_web_resource ||
+					nullptr == this->m_web_resource->m_db_conn ||
+					nullptr == this->m_web_resource->m_server ||
+					nullptr == this->m_route_handler ){
+				return;
+			}
+
+			this->wifi_configs = this->m_web_resource->m_db_conn->get_wifi_config_table();
+
       bool _is_posted = false;
       bool _is_error = true;
 
 			#if defined( ALLOW_WIFI_CONFIG_MODIFICATION ) || defined( ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY )
-      if ( this->web_resource->server->hasArg("sta_ssid") && this->web_resource->server->hasArg("sta_pswd") ) {
+      if ( this->m_web_resource->m_server->hasArg("sta_ssid") && this->m_web_resource->m_server->hasArg("sta_pswd") ) {
 
-        String _sta_ssid = this->web_resource->server->arg("sta_ssid");
-        String _sta_pswd = this->web_resource->server->arg("sta_pswd");
-        String _sta_lip = this->web_resource->server->arg("sta_lip");
-        String _sta_gip = this->web_resource->server->arg("sta_gip");
-        String _sta_sip = this->web_resource->server->arg("sta_sip");
+        String _sta_ssid = this->m_web_resource->m_server->arg("sta_ssid");
+        String _sta_pswd = this->m_web_resource->m_server->arg("sta_pswd");
+        String _sta_lip = this->m_web_resource->m_server->arg("sta_lip");
+        String _sta_gip = this->m_web_resource->m_server->arg("sta_gip");
+        String _sta_sip = this->m_web_resource->m_server->arg("sta_sip");
 
-        String _ap_ssid = this->web_resource->server->arg("ap_ssid");
-        String _ap_pswd = this->web_resource->server->arg("ap_pswd");
-        String _ap_lip = this->web_resource->server->arg("ap_lip");
-        String _ap_gip = this->web_resource->server->arg("ap_gip");
-        String _ap_sip = this->web_resource->server->arg("ap_sip");
+        String _ap_ssid = this->m_web_resource->m_server->arg("ap_ssid");
+        String _ap_pswd = this->m_web_resource->m_server->arg("ap_pswd");
+        String _ap_lip = this->m_web_resource->m_server->arg("ap_lip");
+        String _ap_gip = this->m_web_resource->m_server->arg("ap_gip");
+        String _ap_sip = this->m_web_resource->m_server->arg("ap_sip");
 
         #ifdef EW_SERIAL_LOG
           Logln(F("\nSubmitted info :\n"));
@@ -211,7 +224,7 @@ class WiFiConfigController : public Controller {
 
 					#endif
 
-          this->web_resource->db_conn->set_wifi_config_table( &this->wifi_configs );
+          this->m_web_resource->m_db_conn->set_wifi_config_table( &this->wifi_configs );
           // this->set_wifi_config_table( &this->wifi_configs );
           _is_error = false;
         }
@@ -223,9 +236,9 @@ class WiFiConfigController : public Controller {
       this->build_wifi_config_html( _page, _is_error, _is_posted );
 
       if( _is_posted && !_is_error ){
-        this->route_handler->send_inactive_session_headers();
+        this->m_route_handler->send_inactive_session_headers();
       }
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
       if( _is_posted && !_is_error ){
         __factory_reset.restart_device( 100 );

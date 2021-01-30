@@ -75,7 +75,9 @@ void handleCrashData(){
   }
 
 	uint16_t _size = 0;
-	String _filedata = readCrashFileToBuffer( CRASHFILEPATH, _size );
+	String _filepath = CRASHFILEPATH;
+	String _filedata = "";
+	readCrashFileToBuffer( _filepath, _filedata, _size );
 	if( _filename.length() && _size ){
 
 		_filedata += "\n\nRegards,\n";
@@ -96,28 +98,32 @@ void handleCrashData(){
 /**
  * This function returns saved crashdump file as a string
  */
-String readCrashFileToBuffer(String path, uint16_t &_size){
+void readCrashFileToBuffer(String &_filepath, String &_filedata, uint16_t &_size){
 
-	File _file = SPIFFS.open(path, "r");
-	if (!_file)	  return String();
+	File _file = SPIFFS.open(_filepath, "r");
 
-	_size = _file.size();
-	char * _buffer = new char[_size+1];
+	if ( _file ){
 
-	_size = _file.readBytes(_buffer, _size);
-	_file.close();
-	_buffer[_size] = 0;
+		_size = _file.size();
+		char *_buffer = new char[_size+1];
 
-	String _buff_str = String(_buffer);
-	delete _buffer;
-	return _buff_str;
-};
+		if( nullptr != _buffer ){
+
+			_size = _file.readBytes(_buffer, _size);
+			_file.close();
+			_buffer[_size] = 0;
+
+			_filedata = String(_buffer);
+			delete []_buffer;
+		}
+	}
+}
 
 
 /**
  * This function saves crashdump to spiff
  */
-void saveCrashToSpiffs(struct rst_info * rst_info, uint32_t stack, uint32_t stack_end,Print& outputDev ){
+void saveCrashToSpiffs(struct rst_info *rst_info, uint32_t stack, uint32_t stack_end,Print& outputDev ){
 
 	ESP.wdtFeed();
 	outputDev.printf("\nRestart reason : %d\n", rst_info->reason);
@@ -160,7 +166,9 @@ extern "C" void custom_crash_callback(struct rst_info * rst_info, uint32_t stack
 
 	saveCrashToSpiffs(rst_info, stack, stack_end, strprinter2);
 	File _file = SPIFFS.open(CRASHFILEPATH, "a");
-	if(!_file) _file= SPIFFS.open(CRASHFILEPATH, "w");
+	if(!_file){
+		_file = SPIFFS.open(CRASHFILEPATH, "w");
+	}
 	if(_file) {
 		unsigned int w = _file.write((uint8_t*)strprinter2.str.c_str(), strprinter2.str.length());
 		_file.close();
@@ -174,7 +182,7 @@ extern "C" void custom_crash_callback(struct rst_info * rst_info, uint32_t stack
 
 
 /**
- * Clear crash information saved in EEPROM
+ * Clear crash information saved in SPIFFS
  * In fact only crash counter is cleared
  * The crash data are not deleted
  */

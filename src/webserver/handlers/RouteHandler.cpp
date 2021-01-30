@@ -11,6 +11,18 @@ created Date    : 1st June 2019
 #include "RouteHandler.h"
 
 /**
+ * RouteHandler constructor
+ */
+RouteHandler::RouteHandler(){
+}
+
+/**
+ * RouteHandler destructor
+ */
+RouteHandler::~RouteHandler(){
+}
+
+/**
  * register route, callbacks, middlware level etc.
  *
  * @param const char* _uri
@@ -19,10 +31,14 @@ created Date    : 1st June 2019
  * @param const char*|EW_SERVER_LOGIN_ROUTE _redirect_uri
  */
 void RouteHandler::register_route( const char* _uri, CallBackVoidArgFn _fn, middlwares _middleware_level, const char* _redirect_uri ){
-  __web_resource.server->on( _uri, [=]() {
-    if( this->handle_middleware(_middleware_level,_redirect_uri) )
-    _fn();
-  } );
+
+  if( nullptr != __web_resource.m_server ){
+
+    __web_resource.m_server->on( _uri, [=]() {
+      if( this->handle_middleware(_middleware_level,_redirect_uri) )
+      _fn();
+    } );
+  }
 }
 
 /**
@@ -31,7 +47,11 @@ void RouteHandler::register_route( const char* _uri, CallBackVoidArgFn _fn, midd
  * @param CallBackVoidArgFn _fn
  */
 void RouteHandler::register_not_found_fn( CallBackVoidArgFn _fn ){
-  __web_resource.server->onNotFound( _fn );
+
+  if( nullptr != __web_resource.m_server ){
+
+    __web_resource.m_server->onNotFound( _fn );
+  }
 }
 
 RouteHandler __web_route_handler;

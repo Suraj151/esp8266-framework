@@ -14,29 +14,43 @@ created Date    : 1st June 2019
 
 #include "EwingsWebServer.h"
 
+/**
+ * WebServer constructor.
+ */
+WebServer::WebServer():
+  m_wifi(nullptr)
+{
+}
+
+/**
+ * WebServer destructor.
+ */
+WebServer::~WebServer(){
+  this->m_wifi = nullptr;
+}
 
 /**
  * start http server functionality. this requires wifi should work as access point
  */
 void WebServer::start_server( ESP8266WiFiClass* _wifi ){
 
-  this->wifi = _wifi;
-  __web_resource.collect_resource( &this->server, this->wifi );
+  this->m_wifi = _wifi;
+  __web_resource.collect_resource( &this->m_server, this->m_wifi );
 
-  for (int i = 0; i < Controller::controllers.size(); i++) {
+  for (int i = 0; i < Controller::m_controllers.size(); i++) {
     #ifdef EW_SERIAL_LOG
-    Log(F("booting :"));Log(Controller::controllers[i].controller->controller_name);Logln(F(" controller"));
+    Log(F("booting :"));Log(Controller::m_controllers[i].controller->m_controller_name);Logln(F(" controller"));
     #endif
-    Controller::controllers[i].controller->boot();
+    Controller::m_controllers[i].controller->boot();
   }
 
-  //here the list of headers to be recorded
+  // here the list of headers to be recorded
   // const char * headerkeys[] = {"User-Agent", "Cookie"} ;
-  const char * headerkeys[] = {"Cookie"} ;
+  const char *headerkeys[] = {"Cookie"} ;
   size_t headerkeyssize = sizeof(headerkeys) / sizeof(char*);
   //ask server to track these headers
-  this->server.collectHeaders(headerkeys, headerkeyssize);
-  this->server.begin();
+  this->m_server.collectHeaders(headerkeys, headerkeyssize);
+  this->m_server.begin();
   #ifdef EW_SERIAL_LOG
   Logln(F("HTTP server started !"));
   #endif
@@ -47,7 +61,7 @@ void WebServer::start_server( ESP8266WiFiClass* _wifi ){
  */
 void WebServer::handle_clients(){
 
-  this->server.handleClient();
+  this->m_server.handleClient();
 }
 
 WebServer __web_server;

@@ -15,15 +15,45 @@ created Date    : 1st June 2019
 #include "MqttServiceProvider.h"
 
 /**
+ * MqttServiceProvider constructor.
+ */
+MqttServiceProvider::MqttServiceProvider():
+  m_mqtt_timer_cb_id(0),
+  m_mqtt_publish_cb_id(0),
+  m_mqtt_subscribe_cb_id(0),
+  m_mqtt_payload(nullptr),
+  m_mqtt_publish_data_cb(nullptr),
+  m_mqtt_subscribe_data_cb(nullptr),
+  m_wifi(nullptr)
+{
+}
+
+/**
+ * MqttServiceProvider destructor
+ */
+MqttServiceProvider::~MqttServiceProvider(){
+  this->stop();
+  if( nullptr != this->m_mqtt_payload ){
+    delete[] this->m_mqtt_payload;
+    this->m_mqtt_payload = nullptr;
+  }
+  this->m_wifi = nullptr;
+  this->m_mqtt_publish_data_cb = nullptr;
+  this->m_mqtt_subscribe_data_cb = nullptr;
+}
+
+/**
  * start mqtt service. initialize it with mqtt configs at database
  */
 void MqttServiceProvider::begin( ESP8266WiFiClass* _wifi ){
 
-  this->wifi = _wifi;
-  this->_mqtt_payload = new char[ MQTT_PAYLOAD_BUF_SIZE ];
-  memset( this->_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
-  this->mqtt_client.mqttDataCallbackArgs = (uint32_t*)this;
-  this->mqtt_client.OnData( MqttServiceProvider::handleMqttDataCb );
+  this->m_wifi = _wifi;
+  this->m_mqtt_payload = new char[ MQTT_PAYLOAD_BUF_SIZE ];
+  if( nullptr != this->m_mqtt_payload ){
+    memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
+  }
+  this->m_mqtt_client.m_mqttDataCallbackArgs = reinterpret_cast<uint32_t*>(this);
+  this->m_mqtt_client.OnData( MqttServiceProvider::handleMqttDataCb );
 
   this->handleMqttConfigChange();
 }
@@ -36,7 +66,7 @@ void MqttServiceProvider::handleMqttPublish(){
   #ifdef EW_SERIAL_LOG
   Logln( F("MQTT: handling mqtt publish interval") );
   #endif
-  if( !this->mqtt_client.is_mqtt_connected() ) return;
+  if( !this->m_mqtt_client.is_mqtt_connected() ) return;
 
   mqtt_pubsub_config_table _mqtt_pubsub_configs = __database_service.get_mqtt_pubsub_config_table();
   uint8_t mac[6];
@@ -50,7 +80,7 @@ void MqttServiceProvider::handleMqttPublish(){
     #ifdef EW_SERIAL_LOG
     Log( F("MQTT: publishing on topic : ") );Logln( _mqtt_pubsub_configs.publish_topics[i].topic );
     #endif
-    if( strlen(_mqtt_pubsub_configs.publish_topics[i].topic) > 0 ){
+    if( nullptr != this->m_mqtt_payload && strlen(_mqtt_pubsub_configs.publish_topics[i].topic) > 0 ){
 
       #ifdef ENABLE_MQTT_DEFAULT_PAYLOAD
 
@@ -65,20 +95,22 @@ void MqttServiceProvider::handleMqttPublish(){
           _payload += ESP.getChipId();
         #endif
 
-        memset( this->_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
-        _payload.toCharArray( this->_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
+        memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
+        _payload.toCharArray( this->m_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
 
       #else
 
       #endif
 
-      if( this->_mqtt_publish_data_cb ) this->_mqtt_publish_data_cb( this->_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
-      __find_and_replace( this->_mqtt_payload, "[mac]", macStr, 2 );
+      if( nullptr != this->m_mqtt_publish_data_cb ){
+        this->m_mqtt_publish_data_cb( this->m_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
+      }
+      __find_and_replace( this->m_mqtt_payload, "[mac]", macStr, 2 );
 
-      this->mqtt_client.Publish(
+      this->m_mqtt_client.Publish(
         _mqtt_pubsub_configs.publish_topics[i].topic,
-        this->_mqtt_payload,
-        strlen( this->_mqtt_payload ),
+        this->m_mqtt_payload,
+        strlen( this->m_mqtt_payload ),
         _mqtt_pubsub_configs.publish_topics[i].qos < MQTT_MAX_QOS_LEVEL ?
         _mqtt_pubsub_configs.publish_topics[i].qos : MQTT_MAX_QOS_LEVEL,
         _mqtt_pubsub_configs.publish_topics[i].retain
@@ -95,15 +127,15 @@ void MqttServiceProvider::handleMqttSubScribe(){
   #ifdef EW_SERIAL_LOG
   Logln( F("MQTT: handling mqtt subscribe interval") );
   #endif
-  if( !this->mqtt_client.is_mqtt_connected() ) return;
+  if( !this->m_mqtt_client.is_mqtt_connected() ) return;
 
   mqtt_pubsub_config_table _mqtt_pubsub_configs = __database_service.get_mqtt_pubsub_config_table();
 
   for (uint8_t i = 0; i < MQTT_MAX_SUBSCRIBE_TOPIC; i++) {
 
-    if( strlen(_mqtt_pubsub_configs.subscribe_topics[i].topic) > 0 && !this->mqtt_client.is_topic_subscribed(_mqtt_pubsub_configs.subscribe_topics[i].topic) ){
+    if( strlen(_mqtt_pubsub_configs.subscribe_topics[i].topic) > 0 && !this->m_mqtt_client.is_topic_subscribed(_mqtt_pubsub_configs.subscribe_topics[i].topic) ){
 
-      this->mqtt_client.Subscribe(
+      this->m_mqtt_client.Subscribe(
 
         _mqtt_pubsub_configs.subscribe_topics[i].topic,
         _mqtt_pubsub_configs.subscribe_topics[i].qos < MQTT_MAX_QOS_LEVEL ?
@@ -119,9 +151,9 @@ void MqttServiceProvider::handleMqttSubScribe(){
  */
 void MqttServiceProvider::stop(){
 
-  this->mqtt_client.DeleteClient();
-  __task_scheduler.clearInterval( this->_mqtt_timer_cb_id );
-  this->_mqtt_timer_cb_id = 0;
+  this->m_mqtt_client.DeleteClient();
+  __task_scheduler.clearInterval( this->m_mqtt_timer_cb_id );
+  this->m_mqtt_timer_cb_id = 0;
 }
 
 /**
@@ -135,9 +167,9 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
   mqtt_general_config_table _mqtt_general_configs = __database_service.get_mqtt_general_config_table();
   mqtt_pubsub_config_table _mqtt_pubsub_configs = __database_service.get_mqtt_pubsub_config_table();
 
-  if( _mqtt_config_type == MQTT_GENERAL_CONFIG || _mqtt_config_type == MQTT_LWT_CONFIG ){
+  if( MQTT_GENERAL_CONFIG == _mqtt_config_type || MQTT_LWT_CONFIG == _mqtt_config_type ){
 
-    this->mqtt_client.DeleteClient();
+    this->m_mqtt_client.DeleteClient();
     int _stat = __task_scheduler.setTimeout( [&]() {
 
       mqtt_general_config_table _mqtt_general_configs = __database_service.get_mqtt_general_config_table();
@@ -152,33 +184,33 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
       __find_and_replace( _mqtt_general_configs.client_id, "[mac]", macStr, 2 );
       __find_and_replace( _mqtt_lwt_configs.will_message, "[mac]", macStr, 2 );
 
-      if( this->mqtt_client.begin( this->wifi, &_mqtt_general_configs, &_mqtt_lwt_configs ) ){
-        this->_mqtt_timer_cb_id = __task_scheduler.updateInterval(
-          this->_mqtt_timer_cb_id,
-          [&]() { this->mqtt_client.mqtt_timer(); },
+      if( this->m_mqtt_client.begin( this->m_wifi, &_mqtt_general_configs, &_mqtt_lwt_configs ) ){
+        this->m_mqtt_timer_cb_id = __task_scheduler.updateInterval(
+          this->m_mqtt_timer_cb_id,
+          [&]() { this->m_mqtt_client.mqtt_timer(); },
           MILLISECOND_DURATION_1000
         );
       }else{
-        __task_scheduler.clearInterval( this->_mqtt_timer_cb_id );
-        this->_mqtt_timer_cb_id = 0;
+        __task_scheduler.clearInterval( this->m_mqtt_timer_cb_id );
+        this->m_mqtt_timer_cb_id = 0;
       }
     }, MQTT_INITIALIZE_DURATION );
-  }else if( _mqtt_config_type == MQTT_PUBSUB_CONFIG ){
+  }else if( MQTT_PUBSUB_CONFIG == _mqtt_config_type ){
 
-    for ( uint16_t i = 0; i < this->mqtt_client.mqttClient.subscribed_topics.size(); i++) {
+    for ( uint16_t i = 0; i < this->m_mqtt_client.m_mqttClient.subscribed_topics.size(); i++) {
 
       bool _found = false;
       for (uint8_t j = 0; j < MQTT_MAX_SUBSCRIBE_TOPIC; j++) {
 
         if( __are_str_equals(
           _mqtt_pubsub_configs.subscribe_topics[j].topic,
-          this->mqtt_client.mqttClient.subscribed_topics[i].topic,
+          this->m_mqtt_client.m_mqttClient.subscribed_topics[i].topic,
           strlen( _mqtt_pubsub_configs.subscribe_topics[j].topic )
         ) ) _found = true;
 
       }
       if( !_found )
-        this->mqtt_client.UnSubscribe( this->mqtt_client.mqttClient.subscribed_topics[i].topic );
+        this->m_mqtt_client.UnSubscribe( this->m_mqtt_client.m_mqttClient.subscribed_topics[i].topic );
     }
 
   }else{
@@ -186,25 +218,25 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
   }
 
   if( _mqtt_pubsub_configs.publish_frequency > 0 ){
-    this->_mqtt_publish_cb_id = __task_scheduler.updateInterval(
-      this->_mqtt_publish_cb_id,
+    this->m_mqtt_publish_cb_id = __task_scheduler.updateInterval(
+      this->m_mqtt_publish_cb_id,
       [&]() { this->handleMqttPublish(); },
       _mqtt_pubsub_configs.publish_frequency*MILLISECOND_DURATION_1000
     );
   }else{
-    __task_scheduler.clearInterval( this->_mqtt_publish_cb_id );
-    this->_mqtt_publish_cb_id = 0;
+    __task_scheduler.clearInterval( this->m_mqtt_publish_cb_id );
+    this->m_mqtt_publish_cb_id = 0;
   }
 
   if( _mqtt_general_configs.keepalive > 0 ){
-    this->_mqtt_subscribe_cb_id = __task_scheduler.updateInterval(
-      this->_mqtt_subscribe_cb_id,
+    this->m_mqtt_subscribe_cb_id = __task_scheduler.updateInterval(
+      this->m_mqtt_subscribe_cb_id,
       [&]() { this->handleMqttSubScribe(); },
       _mqtt_general_configs.keepalive*MILLISECOND_DURATION_1000
     );
   }else{
-    __task_scheduler.clearInterval( this->_mqtt_subscribe_cb_id );
-    this->_mqtt_subscribe_cb_id = 0;
+    __task_scheduler.clearInterval( this->m_mqtt_subscribe_cb_id );
+    this->m_mqtt_subscribe_cb_id = 0;
   }
 
 }
@@ -216,7 +248,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
  */
 void MqttServiceProvider::setMqttPublishDataCallback( MqttPublishDataCallback _cb ){
 
-  this->_mqtt_publish_data_cb = _cb;
+  this->m_mqtt_publish_data_cb = _cb;
 }
 
 /**
@@ -226,7 +258,7 @@ void MqttServiceProvider::setMqttPublishDataCallback( MqttPublishDataCallback _c
  */
 void MqttServiceProvider::setMqttSubscribeDataCallback( MqttSubscribeDataCallback _cb ){
 
-  this->_mqtt_subscribe_data_cb = _cb;
+  this->m_mqtt_subscribe_data_cb = _cb;
 }
 
 /**
@@ -235,27 +267,32 @@ void MqttServiceProvider::setMqttSubscribeDataCallback( MqttSubscribeDataCallbac
  */
 void MqttServiceProvider::handleMqttDataCb( uint32_t *args, const char* topic, uint32_t topic_len, const char *data, uint32_t data_len ){
 
-    if( __mqtt_service._mqtt_subscribe_data_cb ) __mqtt_service._mqtt_subscribe_data_cb(
+    if( nullptr != __mqtt_service.m_mqtt_subscribe_data_cb ) __mqtt_service.m_mqtt_subscribe_data_cb(
       args, topic, topic_len, data, data_len
     );
 
     char *topicBuf = new char[topic_len+1], *dataBuf = new char[data_len+1];
 
-    memcpy(topicBuf, topic, topic_len);
-    topicBuf[topic_len] = 0;
+    if( nullptr != topicBuf ){
+      memcpy(topicBuf, topic, topic_len);
+      topicBuf[topic_len] = 0;
+      delete[] topicBuf;
+    }
 
-    memcpy(dataBuf, data, data_len);
-    dataBuf[data_len] = 0;
+    if( nullptr != dataBuf ){
+      memcpy(dataBuf, data, data_len);
+      dataBuf[data_len] = 0;
 
+      #if defined( ENABLE_MQTT_DEFAULT_PAYLOAD ) && defined( ENABLE_GPIO_SERVICE )
+      __gpio_service.applyGpioJsonPayload( dataBuf, data_len );
+      #endif
+
+      delete[] dataBuf;
+    }
     // #ifdef EW_SERIAL_LOG
     // Logln(F("\n\nMQTT: service data callback"));
     // Serial.printf("MQTT: service Receive topic: %s, data: %s \n\n", topicBuf, dataBuf);
     // #endif
-
-    #if defined( ENABLE_MQTT_DEFAULT_PAYLOAD ) && defined( ENABLE_GPIO_SERVICE )
-    __gpio_service.applyGpioJsonPayload( dataBuf, data_len );
-    #endif
-    delete[] topicBuf; delete[] dataBuf;
 }
 
 #ifdef EW_SERIAL_LOG

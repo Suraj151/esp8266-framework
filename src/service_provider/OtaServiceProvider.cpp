@@ -11,6 +11,23 @@ created Date    : 1st June 2019
 #include "OtaServiceProvider.h"
 
 /**
+ * OtaServiceProvider constructor.
+ */
+OtaServiceProvider::OtaServiceProvider():
+  m_wifi_client(nullptr),
+  m_http_client(nullptr)
+{
+}
+
+/**
+ * OtaServiceProvider destructor.
+ */
+OtaServiceProvider::~OtaServiceProvider(){
+  this->m_wifi_client = nullptr;
+  this->m_http_client = nullptr;
+}
+
+/**
  * begin ota with client and database configs
  * schedule task for ota check once in perticuler duration
  *
@@ -20,8 +37,8 @@ created Date    : 1st June 2019
  */
 void OtaServiceProvider::begin_ota( WiFiClient* _wifi_client, HTTPClient* _http_client ){
 
-  this->wifi_client = _wifi_client;
-  this->http_client = _http_client;
+  this->m_wifi_client = _wifi_client;
+  this->m_http_client = _http_client;
 
   __task_scheduler.setInterval( [&]() {  this->handleOta();  }, OTA_API_CHECK_DURATION );
 }
@@ -55,7 +72,9 @@ void OtaServiceProvider::handleOta(){
  */
 http_ota_status OtaServiceProvider::handle(){
 
-   if( !this->wifi_client || !this->http_client ) return BEGIN_FAILED;
+   if( nullptr == this->m_wifi_client || nullptr == this->m_http_client ){
+     return BEGIN_FAILED;
+   }
 
    ota_config_table _ota_configs = __database_service.get_ota_config_table();
    global_config_table _global_configs = __database_service.get_global_config_table();
@@ -69,27 +88,35 @@ http_ota_status OtaServiceProvider::handle(){
    _firmware_version_url += _global_configs.firmware_version;
 
    if( _firmware_version_url.length() > 12 && _ota_configs.ota_port > 0 &&
-     this->http_client->begin( *this->wifi_client, _firmware_version_url )
+     this->m_http_client->begin( *this->m_wifi_client, _firmware_version_url )
    ){
 
-     this->http_client->setUserAgent("Ewings");
-     this->http_client->setAuthorization("ota", "firmware");
-     this->http_client->setTimeout(2000);
+     this->m_http_client->setUserAgent("Ewings");
+     this->m_http_client->setAuthorization("ota", "firmware");
+     this->m_http_client->setTimeout(2000);
 
-     int _httpCode = this->http_client->GET();
+     int _httpCode = this->m_http_client->GET();
 
      #ifdef EW_SERIAL_LOG
      Log( F("Http OTA version url Response code : ") );
      Logln( _httpCode );
      #endif
-     if ( _httpCode == HTTP_CODE_OK || _httpCode == HTTP_CODE_MOVED_PERMANENTLY ) {
+     if ( HTTP_CODE_OK == _httpCode || HTTP_CODE_MOVED_PERMANENTLY == _httpCode ) {
 
-       String _response = this->http_client->getString();
-       this->http_client->end();
+       String _response = this->m_http_client->getString();
+       this->m_http_client->end();
 
        int _rsponse_len = (_response.length()+1) > OTA_VERSION_API_RESP_LENGTH ? OTA_VERSION_API_RESP_LENGTH : (_response.length()+1) ;
-       char *_buf = new char[_rsponse_len]; memset( _buf, 0, _rsponse_len );
-       char *_version_buf = new char[OTA_VERSION_LENGTH]; memset( _version_buf, 0, OTA_VERSION_LENGTH );
+       char *_buf = new char[_rsponse_len];
+       if( nullptr == _buf ){
+         return UNKNOWN;
+       }
+       char *_version_buf = new char[OTA_VERSION_LENGTH];
+       if( nullptr == _version_buf ){
+         return UNKNOWN;
+       }
+       memset( _buf, 0, _rsponse_len );
+       memset( _version_buf, 0, OTA_VERSION_LENGTH );
        _response.toCharArray( _buf, _rsponse_len );
 
        if( __get_from_json( _buf, (char*)OTA_VERSION_KEY, _version_buf, OTA_VERSION_LENGTH ) ){
@@ -116,7 +143,7 @@ http_ota_status OtaServiceProvider::handle(){
 
            ESPhttpUpdate.rebootOnUpdate(false);
            ESPhttpUpdate.followRedirects(true);
-           t_httpUpdate_return ret = ESPhttpUpdate.update( *this->wifi_client, _firmware_bin_url );
+           t_httpUpdate_return ret = ESPhttpUpdate.update( *this->m_wifi_client, _firmware_bin_url );
 
            if( ret == HTTP_UPDATE_FAILED ){
 
@@ -154,7 +181,7 @@ http_ota_status OtaServiceProvider::handle(){
          return VERSION_JSON_ERROR;
        }
      }else{
-       this->http_client->end();
+       this->m_http_client->end();
        return VERSION_CHECK_FAILED;
      }
    }else{
