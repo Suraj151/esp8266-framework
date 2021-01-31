@@ -22,7 +22,7 @@ bool connectToServer( iWiFiClientInterface *client, char* host, uint16_t port, u
     #endif
     client->setTimeout(timeout);
     // client->keepAlive();
-    int result = client->connect( host, port);
+    result = client->connect( host, port);
   }
   #ifdef EW_SERIAL_LOG
   Log(F("Client: Connect result -: ")); Logln(result);
