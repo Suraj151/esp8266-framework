@@ -14,7 +14,7 @@ created Date    : 1st June 2019
 
 #define MQTT_HOST_BUF_SIZE      50
 #define MQTT_CLIENT_ID_BUF_SIZE 100
-#define MQTT_DEFAULT_KEEPALIVE  120     /*second*/
+#define MQTT_DEFAULT_KEEPALIVE  30      /*second*/
 #define MQTT_HOST_CONNECT_TIMEOUT  5    /*second*/
 #define MQTT_DEFAULT_PORT       1883
 #define MQTT_USERNAME_BUF_SIZE  25
@@ -31,7 +31,9 @@ created Date    : 1st June 2019
 /**
  * enable/disable mqtt default payload for publish if user not assigned explicitely
  */
+#ifndef ENABLE_DEVICE_IOT
 #define ENABLE_MQTT_DEFAULT_PAYLOAD
+#endif
 /**
  * enable/disable mqtt config modification here
  */

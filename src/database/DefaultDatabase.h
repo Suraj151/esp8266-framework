@@ -26,6 +26,9 @@ created Date    : 1st June 2019
 #ifdef ENABLE_EMAIL_SERVICE
 #include "EmailTable.h"
 #endif
+#ifdef ENABLE_DEVICE_IOT
+#include "DeviceIotTable.h"
+#endif
 
 
 /**
@@ -69,6 +72,10 @@ class DefaultDatabase {
     email_config_table get_email_config_table();
     #endif
 
+    #ifdef ENABLE_DEVICE_IOT
+    device_iot_config_table get_device_iot_config_table();
+    #endif
+
     void set_global_config_table( global_config_table* _table );
     void set_login_credential_table( login_credential_table* _table );
     void set_wifi_config_table( wifi_config_table* _table );
@@ -86,6 +93,10 @@ class DefaultDatabase {
 
     #ifdef ENABLE_EMAIL_SERVICE
     void set_email_config_table( email_config_table* _table );
+    #endif
+
+    #ifdef ENABLE_DEVICE_IOT
+    void set_device_iot_config_table( device_iot_config_table* _table );
     #endif
 
 };

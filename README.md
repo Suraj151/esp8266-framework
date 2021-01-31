@@ -175,6 +175,26 @@ As name clears the purpose of this utility. It just used to convert the data typ
 * **Logger :**
 Logger enables log on uart0 pins at 115200 baud rate. This is useful in case of debugging application flow.
 
+# Device Iot (beta)
+
+Added example of device iot where internal services take care of publishing/sending payload provided by device to mqtt iot server.
+currently MQTT server configs for device iot are configured from server with DEVICE_IOT_CONFIG_REQ_URL set in **config/DeviceIotConfig.h**.
+to DEVICE_IOT_CONFIG_REQ_URL http server should response the config includes
+* topic
+* password
+* keepalive
+* data rate
+* samples per data
+
+other configs like
+* clientid, username are kept as device mac by default
+* host, port can be configured in **config/DeviceIotConfig.h** file
+
+you can modify them as per requirements
+
+**Note** that currently mqtt configs (in **config/MqttConfig.h**/web portal) are not used for device iot purpose.
+
+by default this service is disabled. to enable, just uncomment ENABLE_DEVICE_IOT in **config/Common.h** file
 
 # Detailed Documentation
 Detailed documentation is ongoing..., please visit [wiki page](https://github.com/Suraj151/esp8266-framework/wiki)....

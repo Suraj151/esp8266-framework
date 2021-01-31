@@ -107,7 +107,7 @@ class HomeController : public Controller {
       #endif
 
 			if( nullptr == this->m_web_resource ||
-					nullptr == this->m_web_resource->m_server || 
+					nullptr == this->m_web_resource->m_server ||
 					nullptr == this->m_route_handler ){
 				return;
 			}
@@ -132,6 +132,9 @@ class HomeController : public Controller {
 				#endif
 				#ifdef ENABLE_EMAIL_SERVICE
 				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_EMAIL, SVG_ICON48_PATH_MAIL, EW_SERVER_EMAIL_CONFIG_ROUTE );
+				#endif
+				#ifdef ENABLE_DEVICE_IOT
+				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_DEVICE_REGISTER, SVG_ICON48_PATH_BEENHERE, EW_SERVER_DEVICE_REGISTER_CONFIG_ROUTE );
 				#endif
 				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_DASHBOARD, SVG_ICON48_PATH_DASHBOARD, EW_SERVER_DASHBOARD_ROUTE );
 				concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_LOGOUT, SVG_ICON48_PATH_POWER, EW_SERVER_LOGOUT_ROUTE );

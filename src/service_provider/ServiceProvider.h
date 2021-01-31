@@ -15,6 +15,8 @@ created Date    : 1st June 2019
 #include <interface/WiFiInterface.h>
 #include <interface/WiFiClientInterface.h>
 #include <interface/HttpClientInterface.h>
+#include <interface/iDeviceIotInterface.h>
+
 #include <config/Config.h>
 #include <utility/Utility.h>
 #include <database/DefaultDatabase.h>

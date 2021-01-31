@@ -75,6 +75,10 @@ void EwingsEspStack::initialize(){
   __task_scheduler.setInterval( [&]() { __espnow_service.handlePeers(); }, ESP_NOW_HANDLE_DURATION );
   #endif
 
+  #ifdef ENABLE_DEVICE_IOT
+  __device_iot_service.init( this->m_wifi, this->m_wifi_client );
+  #endif
+
   #ifdef ENABLE_EXCEPTION_NOTIFIER
   beginCrashHandler();
   #endif
@@ -153,6 +157,9 @@ void EwingsEspStack::handleLogPrints(){
   #endif
   #ifdef ENABLE_EMAIL_SERVICE
   __email_service.printEmailConfigLogs();
+  #endif
+  #ifdef ENABLE_DEVICE_IOT
+  __device_iot_service.printDeviceIotConfigLogs();
   #endif
   __task_scheduler.printTaskSchedulerLogs();
   Log( F("\nNTP Validity : ") );

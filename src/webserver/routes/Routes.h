@@ -34,6 +34,8 @@ created Date    : 1st June 2019
 #define EW_SERVER_MQTT_LWT_CONFIG_ROUTE "/mqtt-lwt-config"
 #define EW_SERVER_MQTT_PUBSUB_CONFIG_ROUTE "/mqtt-pubsub-config"
 
+#define EW_SERVER_DEVICE_REGISTER_CONFIG_ROUTE "/device-register-config"
+
 #endif
 
 // var _sv=document.getElementById('svga0');

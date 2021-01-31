@@ -25,6 +25,10 @@ created Date    : 1st June 2019
 #ifdef ENABLE_EMAIL_SERVICE
 #include <webserver/controllers/EmailConfigController.h>
 #endif
+#ifdef ENABLE_DEVICE_IOT
+#include <webserver/controllers/DeviceIotController.h>
+#endif
+
 
 /**
  * WebServer class
@@ -101,6 +105,12 @@ class WebServer {
 		 * @var	EmailConfigController  m_emailconfig_controller
 		 */
     EmailConfigController m_emailconfig_controller;
+    #endif
+    #ifdef ENABLE_DEVICE_IOT
+    /**
+		 * @var	DeviceIotController  m_device_iot_controller
+		 */
+    DeviceIotController   m_device_iot_controller;
     #endif
 
 };

@@ -34,6 +34,10 @@ created Date    : 1st June 2019
 #include "EmailConfig.h"
 #endif
 
+#ifdef ENABLE_DEVICE_IOT
+#include "DeviceIotConfig.h"
+#endif
+
 // #define GLOBAL_CONFIG_TABLE_ADDRESS CONFIG_START
 // #define LOGIN_CREDENTIAL_TABLE_ADDRESS GLOBAL_CONFIG_TABLE_ADDRESS +  global_config_size
 // #define WIFI_CONFIG_TABLE_ADDRESS LOGIN_CREDENTIAL_TABLE_ADDRESS + login_credential_size
@@ -65,6 +69,9 @@ enum eeprom_db_table_address {
   #endif
   #ifdef ENABLE_EMAIL_SERVICE
   EMAIL_CONFIG_TABLE_ADDRESS = 1900,
+  #endif
+  #ifdef ENABLE_DEVICE_IOT
+  DEVICE_IOT_CONFIG_TABLE_ADDRESS = 2500,
   #endif
 };
 

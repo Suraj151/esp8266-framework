@@ -62,6 +62,12 @@ MqttPubSubTable	__mqtt_pubsub_table;
 EmailTable	__email_table;
 #endif
 
+#ifdef ENABLE_DEVICE_IOT
+/**
+ * @var	DeviceIotTable	__device_iot_table
+ */
+DeviceIotTable	__device_iot_table;
+#endif
 
 
 /**
@@ -165,6 +171,17 @@ email_config_table DefaultDatabase::get_email_config_table(){
 }
 #endif
 
+#ifdef ENABLE_DEVICE_IOT
+/**
+ * get/fetch device iot config table from database.
+ *
+ * @return device_iot_config_table
+ */
+device_iot_config_table DefaultDatabase::get_device_iot_config_table(){
+  return __device_iot_table.get();
+}
+#endif
+
 /**
  * set global config table in database.
  *
@@ -252,5 +269,15 @@ void DefaultDatabase::set_email_config_table( email_config_table* _table ){
 }
 #endif
 
+#ifdef ENABLE_DEVICE_IOT
+/**
+ * set device iot config table in database.
+ *
+ * @param device_iot_config_table* _table
+ */
+void DefaultDatabase::set_device_iot_config_table( device_iot_config_table* _table ){
+  __device_iot_table.set( _table );
+}
+#endif
 
 DefaultDatabase __database_service;

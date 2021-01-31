@@ -19,7 +19,7 @@ static const char EW_SERVER_HEADER_HTML[] PROGMEM = "\
 <title>Device Manager</title>\
 <meta name='viewport' content='width=device-width, initial-scale=1.0, user-scalable=yes'>\
 <style>\
-.cntnr{\
+#cntnr{\
 border:1px solid #d0d0d0;\
 border-radius:10px;\
 max-width:350px;\
@@ -83,10 +83,23 @@ text-align:center;\
 background:none;\
 color:black;\
 }\
+.ldr{\
+border:4px solid #fff;\
+border-radius:50%;\
+border-top:4px solid #2196F3;\
+width:30px;\
+height:30px;\
+animation:spin 1s ease-in infinite;\
+margin:10px auto;\
+}\
+@keyframes spin{\
+0%{transform:rotate(0deg);}\
+100%{transform:rotate(360deg);}\
+}\
 </style>\
 </head>\
 <body>\
-<div class='cntnr'>\
+<div id='cntnr'>\
 <a href='/'><h1>Device Manager</h1></a>";
 
 #endif

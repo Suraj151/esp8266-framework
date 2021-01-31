@@ -114,4 +114,52 @@ rq.send();\
 </body>\
 </html>";
 
+#ifdef ENABLE_DEVICE_IOT
+
+static const char EW_SERVER_FOOTER_WITH_OTP_MONITOR_HTML[] PROGMEM = "\
+<tr>\
+<td></td>\
+<td>\
+<button id='otpbtn' class='btn' type='button' onclick='gotp()'>\
+Request OTP\
+</button>\
+</td>\
+</tr>\
+</table>\
+</form>\
+</div>\
+<script>\
+var isldr=0,\
+rq=new XMLHttpRequest(),\
+el=document.getElementById('cntnr'),\
+eldr=document.createElement('div');\
+function rql(){\
+var r=JSON.parse(this.responseText);\
+console.log('r',r);\
+if(r){\
+eldr.setAttribute('class','msg');\
+eldr.style.background=r.status?'#a6eaa8':'#f9dc87';\
+eldr.innerHTML=r.status?'OTP is <strong>'+r.otp+'</strong> : '+r.remark:r.remark;\
+isldr=0;\
+}\
+}\
+function gotp(){\
+if(!isldr){\
+eldr.setAttribute('class','ldr');\
+eldr.innerHTML='';\
+eldr.style.background='';\
+el.appendChild(eldr);\
+}\
+rq.addEventListener('load',rql);\
+rq.open('POST','/device-register-config');\
+var fd=new FormData(document.getElementById('drcf'));\
+rq.send(fd);\
+isldr=1;\
+}\
+</script>\
+</body>\
+</html>";
+
+#endif
+
 #endif

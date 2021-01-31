@@ -34,6 +34,11 @@ extern "C" {
 #define ENABLE_EMAIL_SERVICE
 
 /**
+ * enable/disable device iot feature here
+ */
+// #define ENABLE_DEVICE_IOT
+
+/**
  * enable/disable serial log
  */
 #define EW_SERIAL_LOG

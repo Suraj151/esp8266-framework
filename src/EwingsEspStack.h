@@ -48,6 +48,10 @@ created Date    : 1st June 2019
 #include <helpers/ExceptionsNotifier.h>
 #endif
 
+#ifdef ENABLE_DEVICE_IOT
+#include <service_provider/DeviceIotServiceProvider.h>
+#endif
+
 #if defined( ENABLE_NAPT_FEATURE )
 #include "lwip/lwip_napt.h"
 #include "lwip/app/dhcpserver.h"
