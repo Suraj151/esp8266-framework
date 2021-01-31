@@ -1,5 +1,5 @@
 /***************************** WiFiClient helper ******************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 
 /*   WiFi client support functions */
 
-bool connectToServer( WiFiClient *client, char* host, uint16_t port, uint16_t timeout ){
+bool connectToServer( iWiFiClientInterface *client, char* host, uint16_t port, uint16_t timeout ){
 
   int result = 0;
 
@@ -30,17 +30,17 @@ bool connectToServer( WiFiClient *client, char* host, uint16_t port, uint16_t ti
   return result != 0;
 }
 
-bool isConnected( WiFiClient *client ) {
+bool isConnected( iWiFiClientInterface *client ) {
 
   return ( nullptr != client ) ? client->connected() : false;
 }
 
-bool disconnect( WiFiClient *client ) {
+bool disconnect( iWiFiClientInterface *client ) {
 
   return isConnected(client) ? client->stop(500) : true;
 }
 
-bool sendPacket( WiFiClient *client, uint8_t *buffer, uint16_t len ) {
+bool sendPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t len ) {
 
   bool status = false;
 
@@ -99,7 +99,7 @@ bool sendPacket( WiFiClient *client, uint8_t *buffer, uint16_t len ) {
   return status;
 }
 
-uint16_t readPacket( WiFiClient *client, uint8_t *buffer, uint16_t maxlen, int16_t timeout ) {
+uint16_t readPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t maxlen, int16_t timeout ) {
 
   uint16_t len = 0;
   int16_t t = timeout;

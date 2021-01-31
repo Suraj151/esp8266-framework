@@ -1,5 +1,5 @@
-/************************** Ewings Esp8266 Stack ******************************
-This file is part of the Ewings Esp8266 Stack.
+/***************************** Ewings Esp Stack *******************************
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -8,12 +8,14 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EWINGS_ESP8266_STACK_H_
-#define _EWINGS_ESP8266_STACK_H_
+#ifndef _EWINGS_ESP_STACK_H_
+#define _EWINGS_ESP_STACK_H_
 
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
 #include <config/Config.h>
+
+#include <interface/WiFiInterface.h>
+#include <interface/WiFiClientInterface.h>
+#include <interface/HttpClientInterface.h>
 
 #ifdef ENABLE_EWING_HTTP_SERVER
 #include <webserver/EwingsWebServer.h>
@@ -56,20 +58,20 @@ created Date    : 1st June 2019
 #endif
 
 /**
- * EwingsEsp8266Stack class
+ * EwingsEspStack class
  */
-class EwingsEsp8266Stack {
+class EwingsEspStack {
 
   public:
 
     /**
-     * EwingsEsp8266Stack constructor.
+     * EwingsEspStack constructor.
      */
-    EwingsEsp8266Stack();
+    EwingsEspStack();
     /**
-     * EwingsEsp8266Stack destructor.
+     * EwingsEspStack destructor.
      */
-    ~EwingsEsp8266Stack();
+    ~EwingsEspStack();
 
     void initialize( void );
     void serve( void );
@@ -83,15 +85,19 @@ class EwingsEsp8266Stack {
     #endif
 
     /**
-		 * @var	ESP8266WiFiClass*|&WiFi m_wifi
+		 * @var	iWiFiInterface*   m_wifi
 		 */
-    ESP8266WiFiClass  *m_wifi;
+    iWiFiInterface        *m_wifi;
     /**
-		 * @var	WiFiClient  m_wifi_client
+		 * @var	iWiFiClientInterface*  m_wifi_client
 		 */
-    WiFiClient        m_wifi_client;
+    iWiFiClientInterface  *m_wifi_client;
+    /**
+		 * @var	iHttpClientInterface*  m_http_client
+		 */
+    iHttpClientInterface  *m_http_client;
 };
 
-extern EwingsEsp8266Stack EwStack;
+extern EwingsEspStack EwStack;
 
 #endif

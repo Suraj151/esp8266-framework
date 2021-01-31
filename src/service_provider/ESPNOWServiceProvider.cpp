@@ -1,5 +1,5 @@
 /******************************* ESPNOW service ********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -232,7 +232,7 @@ void ESPNOWServiceProvider::unregisterCallbacks(void) {
   esp_now_unregister_recv_cb();
 }
 
-void ESPNOWServiceProvider::beginEspNow( ESP8266WiFiClass* _wifi ){
+void ESPNOWServiceProvider::beginEspNow( iWiFiInterface* _wifi ){
 
   #ifdef EW_SERIAL_LOG
   Logln(F("espnow: begin"));

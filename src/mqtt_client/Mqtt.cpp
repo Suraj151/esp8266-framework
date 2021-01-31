@@ -1,5 +1,5 @@
 /******************************** MQTT File ***********************************
-This file is part of the Ewings Esp8266 Stack. It is written with the reference
+This file is part of the Ewings Esp Stack. It is written with the reference
 of https://github.com/tuanpmt/esp_mqtt
 
 
@@ -807,7 +807,7 @@ MQTTClient::~MQTTClient(){
   this->mqtt_client_delete();
 }
 
-bool MQTTClient::begin( ESP8266WiFiClass *_wifi, mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs ){
+bool MQTTClient::begin( iWiFiInterface *_wifi, mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs ){
 
   if( nullptr == _wifi || nullptr == _mqtt_general_configs || nullptr == _mqtt_lwt_configs ){
     return false;
@@ -1071,7 +1071,7 @@ void MQTTClient::Connect(){
 
     if ( nullptr == this->m_wifi_client ) {
 
-      this->m_wifi_client = new WiFiClient;
+      this->m_wifi_client = new WiFiClientInterface;
     }
     this->m_mqttClient.keepAliveTick = 0;
     this->m_mqttClient.host_connect_tick = 0;

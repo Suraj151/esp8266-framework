@@ -1,5 +1,5 @@
 /*************************** Http Protocol service ****************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -12,7 +12,6 @@ created Date    : 1st June 2019
 #define _HTTP_SERVICE_PROVIDER_H_
 
 #include <service_provider/ServiceProvider.h>
-#include <ESP8266HTTPClient.h>
 
 /**
  * HttpServiceProvider class
@@ -32,9 +31,9 @@ class HttpServiceProvider : public ServiceProvider {
     ~HttpServiceProvider();
 
     /**
-		 * @var	HTTPClient  http_service
+		 * @var	iHttpClientInterface*  m_http_client
 		 */
-    HTTPClient  m_client;
+    iHttpClientInterface  *m_http_client;
     /**
 		 * @var	char array m_host
 		 */

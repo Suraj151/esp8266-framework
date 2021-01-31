@@ -1,5 +1,5 @@
-/************************** Ewings Esp8266 Stack ******************************
-This file is part of the Ewings Esp8266 Stack.
+/**************************** Ewings Esp Stack *********************************
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -7,28 +7,32 @@ warranty.
 Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
-#include "EwingsEsp8266Stack.h"
+#include "EwingsEspStack.h"
 
 /**
- * EwingsEsp8266Stack constructor.
+ * EwingsEspStack constructor.
  */
-EwingsEsp8266Stack::EwingsEsp8266Stack():
-  m_wifi(&WiFi)
+EwingsEspStack::EwingsEspStack():
+  m_wifi(&__wifi_interface),
+  m_wifi_client(&__wifi_client_interface),
+  m_http_client(&__http_client_interface)
 {
 
 }
 
 /**
- * EwingsEsp8266Stack destructor.
+ * EwingsEspStack destructor.
  */
-EwingsEsp8266Stack::~EwingsEsp8266Stack(){
+EwingsEspStack::~EwingsEspStack(){
   this->m_wifi = nullptr;
+  this->m_wifi_client = nullptr;
+  this->m_http_client = nullptr;
 }
 
 /**
  * initialize all required features/services/actions.
  */
-void EwingsEsp8266Stack::initialize(){
+void EwingsEspStack::initialize(){
 
   #ifdef EW_SERIAL_LOG
   LogBegin(115200);
@@ -47,16 +51,16 @@ void EwingsEsp8266Stack::initialize(){
   #ifdef ENABLE_EWING_HTTP_SERVER
   __web_server.start_server( this->m_wifi );
   #endif
-  __ota_service.begin_ota( &this->m_wifi_client, &__http_service.m_client );
+  __ota_service.begin_ota( this->m_wifi_client, this->m_http_client );
   #ifdef ENABLE_GPIO_SERVICE
-  __gpio_service.begin( this->m_wifi, &this->m_wifi_client );
+  __gpio_service.begin( this->m_wifi, this->m_wifi_client );
   #endif
   #ifdef ENABLE_MQTT_SERVICE
   __mqtt_service.begin( this->m_wifi );
   #endif
 
   #ifdef ENABLE_EMAIL_SERVICE
-  __email_service.begin( this->m_wifi, &this->m_wifi_client );
+  __email_service.begin( this->m_wifi, this->m_wifi_client );
   #endif
 
   #ifdef EW_SERIAL_LOG
@@ -80,7 +84,7 @@ void EwingsEsp8266Stack::initialize(){
 /**
  * enable napt feature
  */
-void EwingsEsp8266Stack::enable_napt_service(){
+void EwingsEspStack::enable_napt_service(){
 
   // Initialize the NAT feature
   ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
@@ -97,7 +101,7 @@ void EwingsEsp8266Stack::enable_napt_service(){
 /**
  * enable napt feature
  */
-void EwingsEsp8266Stack::enable_napt_service(){
+void EwingsEspStack::enable_napt_service(){
 
   // Initialize the NAPT feature
   err_t ret = ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
@@ -125,7 +129,7 @@ void EwingsEsp8266Stack::enable_napt_service(){
 /**
  * serve each internal action, client request, auto operations
  */
-void EwingsEsp8266Stack::serve(){
+void EwingsEspStack::serve(){
 
   #ifdef ENABLE_EWING_HTTP_SERVER
   __web_server.handle_clients();
@@ -137,7 +141,7 @@ void EwingsEsp8266Stack::serve(){
 /**
  * prints log as per defined duration
  */
-void EwingsEsp8266Stack::handleLogPrints(){
+void EwingsEspStack::handleLogPrints(){
 
   __wifi_service.printWiFiConfigLogs();
   __ota_service.printOtaConfigLogs();
@@ -158,4 +162,4 @@ void EwingsEsp8266Stack::handleLogPrints(){
 }
 #endif
 
-EwingsEsp8266Stack EwStack;
+EwingsEspStack EwStack;

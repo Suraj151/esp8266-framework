@@ -1,5 +1,5 @@
 /******************************** MQTT File ***********************************
-This file is part of the Ewings Esp8266 Stack. It is referred from
+This file is part of the Ewings Esp Stack. It is referred from
 https://github.com/tuanpmt/esp_mqtt
 
 

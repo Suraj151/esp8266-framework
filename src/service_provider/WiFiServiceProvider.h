@@ -1,5 +1,5 @@
 /************************ N/W Time Protocol service ***************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -31,7 +31,7 @@ class WiFiServiceProvider : public ServiceProvider {
 		 */
 		~WiFiServiceProvider();
 
-    void begin( ESP8266WiFiClass* _wifi );
+    void begin( iWiFiInterface* _wifi );
     bool configure_wifi_access_point( wifi_config_table* _wifi_credentials );
     bool configure_wifi_station( wifi_config_table* _wifi_credentials, uint8_t* mac = nullptr );
 
@@ -65,9 +65,9 @@ class WiFiServiceProvider : public ServiceProvider {
 
   protected:
     /**
-		 * @var	ESP8266WiFiClass*|&WiFi wifi
+		 * @var	iWiFiInterface*|&WiFi wifi
 		 */
-    ESP8266WiFiClass  *m_wifi;
+    iWiFiInterface  *m_wifi;
 };
 
 extern WiFiServiceProvider __wifi_service;

@@ -1,5 +1,5 @@
 /******************************** MQTT File ***********************************
-This file is part of the Ewings Esp8266 Stack. It is written with the reference
+This file is part of the Ewings Esp Stack. It is written with the reference
 of https://github.com/tuanpmt/esp_mqtt
 
 
@@ -12,10 +12,9 @@ created Date    : 1st June 2019
 #ifndef EW_MQTT_CLIENT_SERVICE_H
 #define EW_MQTT_CLIENT_SERVICE_H
 
-#include <Arduino.h>
 #include <Esp.h>
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
+#include <interface/WiFiInterface.h>
+#include <interface/WiFiClientInterface.h>
 #include <utility/Utility.h>
 #include <utility/Log.h>
 #include "Mqtt_msg.h"
@@ -119,10 +118,10 @@ class MQTTClient{
 		MQTTClient();
 		~MQTTClient();
 
-		bool begin( ESP8266WiFiClass* _wifi, mqtt_general_config_table* _mqtt_general_configs, mqtt_lwt_config_table* _mqtt_lwt_configs );
+		bool begin( iWiFiInterface *_wifi, mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs );
 		void InitConnection( char* host, int port=MQTT_DEFAULT_PORT, uint8_t security=0 );
-		void InitClient( char* client_id, char* client_user, char* client_pass, uint32_t keepAliveTime=MQTT_DEFAULT_KEEPALIVE, uint8_t cleanSession=1 );
-		void InitLWT( char* will_topic, char* will_msg, uint8_t will_qos, uint8_t will_retain );
+		void InitClient( char *client_id, char *client_user, char *client_pass, uint32_t keepAliveTime=MQTT_DEFAULT_KEEPALIVE, uint8_t cleanSession=1 );
+		void InitLWT( char *will_topic, char *will_msg, uint8_t will_qos, uint8_t will_retain );
 
 		void OnConnected( MqttCallback connectedCb );
 		void OnDisconnected( MqttCallback disconnectedCb );
@@ -136,17 +135,17 @@ class MQTTClient{
 		bool UnSubscribe( char* topic );
 		void Connect( void );
 		void Disconnect( void );
-		bool Publish( const char* topic, const char* data, int data_length, int qos, int retain );
+		bool Publish( const char *topic, const char *data, int data_length, int qos, int retain );
 		void DeleteClient( void );
 
 		void mqtt_timer( void );
 		void MQTT_Task( void );
 
 		bool is_mqtt_connected( void );
-		bool is_topic_subscribed( char* _topic );
+		bool is_topic_subscribed( char *_topic );
 		void clear_all_subscribed_topics( void );
-		void add_to_subscribed_topics( char* _topic, uint8_t _qos );
-		bool remove_from_subscribed_topics( char* _topic );
+		void add_to_subscribed_topics( char *_topic, uint8_t _qos );
+		bool remove_from_subscribed_topics( char *_topic );
 
 		MQTT_Client 				m_mqttClient;
 		uint32_t 						*m_mqttDataCallbackArgs;
@@ -157,8 +156,8 @@ class MQTTClient{
 		int 								m_port;
 		uint8_t 						m_security;
 
-		WiFiClient					*m_wifi_client;
-		ESP8266WiFiClass		*m_wifi;
+		iWiFiClientInterface	*m_wifi_client;
+		iWiFiInterface				*m_wifi;
 
 		MqttCallback 				m_connectedCb;
 		MqttCallback 				m_disconnectedCb;

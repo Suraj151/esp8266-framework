@@ -5,7 +5,7 @@
  *
  */
 
-#include <EwingsEsp8266Stack.h>
+#include <EwingsEspStack.h>
 
 
 #if defined(ENABLE_EWING_HTTP_SERVER)
@@ -32,7 +32,7 @@ class TestController : public Controller {
      * handler method will only call if user is authenticated before with login credentials.
 		 */
 		void boot( void ){
-			this->route_handler->register_route( "/test-route", [&]() { this->handleTestRoute(); }, AUTH_MIDDLEWARE );
+			this->m_route_handler->register_route( "/test-route", [&]() { this->handleTestRoute(); }, AUTH_MIDDLEWARE );
 		}
 
     /**
@@ -72,7 +72,7 @@ class TestController : public Controller {
       /**
        * finally send response and deallocate page
   		 */
-      this->web_resource->server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
     }
 };

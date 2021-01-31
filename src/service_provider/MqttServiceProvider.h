@@ -1,5 +1,5 @@
 /****************************** Mqtt service **********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -39,7 +39,7 @@ class MqttServiceProvider : public ServiceProvider {
 		 */
     ~MqttServiceProvider();
 
-    void begin( ESP8266WiFiClass* _wifi );
+    void begin( iWiFiInterface* _wifi );
     void handleMqttPublish( void );
     void handleMqttSubScribe( void );
     void handleMqttConfigChange( int _mqtt_config_type=MQTT_GENERAL_CONFIG );
@@ -84,9 +84,9 @@ class MqttServiceProvider : public ServiceProvider {
   protected:
 
     /**
-		 * @var	ESP8266WiFiClass*|&WiFi wifi
+		 * @var	iWiFiInterface*|&WiFi wifi
 		 */
-    ESP8266WiFiClass        *m_wifi;
+    iWiFiInterface          *m_wifi;
 };
 
 extern MqttServiceProvider __mqtt_service;

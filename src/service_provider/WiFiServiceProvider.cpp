@@ -1,5 +1,5 @@
 /******************************* WiFi service *********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 
 extern "C" void preinit() {
 #ifdef ENABLE_NAPT_FEATURE_LWIP_V2
-  ESP8266WiFiClass::preinitWiFiOff();
+  WiFiInterface::preinitWiFiOff();
 #endif
   ESP.eraseConfig();
 	uint8_t sta_mac[6];
@@ -45,7 +45,7 @@ WiFiServiceProvider::~WiFiServiceProvider(){
 /**
  * begin wifi functionality
  */
-void WiFiServiceProvider::begin( ESP8266WiFiClass* _wifi ){
+void WiFiServiceProvider::begin( iWiFiInterface* _wifi ){
 
   if ( nullptr == _wifi ) {
     return;

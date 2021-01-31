@@ -3,7 +3,7 @@
  * This example illustrate adding tasks in framework
  */
 
-#include <EwingsEsp8266Stack.h>
+#include <EwingsEspStack.h>
 
 int variable_time_task_id = 0;
 

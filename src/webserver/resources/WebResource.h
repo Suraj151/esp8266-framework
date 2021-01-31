@@ -1,5 +1,5 @@
 /****************************** Web Resource **********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -11,7 +11,7 @@ created Date    : 1st June 2019
 #ifndef _WEB_RESOURCE_PROVIDER_
 #define _WEB_RESOURCE_PROVIDER_
 
-#include <ESP8266WiFi.h>
+#include <interface/WiFiInterface.h>
 #include <ESP8266WebServer.h>
 #include <utility/Utility.h>
 #include <database/DefaultDatabase.h>
@@ -55,14 +55,14 @@ class WebResourceProvider {
 		 */
     ~WebResourceProvider();
 
-    void collect_resource( ESP8266WebServer* _server, ESP8266WiFiClass* _wifi );
+    void collect_resource( ESP8266WebServer *_server, iWiFiInterface *_wifi );
 
   // protected:
 
     /**
-		 * @var	ESP8266WiFiClass*  m_wifi
+		 * @var	iWiFiInterface*  m_wifi
 		 */
-    ESP8266WiFiClass    *m_wifi;
+    iWiFiInterface      *m_wifi;
     /**
 		 * @var	ESP8266WebServer*	m_server
 		 */

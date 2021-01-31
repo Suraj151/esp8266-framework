@@ -2,7 +2,7 @@
  * should serve in loop continueously
  */
 
-#include <EwingsEsp8266Stack.h>
+#include <EwingsEspStack.h>
 
 void setup() {
  EwStack.initialize();

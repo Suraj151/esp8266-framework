@@ -1,5 +1,5 @@
 /******************************* ESPNOW service ********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -48,7 +48,7 @@ class ESPNOWServiceProvider : public ServiceProvider{
      */
     ~ESPNOWServiceProvider();
 
-    void beginEspNow( ESP8266WiFiClass* _wifi );
+    void beginEspNow( iWiFiInterface* _wifi );
     void handlePeers(void);
     void scanPeers(void);
     void printPeers(void);
@@ -77,9 +77,9 @@ class ESPNOWServiceProvider : public ServiceProvider{
   protected:
 
     /**
-		 * @var	ESP8266WiFiClass*  m_wifi
+		 * @var	iWiFiInterface*  m_wifi
 		 */
-    ESP8266WiFiClass  *m_wifi;
+    iWiFiInterface  *m_wifi;
 
 };
 

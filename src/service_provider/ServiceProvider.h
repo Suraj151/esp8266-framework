@@ -1,5 +1,5 @@
 /***************************** service provider *******************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -12,7 +12,9 @@ created Date    : 1st June 2019
 #define _SERVICE_PROVIDER_H_
 
 
-#include <ESP8266WiFi.h>
+#include <interface/WiFiInterface.h>
+#include <interface/WiFiClientInterface.h>
+#include <interface/HttpClientInterface.h>
 #include <config/Config.h>
 #include <utility/Utility.h>
 #include <database/DefaultDatabase.h>

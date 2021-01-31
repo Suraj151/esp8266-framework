@@ -1,5 +1,5 @@
 /****************************** Mqtt service **********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -45,7 +45,7 @@ MqttServiceProvider::~MqttServiceProvider(){
 /**
  * start mqtt service. initialize it with mqtt configs at database
  */
-void MqttServiceProvider::begin( ESP8266WiFiClass* _wifi ){
+void MqttServiceProvider::begin( iWiFiInterface* _wifi ){
 
   this->m_wifi = _wifi;
   this->m_mqtt_payload = new char[ MQTT_PAYLOAD_BUF_SIZE ];

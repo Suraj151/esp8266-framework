@@ -1,7 +1,7 @@
 /* Demo example about how to use mqtt service provider
  */
 
-#include <EwingsEsp8266Stack.h>
+#include <EwingsEspStack.h>
 
 // mqtt grneral configuration
 #define MQTT_HOST             "---mqtt host---"

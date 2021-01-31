@@ -1,5 +1,5 @@
 /****************************** ping service **********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -55,7 +55,7 @@ PingServiceProvider::~PingServiceProvider(){
   this->m_wifi = nullptr;
 }
 
-void PingServiceProvider::init_ping( ESP8266WiFiClass* _wifi ){
+void PingServiceProvider::init_ping( iWiFiInterface* _wifi ){
 
   this->m_wifi = _wifi;
   memset(&this->m_opt, 0, sizeof(struct ping_option));

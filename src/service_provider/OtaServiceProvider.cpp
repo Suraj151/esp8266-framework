@@ -1,5 +1,5 @@
 /************** Over The Air firmware update service **************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -31,11 +31,11 @@ OtaServiceProvider::~OtaServiceProvider(){
  * begin ota with client and database configs
  * schedule task for ota check once in perticuler duration
  *
- * @param WiFiClient*	      _wifi_client
- * @param HTTPClient*	      _http_client
- * @param DefaultDatabase*	_database
+ * @param iWiFiClientInterface* _wifi_client
+ * @param iHttpClientInterface*	_http_client
+ * @param DefaultDatabase*      _database
  */
-void OtaServiceProvider::begin_ota( WiFiClient* _wifi_client, HTTPClient* _http_client ){
+void OtaServiceProvider::begin_ota( iWiFiClientInterface *_wifi_client, iHttpClientInterface *_http_client ){
 
   this->m_wifi_client = _wifi_client;
   this->m_http_client = _http_client;
@@ -143,7 +143,7 @@ http_ota_status OtaServiceProvider::handle(){
 
            ESPhttpUpdate.rebootOnUpdate(false);
            ESPhttpUpdate.followRedirects(true);
-           t_httpUpdate_return ret = ESPhttpUpdate.update( *this->m_wifi_client, _firmware_bin_url );
+           t_httpUpdate_return ret = ESPhttpUpdate.update( *(this->m_wifi_client->getWiFiClient()), _firmware_bin_url );
 
            if( ret == HTTP_UPDATE_FAILED ){
 

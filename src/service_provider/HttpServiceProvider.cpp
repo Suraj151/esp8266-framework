@@ -1,5 +1,5 @@
 /*************************** Http Protocol service ****************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -14,6 +14,7 @@ created Date    : 1st June 2019
  * HttpServiceProvider constructor.
  */
 HttpServiceProvider::HttpServiceProvider():
+  m_http_client(&__http_client_interface),
   m_port(80),
   m_retry(HTTP_REQUEST_RETRY)
 {
@@ -24,6 +25,7 @@ HttpServiceProvider::HttpServiceProvider():
  * HttpServiceProvider destructor
  */
 HttpServiceProvider::~HttpServiceProvider(){
+  this->m_http_client = nullptr;
 }
 
 /**
@@ -39,10 +41,10 @@ bool HttpServiceProvider::followHttpRequest( int _httpCode ){
   Log( F("Http Request Status Code : ") ); Logln( _httpCode );
   if ( _httpCode == HTTP_CODE_OK || _httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
     Log( F("Http Response : ") );
-    Logln( this->m_client.getString() );
+    Logln( this->m_http_client->getString() );
   }
   #endif
-  this->m_client.end();
+  this->m_http_client->end();
 
   if( _httpCode < 0 && this->m_retry > 0 ){
     this->m_retry--;

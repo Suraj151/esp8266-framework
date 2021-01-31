@@ -1,5 +1,5 @@
 /****************************** Gpio service **********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -40,7 +40,7 @@ GpioServiceProvider::~GpioServiceProvider(){
 /**
  * start gpio services if enabled
  */
-void GpioServiceProvider::begin( ESP8266WiFiClass* _wifi, WiFiClient* _wifi_client ){
+void GpioServiceProvider::begin( iWiFiInterface* _wifi, iWiFiClientInterface* _wifi_client ){
 
   if( nullptr == _wifi || nullptr == _wifi_client ){
     return;
@@ -71,18 +71,18 @@ void GpioServiceProvider::handleGpioHttpRequest( ){
 
   if( strlen( __http_service.m_host ) > 5 && __http_service.m_port > 0 &&
     this->m_gpio_config_copy.gpio_post_frequency > 0 &&
-    __http_service.m_client.begin( *this->m_wifi_client, __http_service.m_host )
+    __http_service.m_http_client->begin( *this->m_wifi_client, __http_service.m_host )
   ){
 
     String _payload = "";
     this->appendGpioJsonPayload( _payload );
 
-    __http_service.m_client.setUserAgent("Ewings");
-    __http_service.m_client.addHeader("Content-Type", "application/json");
-    __http_service.m_client.setAuthorization("user", "password");
-    __http_service.m_client.setTimeout(2000);
+    __http_service.m_http_client->setUserAgent("Ewings");
+    __http_service.m_http_client->addHeader("Content-Type", "application/json");
+    __http_service.m_http_client->setAuthorization("user", "password");
+    __http_service.m_http_client->setTimeout(2000);
 
-    int _httpCode = __http_service.m_client.POST( _payload );
+    int _httpCode = __http_service.m_http_client->POST( _payload );
 
     if( __http_service.followHttpRequest( _httpCode ) ) this->handleGpioHttpRequest();
 

@@ -1,5 +1,5 @@
 /******************************* Email service *********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -37,10 +37,10 @@ EmailServiceProvider::~EmailServiceProvider(){
 /**
  * begin email service with wifi and client
  *
- * @param ESP8266WiFiClass*	_wifi
- * @param WiFiClient*	      _wifi_client
+ * @param iWiFiInterface*	  _wifi
+ * @param iWiFiClientInterface*	      _wifi_client
  */
-void EmailServiceProvider::begin( ESP8266WiFiClass *_wifi, WiFiClient *_wifi_client ){
+void EmailServiceProvider::begin( iWiFiInterface *_wifi, iWiFiClientInterface *_wifi_client ){
 
   this->m_wifi = _wifi;
   this->m_wifi_client = _wifi_client;

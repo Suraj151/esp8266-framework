@@ -1,9 +1,9 @@
-# EwingsEsp8266Stack
+# EwingsEspStack
 
-Ewings Framework is cover all essential things to build ESP8266 IoT applications easily.
+Ewings Framework covers all essential things to build ESP8266 IoT applications easily.
 Basically it is designed on the top of arduino-esp8266 layer to make things easy to understand for developers.
 
-**Ewings Esp8266 Framework Structure**
+**Ewings Esp Framework Structure**
 
 
 <p align="center">

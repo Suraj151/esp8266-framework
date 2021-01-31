@@ -1,5 +1,5 @@
 /****************************** ping service **********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -39,7 +39,7 @@ class PingServiceProvider : public ServiceProvider {
     /**
      * initialize ping
      */
-    void init_ping( ESP8266WiFiClass* _wifi );
+    void init_ping( iWiFiInterface* _wifi );
     bool ping( void );
     bool isHostRespondingToPing( void );
 
@@ -48,9 +48,9 @@ class PingServiceProvider : public ServiceProvider {
 
   protected:
     /**
-		 * @var	ESP8266WiFiClass*|&WiFi wifi
+		 * @var	iWiFiInterface*|&WiFi wifi
 		 */
-    ESP8266WiFiClass  *m_wifi;
+    iWiFiInterface  *m_wifi;
 };
 
 extern PingServiceProvider __ping_service;

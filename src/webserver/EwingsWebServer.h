@@ -1,5 +1,5 @@
 /******************************** web server **********************************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -42,7 +42,7 @@ class WebServer {
      */
     ~WebServer();
 
-    void start_server( ESP8266WiFiClass* _wifi );
+    void start_server( iWiFiInterface* _wifi );
     void handle_clients( void );
 
   protected:
@@ -51,9 +51,9 @@ class WebServer {
 		 */
     ESP8266WebServer  m_server;
     /**
-		 * @var	ESP8266WiFiClass*|&WiFi m_wifi
+		 * @var	iWiFiInterface*|&WiFi m_wifi
 		 */
-    ESP8266WiFiClass  *m_wifi;
+    iWiFiInterface    *m_wifi;
 
 
 

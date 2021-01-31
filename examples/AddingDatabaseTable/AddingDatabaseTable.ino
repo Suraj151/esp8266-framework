@@ -3,7 +3,7 @@
  * This example illustrate adding table to database
  */
 
-#include <EwingsEsp8266Stack.h>
+#include <EwingsEspStack.h>
 
 
 #if defined(ENABLE_EWING_HTTP_SERVER)

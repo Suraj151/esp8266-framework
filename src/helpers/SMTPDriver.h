@@ -1,5 +1,5 @@
 /*********** SMTP (Simple Mail Transfer Protocol) Driver **********************
-This file is part of the Ewings Esp8266 Stack.
+This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -11,8 +11,7 @@ created Date    : 1st June 2019
 #ifndef _SMTP_DRIVER_H_
 #define _SMTP_DRIVER_H_
 
-#include <ESP8266WiFi.h>
-#include <WiFiClient.h>
+#include <interface/iWiFiClientInterface.h>
 #include <config/Config.h>
 #include <utility/Utility.h>
 #include <utility/Base64.h>
@@ -146,7 +145,7 @@ class SMTPdriver {
     SMTPdriver();
     ~SMTPdriver();
 
-    bool begin( WiFiClient *_client, char *_host, uint16_t _port );
+    bool begin( iWiFiClientInterface *_client, char *_host, uint16_t _port );
     void readResponse( void );
     void flushClient( void );
     void startReadResponse( uint16_t _timeOut=SMTP_DEFAULT_TIMEOUT );
@@ -170,7 +169,7 @@ class SMTPdriver {
 
   protected:
 
-    WiFiClient    *m_client;
+    iWiFiClientInterface    *m_client;
     uint16_t      m_port;
     int           m_lastResponseCode;
     uint16_t      m_responseBufferIndex;
