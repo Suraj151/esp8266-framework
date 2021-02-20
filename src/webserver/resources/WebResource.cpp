@@ -32,10 +32,10 @@ WebResourceProvider::~WebResourceProvider(){
 /**
  * collect resources for web services
  *
- * @param ESP8266WebServer* _server
+ * @param iWiFiServerInterface* _server
  * @param iWiFiInterface*   _wifi
  */
-void WebResourceProvider::collect_resource( ESP8266WebServer *_server, iWiFiInterface *_wifi ){
+void WebResourceProvider::collect_resource( iWiFiInterface *_wifi, iWiFiServerInterface *_server ){
 
   this->m_server = _server;
   this->m_db_conn = &__database_service;

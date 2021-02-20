@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _WEB_RESOURCE_PROVIDER_
 
 #include <interface/WiFiInterface.h>
-#include <ESP8266WebServer.h>
+#include <interface/WiFiServerInterface.h>
 #include <utility/Utility.h>
 #include <database/DefaultDatabase.h>
 #include <webserver/routes/Routes.h>
@@ -55,22 +55,22 @@ class WebResourceProvider {
 		 */
     ~WebResourceProvider();
 
-    void collect_resource( ESP8266WebServer *_server, iWiFiInterface *_wifi );
+    void collect_resource( iWiFiInterface *_wifi, iWiFiServerInterface *_server );
 
   // protected:
 
     /**
 		 * @var	iWiFiInterface*  m_wifi
 		 */
-    iWiFiInterface      *m_wifi;
+    iWiFiInterface        *m_wifi;
     /**
-		 * @var	ESP8266WebServer*	m_server
+		 * @var	iWiFiServerInterface*	m_server
 		 */
-    ESP8266WebServer    *m_server;
+    iWiFiServerInterface  *m_server;
     /**
 		 * @var	DefaultDatabase*  m_db_conn
 		 */
-    DefaultDatabase     *m_db_conn;
+    DefaultDatabase       *m_db_conn;
 
 };
 

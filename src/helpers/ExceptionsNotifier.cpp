@@ -147,7 +147,7 @@ void saveCrashToSpiffs(struct rst_info *rst_info, uint32_t stack, uint32_t stack
 
 
 /**
- * This function is called automatically if ESP8266 suffers an exception
+ * This function is called automatically if ESP suffers an exception
  * It should be kept quick / consise to be able to execute before hardware wdt may kick in
  */
 extern "C" void custom_crash_callback(struct rst_info * rst_info, uint32_t stack, uint32_t stack_end ){

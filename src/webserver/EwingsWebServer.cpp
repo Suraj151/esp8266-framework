@@ -18,7 +18,8 @@ created Date    : 1st June 2019
  * WebServer constructor.
  */
 WebServer::WebServer():
-  m_wifi(nullptr)
+  m_wifi(nullptr),
+  m_server(&__wifi_server_interface)
 {
 }
 
@@ -35,7 +36,7 @@ WebServer::~WebServer(){
 void WebServer::start_server( iWiFiInterface* _wifi ){
 
   this->m_wifi = _wifi;
-  __web_resource.collect_resource( &this->m_server, this->m_wifi );
+  __web_resource.collect_resource( this->m_wifi, this->m_server );
 
   for (int i = 0; i < Controller::m_controllers.size(); i++) {
     #ifdef EW_SERIAL_LOG
@@ -48,9 +49,11 @@ void WebServer::start_server( iWiFiInterface* _wifi ){
   // const char * headerkeys[] = {"User-Agent", "Cookie"} ;
   const char *headerkeys[] = {"Cookie"} ;
   size_t headerkeyssize = sizeof(headerkeys) / sizeof(char*);
-  //ask server to track these headers
-  this->m_server.collectHeaders(headerkeys, headerkeyssize);
-  this->m_server.begin();
+  // ask server to track these headers
+  this->m_server->collectHeaders(headerkeys, headerkeyssize);
+
+  // start the server
+  this->m_server->begin();
   #ifdef EW_SERIAL_LOG
   Logln(F("HTTP server started !"));
   #endif
@@ -61,7 +64,7 @@ void WebServer::start_server( iWiFiInterface* _wifi ){
  */
 void WebServer::handle_clients(){
 
-  this->m_server.handleClient();
+  this->m_server->handleClient();
 }
 
 WebServer __web_server;

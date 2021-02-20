@@ -51,15 +51,13 @@ class WebServer {
 
   protected:
     /**
-		 * @var	ESP8266WebServer  m_server
+		 * @var	iWiFiServerInterface  m_server
 		 */
-    ESP8266WebServer  m_server;
+    iWiFiServerInterface  *m_server;
     /**
 		 * @var	iWiFiInterface*|&WiFi m_wifi
 		 */
-    iWiFiInterface    *m_wifi;
-
-
+    iWiFiInterface        *m_wifi;
 
   private:
     /**

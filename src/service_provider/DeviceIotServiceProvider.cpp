@@ -98,7 +98,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
     __http_service.m_http_client->begin( *this->m_wifi_client, __http_service.m_host )
   ){
 
-    __http_service.m_http_client->setUserAgent("esp8266");
+    __http_service.m_http_client->setUserAgent("esp");
     __http_service.m_http_client->setAuthorization("iot-otp", macStr);
     __http_service.m_http_client->setTimeout(2*MILLISECOND_DURATION_1000);
 
@@ -155,7 +155,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
   if( strlen( __http_service.m_host ) > 5 &&
     __http_service.m_http_client->begin( *this->m_wifi_client, __http_service.m_host )
   ){
-    __http_service.m_http_client->setUserAgent("esp8266");
+    __http_service.m_http_client->setUserAgent("esp");
     __http_service.m_http_client->setAuthorization("iot-otp", macStr);
     __http_service.m_http_client->setTimeout(3*MILLISECOND_DURATION_1000);
     int _httpCode = __http_service.m_http_client->GET();

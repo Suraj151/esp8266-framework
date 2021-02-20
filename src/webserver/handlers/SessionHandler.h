@@ -89,7 +89,7 @@ class EwSessionHandler{
       #endif
 
       if( nullptr == __web_resource.m_server ){
-        false;
+        return false;
 			}
 
       if ( __web_resource.m_server->hasHeader("Cookie") ) {
