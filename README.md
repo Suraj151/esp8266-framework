@@ -31,7 +31,7 @@ To install manually clone or download source, copy folder to esp8266 libraries p
 
 Restart the arduino ide and navigate to File->Examples->esp8266-framework->EwStack example compile and upload.
 
-**Note** that installed version of esp8266 should be > 2.6.x. 2.6.2 or greater is recommended. you can check your installed esp8266 version in tools->boards->board manager (type "esp" in top search bar).
+**Note** that installed version of esp8266 should be > 3.0.x. 3.0.2 or greater is recommended. you can check your installed esp8266 version in tools->boards->board manager (type "esp" in top search bar).
 
 * after initializing device completely, check in pc/mobile wifi list if **esp8266Stack** name appear.
 * select it and enter default password **espStack@8266**.

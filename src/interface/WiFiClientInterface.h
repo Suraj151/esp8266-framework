@@ -52,7 +52,7 @@ class WiFiClientInterface : public iWiFiClientInterface {
     uint16_t  remotePort();
     IPAddress localIP();
     uint16_t  localPort();
-    size_t availableForWrite();
+    int availableForWrite();
     void stopAll();
 
     WiFiClient* getWiFiClient(){ return &this->m_wifi_client; }

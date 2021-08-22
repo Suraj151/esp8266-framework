@@ -11,10 +11,7 @@ created Date    : 1st June 2019
 #ifndef _I_WIFI_SERVER_INTERFACE_H_
 #define _I_WIFI_SERVER_INTERFACE_H_
 
-#include <Arduino.h>
-// #include <Print.h>
-// #include <IPAddress.h>
-// #include <ESP8266WiFi.h>
+#include "typedef.h"
 #include <ESP8266WebServer.h>
 
 // enum HTTP_Method { HTTP_ANY, HTTP_GET, HTTP_HEAD, HTTP_POST, HTTP_PUT, HTTP_PATCH, HTTP_DELETE, HTTP_OPTIONS };
@@ -54,18 +51,18 @@ class iWiFiServerInterface{
     virtual void onNotFound(THandlerFunction fn) = 0;  //called when handler is not assigned
     virtual void onFileUpload(THandlerFunction fn) = 0; //handle file uploads
 
-    virtual const String& arg(const String& name) const = 0;    // get request argument value by name
-    virtual const String& arg(int i) const = 0;          // get request argument value by number
-    virtual const String& argName(int i) const = 0;      // get request argument name by number
+    virtual String arg(const String& name) = 0;    // get request argument value by name
+    virtual String arg(int i) = 0;          // get request argument value by number
+    virtual String argName(int i) = 0;      // get request argument name by number
     virtual int args() const = 0;                        // get arguments count
     virtual bool hasArg(const String& name) const = 0;   // check if argument exists
     virtual void collectHeaders(const char* headerKeys[], const size_t headerKeysCount) = 0; // set the request headers to collect
-    virtual const String& header(const String& name) const = 0; // get request header value by name
-    virtual const String& header(int i) const = 0;       // get request header value by number
-    virtual const String& headerName(int i) const = 0;   // get request header name by number
+    virtual String header(const String& name) = 0; // get request header value by name
+    virtual String header(int i) = 0;       // get request header value by number
+    virtual String headerName(int i) = 0;   // get request header name by number
     virtual int headers() const = 0;                     // get header count
     virtual bool hasHeader(const String& name) const = 0;       // check if header exists
-    virtual const String& hostHeader() const = 0;        // get request host header if available or empty String if not
+    virtual String hostHeader() = 0;        // get request host header if available or empty String if not
 
     virtual void send(int code, const char* content_type = nullptr, const String& content = String("")) = 0;
     virtual void send(int code, char* content_type, const String& content) = 0;

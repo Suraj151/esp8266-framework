@@ -11,7 +11,7 @@ created Date    : 1st June 2019
 #ifndef _I_DEVICE_IOT_INTERFACE_H_
 #define _I_DEVICE_IOT_INTERFACE_H_
 
-#include <Arduino.h>
+#include "typedef.h"
 
 /**
  * iDeviceIotInterface class

@@ -31,20 +31,20 @@ created Date    : 1st June 2019
 
 
 /**
- * WebServer class
+ * EwWebServer class
  */
-class WebServer {
+class EwWebServer {
 
   public:
 
     /**
-     * WebServer constructor.
+     * EwWebServer constructor.
      */
-    WebServer();
+    EwWebServer();
     /**
-     * WebServer destructor.
+     * EwWebServer destructor.
      */
-    ~WebServer();
+    ~EwWebServer();
 
     void start_server( iWiFiInterface* _wifi );
     void handle_clients( void );
@@ -113,6 +113,6 @@ class WebServer {
 
 };
 
-extern WebServer __web_server;
+extern EwWebServer __web_server;
 
 #endif

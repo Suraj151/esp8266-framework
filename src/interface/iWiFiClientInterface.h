@@ -11,6 +11,7 @@ created Date    : 1st June 2019
 #ifndef _I_WIFI_CLIENT_INTERFACE_H_
 #define _I_WIFI_CLIENT_INTERFACE_H_
 
+#include "typedef.h"
 #include <Arduino.h>
 #include <Print.h>
 #include <IPAddress.h>
@@ -57,7 +58,7 @@ class iWiFiClientInterface: public Print{
     virtual IPAddress localIP() = 0;
     virtual uint16_t  localPort() = 0;
     virtual void stopAll() = 0;
-    virtual size_t availableForWrite() = 0;
+    virtual int availableForWrite() = 0;
 
     using Print::write;
 

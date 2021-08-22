@@ -40,7 +40,7 @@ class HttpClientInterface : public iHttpClientInterface {
     void setAuthorization(const char *user, const char *password);
     void setAuthorization(const char *auth);
     void setTimeout(uint16_t timeout);
-    void setFollowRedirects(bool follow);
+    void setFollowRedirects(follow_redirects follow);
     void setRedirectLimit(uint16_t limit);
     bool setURL(const String &url);
 

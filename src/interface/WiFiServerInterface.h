@@ -43,18 +43,18 @@ class WiFiServerInterface : public iWiFiServerInterface {
     void onNotFound(THandlerFunction fn);  //called when handler is not assigned
     void onFileUpload(THandlerFunction fn); //handle file uploads
 
-    const String& arg(const String& name) const;    // get request argument value by name
-    const String& arg(int i) const;          // get request argument value by number
-    const String& argName(int i) const;      // get request argument name by number
+    String arg(const String& name);    // get request argument value by name
+    String arg(int i);          // get request argument value by number
+    String argName(int i);      // get request argument name by number
     int args() const;                        // get arguments count
     bool hasArg(const String& name) const;   // check if argument exists
     void collectHeaders(const char* headerKeys[], const size_t headerKeysCount); // set the request headers to collect
-    const String& header(const String& name) const; // get request header value by name
-    const String& header(int i) const;       // get request header value by number
-    const String& headerName(int i) const;   // get request header name by number
+    String header(const String& name); // get request header value by name
+    String header(int i);       // get request header value by number
+    String headerName(int i);   // get request header name by number
     int headers() const;                     // get header count
     bool hasHeader(const String& name) const;       // check if header exists
-    const String& hostHeader() const;        // get request host header if available or empty String if not
+    String hostHeader();        // get request host header if available or empty String if not
 
     void send(int code, const char* content_type = nullptr, const String& content = String(""));
     void send(int code, char* content_type, const String& content);

@@ -11,14 +11,8 @@ created Date    : 1st June 2019
 #ifndef _I_WIFI_INTERFACE_H_
 #define _I_WIFI_INTERFACE_H_
 
-#include <Arduino.h>
+#include "typedef.h"
 
-typedef uint8_t   wifi_mode;
-typedef uint8_t   sleep_mode;
-typedef uint8_t   phy_mode;
-typedef uint16_t  wifi_status;
-
-class IPAddress;
 /**
  * iWiFiInterface class
  */

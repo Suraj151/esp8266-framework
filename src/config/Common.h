@@ -103,9 +103,9 @@ extern "C" {
 /**
  * @define network address & port translation feature
  */
-#if IP_NAPT && LWIP_VERSION_MAJOR==1
+#if IP_NAPT && LWIP_VERSION_MAJOR == 1
   #define ENABLE_NAPT_FEATURE
-#elif IP_NAPT && LWIP_VERSION_MAJOR==2
+#elif IP_NAPT && LWIP_VERSION_MAJOR >= 2
   #define ENABLE_NAPT_FEATURE_LWIP_V2
 #endif
 

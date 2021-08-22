@@ -58,7 +58,7 @@ created Date    : 1st June 2019
 #elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
 #include <lwip/napt.h>
 #include <lwip/dns.h>
-#include <dhcpserver.h>
+#include <LwipDhcpServer.h>
 #endif
 
 /**

@@ -172,7 +172,7 @@ uint16_t  WiFiClientInterface::localPort(){
 /**
  * availableForWrite
  */
-size_t WiFiClientInterface::availableForWrite(){
+int WiFiClientInterface::availableForWrite(){
   return this->m_wifi_client.availableForWrite();
 }
 

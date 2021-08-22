@@ -11,6 +11,7 @@ created Date    : 1st June 2019
 #ifndef _I_HTTP_CLIENT_INTERFACE_H_
 #define _I_HTTP_CLIENT_INTERFACE_H_
 
+#include "typedef.h"
 #include "iWiFiClientInterface.h"
 
 /**
@@ -39,7 +40,7 @@ class iHttpClientInterface {
     virtual void setAuthorization(const char *user, const char *password) = 0;
     virtual void setAuthorization(const char *auth) = 0;
     virtual void setTimeout(uint16_t timeout) = 0;
-    virtual void setFollowRedirects(bool follow) = 0;
+    virtual void setFollowRedirects(follow_redirects follow) = 0;
     virtual void setRedirectLimit(uint16_t limit) = 0;
     virtual bool setURL(const String &url) = 0;
 

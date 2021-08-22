@@ -98,7 +98,7 @@ void WiFiServerInterface::onFileUpload(THandlerFunction fn){
  * arg
  * get request argument value by name
  */
-const String& WiFiServerInterface::arg(const String& name) const{
+String WiFiServerInterface::arg(const String& name){
   return this->m_server.arg(name);
 }
 
@@ -106,7 +106,7 @@ const String& WiFiServerInterface::arg(const String& name) const{
  * arg
  * get request argument value by number
  */
-const String& WiFiServerInterface::arg(int i) const{
+String WiFiServerInterface::arg(int i){
   return this->m_server.arg(i);
 }
 
@@ -114,7 +114,7 @@ const String& WiFiServerInterface::arg(int i) const{
  * argName
  * get request argument name by number
  */
-const String& WiFiServerInterface::argName(int i) const{
+String WiFiServerInterface::argName(int i){
   return this->m_server.argName(i);
 }
 
@@ -146,7 +146,7 @@ void WiFiServerInterface::collectHeaders(const char* headerKeys[], const size_t 
  * header
  * get request header value by name
  */
-const String& WiFiServerInterface::header(const String& name) const{
+String WiFiServerInterface::header(const String& name){
   return this->m_server.header(name);
 }
 
@@ -154,7 +154,7 @@ const String& WiFiServerInterface::header(const String& name) const{
  * header
  * get request header value by number
  */
-const String& WiFiServerInterface::header(int i) const{
+String WiFiServerInterface::header(int i){
   return this->m_server.header(i);
 }
 
@@ -162,7 +162,7 @@ const String& WiFiServerInterface::header(int i) const{
  * headerName
  * get request header name by number
  */
-const String& WiFiServerInterface::headerName(int i) const{
+String WiFiServerInterface::headerName(int i){
   return this->m_server.headerName(i);
 }
 
@@ -186,7 +186,7 @@ bool WiFiServerInterface::hasHeader(const String& name) const{
  * hostHeader
  * get request host header if available or empty String if not
  */
-const String& WiFiServerInterface::hostHeader() const{
+String WiFiServerInterface::hostHeader(){
   return this->m_server.hostHeader();
 }
 

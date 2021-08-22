@@ -11,7 +11,9 @@ created Date    : 1st June 2019
 
 #if defined(ENABLE_GPIO_SERVICE)
 
+
 #include "GpioServiceProvider.h"
+
 
 __gpio_alert_track_t __gpio_alert_track = {
   false, 0
@@ -26,6 +28,9 @@ GpioServiceProvider::GpioServiceProvider():
   m_wifi_client(nullptr),
   m_wifi(nullptr)
 {
+  for (size_t i = 0; i < MAX_NO_OF_GPIO_PINS; i++) {
+    this->m_digital_blinker[i] = nullptr;
+  }
 }
 
 /**
@@ -35,6 +40,13 @@ GpioServiceProvider::~GpioServiceProvider(){
 
   this->m_wifi = nullptr;
   this->m_wifi_client = nullptr;
+
+  for (size_t i = 0; i < MAX_NO_OF_GPIO_PINS; i++) {
+    if( nullptr != this->m_digital_blinker[i] ){
+      delete this->m_digital_blinker[i];
+      this->m_digital_blinker[i] = nullptr;
+    }
+  }
 }
 
 /**
@@ -207,6 +219,14 @@ void GpioServiceProvider::handleGpioOperations(){
 
   for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
 
+    if( DIGITAL_BLINK != this->m_gpio_config_copy.gpio_mode[_pin] ){
+
+      if( _pin < MAX_NO_OF_GPIO_PINS && nullptr != this->m_digital_blinker[_pin] ){
+        delete this->m_digital_blinker[_pin];
+        this->m_digital_blinker[_pin] = nullptr;
+      }
+    }
+
     switch ( this->is_exceptional_gpio_pin(_pin) ? OFF : this->m_gpio_config_copy.gpio_mode[_pin] ) {
 
       default:
@@ -221,6 +241,17 @@ void GpioServiceProvider::handleGpioOperations(){
       }
       case DIGITAL_READ:{
         this->m_gpio_config_copy.gpio_readings[_pin] = digitalRead( this->getGpioFromPinMap( _pin ) );
+        break;
+      }
+      case DIGITAL_BLINK:{
+        if( nullptr != this->m_digital_blinker[_pin] ){
+
+          this->m_digital_blinker[_pin]->updateConfig( this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+          this->m_digital_blinker[_pin]->start();
+        }else{
+
+          this->m_digital_blinker[_pin] = new DigitalBlinker( this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+        }
         break;
       }
       case ANALOG_WRITE:{
@@ -308,6 +339,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
       default:
         pinMode( this->getGpioFromPinMap( _pin ), INPUT );
         break;
+      case DIGITAL_BLINK:
       case DIGITAL_WRITE:
       case ANALOG_WRITE:
         pinMode( this->getGpioFromPinMap( _pin ), OUTPUT );

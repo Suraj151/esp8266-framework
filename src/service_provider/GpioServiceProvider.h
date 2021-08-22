@@ -15,10 +15,92 @@ created Date    : 1st June 2019
 #include <service_provider/ServiceProvider.h>
 #include <service_provider/HttpServiceProvider.h>
 #include <service_provider/EmailServiceProvider.h>
+#include <Ticker.h>
 
 #define GPIO_PAYLOAD_DATA_KEY   "data"
 #define GPIO_PAYLOAD_MODE_KEY   "mode"
 #define GPIO_PAYLOAD_VALUE_KEY  "val"
+
+// currently 100 ms is kept as lowest blink time
+#define GPIO_DIGITAL_BLINK_MIN_DURATION_MS 100
+
+
+class DigitalBlinker {
+
+  private:
+
+    uint8_t   m_pin;
+    uint32_t  m_duration;
+    Ticker    m_ticker;
+
+  public:
+
+    /**
+     * DigitalBlinker constructor.
+     */
+    DigitalBlinker(uint8_t pin, uint32_t duration) :
+    m_pin(pin),
+    m_duration(duration)
+    {
+      pinMode(this->m_pin, OUTPUT);
+      this->start();
+    }
+
+    /**
+     * DigitalBlinker destructor.
+     */
+    ~DigitalBlinker() {
+
+      this->stop();
+    };
+
+    /**
+     * blink callback function
+     */
+    void blink() {
+
+      digitalWrite(this->m_pin, !digitalRead(this->m_pin));
+    }
+
+    void setConfig(uint8_t pin, uint32_t duration) {
+
+        this->m_pin = pin;
+        this->m_duration = duration;
+    }
+
+    void updateConfig(uint8_t pin, uint32_t duration) {
+
+      if( this->m_pin != pin || this->m_duration != duration ){
+
+        this->setConfig(pin, duration);
+
+        if( this->isRunning() ){
+
+          this->stop();
+          this->start();
+        }
+      }
+    }
+
+    void start() {
+
+      if( !this->isRunning() && GPIO_DIGITAL_BLINK_MIN_DURATION_MS <= this->m_duration ){
+
+        this->m_ticker.attach_ms(this->m_duration, std::bind(&DigitalBlinker::blink, this));
+      }
+    }
+
+    void stop() {
+
+      this->m_ticker.detach();
+    }
+
+    bool isRunning() {
+
+      return this->m_ticker.active();
+    }
+};
+
 
 /**
  * GpioServiceProvider class
@@ -72,6 +154,7 @@ class GpioServiceProvider : public ServiceProvider {
 		 */
     iWiFiClientInterface  *m_wifi_client;
     iWiFiInterface        *m_wifi;
+    DigitalBlinker        *m_digital_blinker[MAX_NO_OF_GPIO_PINS];
 };
 
 extern GpioServiceProvider __gpio_service;

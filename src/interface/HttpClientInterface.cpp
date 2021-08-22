@@ -90,8 +90,9 @@ void HttpClientInterface::setTimeout(uint16_t timeout){
 /**
  * setFollowRedirects
  */
-void HttpClientInterface::setFollowRedirects(bool follow){
-  this->m_http_client.setFollowRedirects(follow);
+void HttpClientInterface::setFollowRedirects(follow_redirects follow){
+  followRedirects_t _follow = static_cast<followRedirects_t>(follow);
+  this->m_http_client.setFollowRedirects(_follow);
 }
 
 /**

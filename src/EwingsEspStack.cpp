@@ -118,8 +118,8 @@ void EwingsEspStack::enable_napt_service(){
         Logln(F(") initialization done"));
       #endif
       // Set the DNS server for clients of the AP to the one we also use for the STA interface
-      dhcps_set_dns(0, this->m_wifi->dnsIP(0));
-      dhcps_set_dns(1, this->m_wifi->dnsIP(1));
+      dhcpSoftAP.dhcps_set_dns(0, this->m_wifi->dnsIP(0));
+      dhcpSoftAP.dhcps_set_dns(1, this->m_wifi->dnsIP(1));
     }
   }
   if (ret != ERR_OK) {

@@ -15,25 +15,25 @@ created Date    : 1st June 2019
 #include "EwingsWebServer.h"
 
 /**
- * WebServer constructor.
+ * EwWebServer constructor.
  */
-WebServer::WebServer():
+EwWebServer::EwWebServer():
   m_wifi(nullptr),
   m_server(&__wifi_server_interface)
 {
 }
 
 /**
- * WebServer destructor.
+ * EwWebServer destructor.
  */
-WebServer::~WebServer(){
+EwWebServer::~EwWebServer(){
   this->m_wifi = nullptr;
 }
 
 /**
  * start http server functionality. this requires wifi should work as access point
  */
-void WebServer::start_server( iWiFiInterface* _wifi ){
+void EwWebServer::start_server( iWiFiInterface* _wifi ){
 
   this->m_wifi = _wifi;
   __web_resource.collect_resource( this->m_wifi, this->m_server );
@@ -62,11 +62,11 @@ void WebServer::start_server( iWiFiInterface* _wifi ){
 /**
  * handle server functionality.
  */
-void WebServer::handle_clients(){
+void EwWebServer::handle_clients(){
 
   this->m_server->handleClient();
 }
 
-WebServer __web_server;
+EwWebServer __web_server;
 
 #endif

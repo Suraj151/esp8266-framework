@@ -297,7 +297,7 @@ class GpioController : public Controller {
       memset( _page, 0, _max_size );
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_GPIO_CONFIG_PAGE_TOP );
-      char* _gpio_mode_general_options[] = {"OFF", "DOUT", "DIN", "AOUT"};
+      char* _gpio_mode_general_options[] = {"OFF", "DOUT", "DIN", "BLINK", "AOUT"};
       char* _gpio_mode_analog_options[] = {"OFF", "", "", "", "AIN"};
 
       char _name[4], _label[4];memset(_name, 0, 4);memset(_label, 0, 4);
@@ -305,9 +305,9 @@ class GpioController : public Controller {
       int _exception = -1;
       for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
         _name[1] = (0x30 + _pin );_label[1] = (0x30 + _pin );
-        _exception = _pin == 0 ? 3:-1;
+        _exception = _pin == 0 ? ANALOG_WRITE:-1;
         if( !__gpio_service.is_exceptional_gpio_pin(_pin) )
-        concat_tr_select_html_tags( _page, _name, _label, _gpio_mode_general_options, 4, (int)__gpio_service.m_gpio_config_copy.gpio_mode[_pin], _exception );
+        concat_tr_select_html_tags( _page, _name, _label, _gpio_mode_general_options, 5, (int)__gpio_service.m_gpio_config_copy.gpio_mode[_pin], _exception );
       }
       concat_tr_select_html_tags( _page, (char*)"A0:", (char*)"a0", _gpio_mode_analog_options, 5, (int)__gpio_service.m_gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] );
 
@@ -393,7 +393,7 @@ class GpioController : public Controller {
       strcat_P( _page, EW_SERVER_GPIO_WRITE_PAGE_TOP );
       char* _gpio_digital_write_options[] = {"LOW","HIGH"};
 
-      char _analog_value[10], _name[4], _label[4];memset(_name, 0, 4);memset(_label, 0, 4);
+      char _input_value[10], _name[4], _label[4];memset(_name, 0, 4);memset(_label, 0, 4);
       strcpy( _name, "D0:" );strcpy( _label, "d0" );
 
       bool _added_options = false;
@@ -406,11 +406,20 @@ class GpioController : public Controller {
             _added_options = true;
             concat_tr_select_html_tags( _page, _name, _label, _gpio_digital_write_options, 2, (int)__gpio_service.m_gpio_config_copy.gpio_readings[_pin] );
           }
-          if( __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE ){
+          if( __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE ||
+						__gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_BLINK
+					){
             _added_options = true;
-            memset( _analog_value, 0, 10 );
-            __appendUintToBuff( _analog_value, "%d", __gpio_service.m_gpio_config_copy.gpio_readings[_pin], 8 );
-						concat_tr_input_html_tags( _page, _name, _label, _analog_value, 0, HTML_INPUT_RANGE_TAG_TYPE, false, false );
+            memset( _input_value, 0, 10 );
+            __appendUintToBuff( _input_value, "%d", __gpio_service.m_gpio_config_copy.gpio_readings[_pin], 8 );
+
+						if( DIGITAL_BLINK == __gpio_service.m_gpio_config_copy.gpio_mode[_pin] ){
+
+							concat_tr_input_html_tags( _page, _name, _label, _input_value, 10, HTML_INPUT_TEXT_TAG_TYPE, false, false );
+						}else{
+
+							concat_tr_input_html_tags( _page, _name, _label, _input_value, 0, HTML_INPUT_RANGE_TAG_TYPE, false, false );
+						}
           }
         }
       }
@@ -451,8 +460,7 @@ class GpioController : public Controller {
         for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
           _label[1] = (0x30 + _pin );
           if( this->m_web_resource->m_server->hasArg(_label) ){
-            __gpio_service.m_gpio_config_copy.gpio_readings[_pin] = __gpio_service.is_exceptional_gpio_pin(_pin) ? 0 : __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_WRITE ?
-            (int)this->m_web_resource->m_server->arg(_label).toInt() : (int)this->m_web_resource->m_server->arg(_label).toInt();
+            __gpio_service.m_gpio_config_copy.gpio_readings[_pin] = __gpio_service.is_exceptional_gpio_pin(_pin) ? 0 : (int)this->m_web_resource->m_server->arg(_label).toInt();
             #ifdef EW_SERIAL_LOG
               Log(F("Pin ")); Log( _pin ); Log(F(" : ")); Logln( (int)this->m_web_resource->m_server->arg(_label).toInt() );
             #endif
