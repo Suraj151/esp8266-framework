@@ -177,7 +177,7 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
 
             uint8_t _mode = StringToUint8( _pin_mode, _pin_values_max_len );
             uint16_t _value = StringToUint16( _pin_value, _pin_values_max_len );
-            uint16_t _value_limit = _mode == ANALOG_WRITE ? ANALOG_GPIO_RESOLUTION : 2;
+            uint16_t _value_limit = _mode == ANALOG_WRITE ? ANALOG_GPIO_RESOLUTION : _mode == DIGITAL_BLINK ? _value+1 : 2;
             this->m_gpio_config_copy.gpio_mode[_pin] = _mode < ANALOG_READ ? _mode : this->m_gpio_config_copy.gpio_mode[_pin];
             this->m_gpio_config_copy.gpio_readings[_pin] = _value < _value_limit ? _value : this->m_gpio_config_copy.gpio_readings[_pin];
             __database_service.set_gpio_config_table(&this->m_gpio_config_copy);

@@ -102,7 +102,7 @@ class GpioController : public Controller {
       _response += !this->m_route_handler->has_active_session();
 			_response += ",\"d\":";
 			__gpio_service.appendGpioJsonPayload(_response);
-			_response += ",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"AOUT\", \"AIN\"]";
+			_response += ",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"BLINK\", \"AOUT\", \"AIN\"]";
       _response += "}";
 
       this->_last_monitor_point.x = x2;
@@ -298,7 +298,7 @@ class GpioController : public Controller {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_GPIO_CONFIG_PAGE_TOP );
       char* _gpio_mode_general_options[] = {"OFF", "DOUT", "DIN", "BLINK", "AOUT"};
-      char* _gpio_mode_analog_options[] = {"OFF", "", "", "", "AIN"};
+      char* _gpio_mode_analog_options[] = {"OFF", "", "", "", "", "AIN"};
 
       char _name[4], _label[4];memset(_name, 0, 4);memset(_label, 0, 4);
       strcpy( _name, "D0:" );strcpy( _label, "d0" );
@@ -309,7 +309,7 @@ class GpioController : public Controller {
         if( !__gpio_service.is_exceptional_gpio_pin(_pin) )
         concat_tr_select_html_tags( _page, _name, _label, _gpio_mode_general_options, 5, (int)__gpio_service.m_gpio_config_copy.gpio_mode[_pin], _exception );
       }
-      concat_tr_select_html_tags( _page, (char*)"A0:", (char*)"a0", _gpio_mode_analog_options, 5, (int)__gpio_service.m_gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] );
+      concat_tr_select_html_tags( _page, (char*)"A0:", (char*)"a0", _gpio_mode_analog_options, 6, (int)__gpio_service.m_gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS] );
 
       strcat_P( _page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
       if( _enable_flash )
