@@ -22,6 +22,12 @@ extern "C" {
 #define MILLISECOND_DURATION_5000   5000
 #define MILLISECOND_DURATION_10000  10000
 
+
+/**
+ * @define task scheduler which makes use of timers
+ */
+// #define ENABLE_TIMER_TASK_SCHEDULER
+
 /**
  * enable/disable gpio and mqtt feature here
  */

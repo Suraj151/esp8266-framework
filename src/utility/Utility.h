@@ -13,7 +13,13 @@ created Date    : 1st June 2019
 
 #include <Esp.h>
 #include <config/Config.h>
+
+#ifdef ENABLE_TIMER_TASK_SCHEDULER
+#include "TimerTaskScheduler.h"
+#else
 #include "TaskScheduler.h"
+#endif
+
 #include "FactoryReset.h"
 #include "DataTypeConversions.h"
 #include "StringOperations.h"

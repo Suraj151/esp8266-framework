@@ -154,7 +154,7 @@ class GpioServiceProvider : public ServiceProvider {
 		 */
     iWiFiClientInterface  *m_wifi_client;
     iWiFiInterface        *m_wifi;
-    DigitalBlinker        *m_digital_blinker[MAX_NO_OF_GPIO_PINS];
+    DigitalBlinker        *m_digital_blinker[MAX_DIGITAL_GPIO_PINS];
 };
 
 extern GpioServiceProvider __gpio_service;

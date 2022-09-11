@@ -28,7 +28,7 @@ GpioServiceProvider::GpioServiceProvider():
   m_wifi_client(nullptr),
   m_wifi(nullptr)
 {
-  for (size_t i = 0; i < MAX_NO_OF_GPIO_PINS; i++) {
+  for (size_t i = 0; i < MAX_DIGITAL_GPIO_PINS; i++) {
     this->m_digital_blinker[i] = nullptr;
   }
 }
@@ -41,7 +41,7 @@ GpioServiceProvider::~GpioServiceProvider(){
   this->m_wifi = nullptr;
   this->m_wifi_client = nullptr;
 
-  for (size_t i = 0; i < MAX_NO_OF_GPIO_PINS; i++) {
+  for (size_t i = 0; i < MAX_DIGITAL_GPIO_PINS; i++) {
     if( nullptr != this->m_digital_blinker[i] ){
       delete this->m_digital_blinker[i];
       this->m_digital_blinker[i] = nullptr;
@@ -116,7 +116,7 @@ void GpioServiceProvider::appendGpioJsonPayload( String& _payload ){
   _payload += GPIO_PAYLOAD_DATA_KEY;
   _payload += "\":{";
 
-  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
+  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++) {
 
     if( !this->is_exceptional_gpio_pin(_pin) ){
 
@@ -136,11 +136,11 @@ void GpioServiceProvider::appendGpioJsonPayload( String& _payload ){
   _payload += "\"A0\":{\"";
   _payload += GPIO_PAYLOAD_MODE_KEY;
   _payload += "\":";
-  _payload += this->m_gpio_config_copy.gpio_mode[MAX_NO_OF_GPIO_PINS];
+  _payload += this->m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS];
   _payload += ",\"";
   _payload += GPIO_PAYLOAD_VALUE_KEY;
   _payload += "\":";
-  _payload += this->m_gpio_config_copy.gpio_readings[MAX_NO_OF_GPIO_PINS];
+  _payload += this->m_gpio_config_copy.gpio_readings[MAX_DIGITAL_GPIO_PINS];
   _payload += "}}}";
 }
 
@@ -165,7 +165,7 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
     int _pin_data_max_len = 30, _pin_values_max_len = 6;
     char _pin_label[_pin_values_max_len]; memset( _pin_label, 0, _pin_values_max_len); _pin_label[0] = 'D';
     char _pin_data[_pin_data_max_len], _pin_mode[_pin_values_max_len], _pin_value[_pin_values_max_len];
-    for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS; _pin++) {
+    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++) {
 
       _pin_label[1] = ( 0x30 + _pin ); memset( _pin_data, 0, _pin_data_max_len);
       memset( _pin_mode, 0, _pin_values_max_len); memset( _pin_value, 0, _pin_values_max_len);
@@ -177,7 +177,7 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
 
             uint8_t _mode = StringToUint8( _pin_mode, _pin_values_max_len );
             uint16_t _value = StringToUint16( _pin_value, _pin_values_max_len );
-            uint16_t _value_limit = _mode == ANALOG_WRITE ? ANALOG_GPIO_RESOLUTION : _mode == DIGITAL_BLINK ? _value+1 : 2;
+            uint16_t _value_limit = _mode == ANALOG_WRITE ? ANALOG_GPIO_RESOLUTION : _mode == DIGITAL_BLINK ? _value+1 : GPIO_STATE_MAX;
             this->m_gpio_config_copy.gpio_mode[_pin] = _mode < ANALOG_READ ? _mode : this->m_gpio_config_copy.gpio_mode[_pin];
             this->m_gpio_config_copy.gpio_readings[_pin] = _value < _value_limit ? _value : this->m_gpio_config_copy.gpio_readings[_pin];
             __database_service.set_gpio_config_table(&this->m_gpio_config_copy);
@@ -217,11 +217,11 @@ bool GpioServiceProvider::handleGpioEmailAlert(){
  */
 void GpioServiceProvider::handleGpioOperations(){
 
-  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
+  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
 
     if( DIGITAL_BLINK != this->m_gpio_config_copy.gpio_mode[_pin] ){
 
-      if( _pin < MAX_NO_OF_GPIO_PINS && nullptr != this->m_digital_blinker[_pin] ){
+      if( _pin < MAX_DIGITAL_GPIO_PINS && nullptr != this->m_digital_blinker[_pin] ){
         delete this->m_digital_blinker[_pin];
         this->m_digital_blinker[_pin] = nullptr;
       }
@@ -259,8 +259,9 @@ void GpioServiceProvider::handleGpioOperations(){
         break;
       }
       case ANALOG_READ:{
-        if( _pin == MAX_NO_OF_GPIO_PINS )
-        this->m_gpio_config_copy.gpio_readings[_pin] = analogRead( A0 );
+        if( MAX_DIGITAL_GPIO_PINS <= _pin  ){
+          this->m_gpio_config_copy.gpio_readings[_pin] = analogRead( A0 );
+        }
         break;
       }
     }
@@ -330,7 +331,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
 
   gpio_config_table _gpio_configs = __database_service.get_gpio_config_table();
 
-  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
+  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
 
     switch ( _gpio_configs.gpio_mode[_pin] ) {
 
@@ -376,23 +377,23 @@ void GpioServiceProvider::printGpioConfigLogs(){
 
   Logln(F("\nGPIO Configs (mode) :"));
   // Logln(F("ssid\tpassword\tlocal\tgateway\tsubnet"));
-  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
+  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
     Log(this->m_gpio_config_copy.gpio_mode[_pin]); Log("\t");
   }
   Logln(F("\nGPIO Configs (readings) :"));
-  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
+  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
     Log(this->m_gpio_config_copy.gpio_readings[_pin]); Log("\t");
   }
   Logln(F("\nGPIO Configs (alert comparator) :"));
-  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
+  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
     Log(this->m_gpio_config_copy.gpio_alert_comparator[_pin]); Log("\t");
   }
   Logln(F("\nGPIO Configs (alert channels) :"));
-  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
+  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
     Log(this->m_gpio_config_copy.gpio_alert_channel[_pin]); Log("\t");
   }
   Logln(F("\nGPIO Configs (alert values) :"));
-  for (uint8_t _pin = 0; _pin < MAX_NO_OF_GPIO_PINS+1; _pin++) {
+  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
     Log(this->m_gpio_config_copy.gpio_alert_values[_pin]); Log("\t");
   }
   Logln(F("\nGPIO Configs (server) :"));

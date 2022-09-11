@@ -12,7 +12,8 @@ created Date    : 1st June 2019
 
 #include "Common.h"
 
-#define MAX_NO_OF_GPIO_PINS           9
+#define MAX_DIGITAL_GPIO_PINS         9
+#define MAX_ANALOG_GPIO_PINS          1
 #define GPIO_HOST_BUF_SIZE            60
 #define ANALOG_GPIO_RESOLUTION        1024
 #define GPIO_GRAPH_ADJ_POINT_DISTANCE 10
@@ -54,6 +55,12 @@ enum GPIO_CONFIG_TYPE {
   GPIO_ALERT_CONFIG,
 };
 
+enum GPIO_STATE {
+  GPIO_STATE_LOW=0,
+  GPIO_STATE_HIGH=1,
+  GPIO_STATE_MAX
+};
+
 enum GPIO_MODE {
   OFF=0,
   DIGITAL_WRITE,
@@ -78,11 +85,11 @@ enum GPIO_ALERT_CHANNEL {
 };
 
 struct gpio_configs {
-  uint8_t gpio_mode[MAX_NO_OF_GPIO_PINS+1];
-  uint16_t gpio_readings[MAX_NO_OF_GPIO_PINS+1];
-  uint8_t gpio_alert_comparator[MAX_NO_OF_GPIO_PINS+1];
-  uint8_t gpio_alert_channel[MAX_NO_OF_GPIO_PINS+1];
-  uint16_t gpio_alert_values[MAX_NO_OF_GPIO_PINS+1];
+  uint8_t gpio_mode[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
+  uint16_t gpio_readings[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
+  uint8_t gpio_alert_comparator[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
+  uint8_t gpio_alert_channel[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
+  uint16_t gpio_alert_values[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
   char gpio_host[GPIO_HOST_BUF_SIZE];
   int gpio_port;
   int gpio_post_frequency;
