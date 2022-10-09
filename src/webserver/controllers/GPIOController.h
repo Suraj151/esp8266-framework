@@ -535,9 +535,9 @@ class GpioController : public Controller {
       strcat_P( _page, EW_SERVER_GPIO_ALERT_PAGE_TOP );
       char* _gpio_digital_alert_options[] = {"LOW","HIGH"};
 			#ifdef ENABLE_EMAIL_SERVICE
-			char* _gpio_alert_channels[] = {"NOALERT","MAIL"};
+			char* _gpio_alert_channels[] = {"NOALERT","MAIL","HTTPSERVER"};
 			#else
-			char* _gpio_alert_channels[] = {"NOALERT",""};
+			char* _gpio_alert_channels[] = {"NOALERT","HTTPSERVER"};
 			#endif
 			char* _gpio_analog_alert_comparators[] = {"=",">","<"};
 

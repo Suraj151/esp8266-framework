@@ -33,6 +33,7 @@ created Date    : 1st June 2019
 #define WIFI_RSSI_THRESHOLD				            -82
 
 #define DEVICE_IOT_CONFIG_REQ_URL             "/api/fordevice/get-config?mac_id=[mac]"
+#define DEVICE_IOT_ALERTS_REQ_URL             "/api/fordevice/get-alerts?mac_id=[mac]"
 #define DEVICE_IOT_CONFIG_RESP_MAX_SIZE       300
 #define DEVICE_IOT_CONFIG_TOKEN_KEY           "token"
 #define DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE      DEVICE_IOT_OTP_API_RESP_LENGTH
@@ -44,7 +45,7 @@ created Date    : 1st June 2019
 #define DEVICE_IOT_MQTT_KEEP_ALIVE_MIN        10
 #define DEVICE_IOT_MQTT_KEEP_ALIVE_MAX        600
 
-#define DEVICE_IOT_MQTT_DATA_HOST             "192.168.43.247"
+#define DEVICE_IOT_MQTT_DATA_HOST             "192.168.0.100"
 #define DEVICE_IOT_MQTT_DATA_PORT             1883
 #define DEVICE_IOT_MQTT_WILL_TOPIC            "disconnect"
 

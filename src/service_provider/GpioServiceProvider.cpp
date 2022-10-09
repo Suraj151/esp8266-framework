@@ -16,7 +16,7 @@ created Date    : 1st June 2019
 
 
 __gpio_alert_track_t __gpio_alert_track = {
-  false, 0
+  false, 0, -1
 };
 
 /**
@@ -71,38 +71,73 @@ void GpioServiceProvider::begin( iWiFiInterface* _wifi, iWiFiClientInterface* _w
 /**
  * post gpio data to server specified in gpio configs
  */
-void GpioServiceProvider::handleGpioHttpRequest( ){
+bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
 
-  memset( __http_service.m_host, 0, HTTP_HOST_ADDR_MAX_SIZE);
+  bool status = false;
+
+  memset( __http_service.m_host, 0, HTTP_HOST_ADDR_MAX_SIZE );
   strcpy( __http_service.m_host, this->m_gpio_config_copy.gpio_host );
+
+  if( isAlertPost ){
+    strcat( __http_service.m_host, GPIO_ALERT_POST_HTTP_URL );
+  }else{
+    strcat( __http_service.m_host, GPIO_DATA_POST_HTTP_URL );
+  }
+
   __http_service.m_port = this->m_gpio_config_copy.gpio_port;
 
   #ifdef EW_SERIAL_LOG
   Logln( F("Handling GPIO Http Request") );
   #endif
 
-  if( strlen( __http_service.m_host ) > 5 && __http_service.m_port > 0 &&
-    this->m_gpio_config_copy.gpio_post_frequency > 0 &&
+  if( strlen( __http_service.m_host ) > 5 &&
+    __http_service.m_port > 0 &&
+    ( isAlertPost ? true : ( this->m_gpio_config_copy.gpio_post_frequency > 0 ) ) &&
+    nullptr != this->m_wifi_client &&
     __http_service.m_http_client->begin( *this->m_wifi_client, __http_service.m_host )
   ){
 
     String _payload = "";
-    this->appendGpioJsonPayload( _payload );
+    this->appendGpioJsonPayload( _payload, isAlertPost );
 
+    #ifdef ENABLE_DEVICE_IOT
+
+    uint8_t mac[6];
+    char macStr[18] = { 0 };
+    wifi_get_macaddr(STATION_IF, mac);
+    sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    __http_service.m_http_client->setUserAgent("esp");
+    __http_service.m_http_client->setAuthorization("iot-otp", macStr);
+    __http_service.m_http_client->setTimeout(3*MILLISECOND_DURATION_1000);
+    #else
     __http_service.m_http_client->setUserAgent("Ewings");
-    __http_service.m_http_client->addHeader("Content-Type", "application/json");
     __http_service.m_http_client->setAuthorization("user", "password");
-    __http_service.m_http_client->setTimeout(2000);
+    __http_service.m_http_client->setTimeout(2*MILLISECOND_DURATION_1000);
+    #endif
+
+    __http_service.m_http_client->addHeader("Content-Type", "application/json");
+
+    #ifdef EW_SERIAL_LOG
+    Log( F("posting data : ") );
+    Logln( _payload );
+    #endif
 
     int _httpCode = __http_service.m_http_client->POST( _payload );
+    status = __http_service.followHttpRequest( _httpCode );
 
-    if( __http_service.followHttpRequest( _httpCode ) ) this->handleGpioHttpRequest();
+    if( status ){
+
+      status = this->handleGpioHttpRequest();
+    }
 
   }else{
     #ifdef EW_SERIAL_LOG
     Logln( F("GPIO Http Request not initializing or failed or Not Configured Correctly") );
     #endif
   }
+
+  return status;
 }
 
 /**
@@ -110,9 +145,37 @@ void GpioServiceProvider::handleGpioHttpRequest( ){
  *
  * @param String& _payload
  */
-void GpioServiceProvider::appendGpioJsonPayload( String& _payload ){
+void GpioServiceProvider::appendGpioJsonPayload( String& _payload, bool isAlertPost ){
 
-  _payload += "{\"";
+  _payload += "{";
+
+  if( nullptr != this->m_wifi ){
+
+    _payload += "\"";
+    _payload += GPIO_PAYLOAD_MAC_KEY;
+    _payload += "\":\"";
+    _payload += this->m_wifi->macAddress();
+    _payload += "\",";
+  }
+
+  if( isAlertPost ){
+
+    _payload += "\"";
+    _payload += GPIO_ALERT_PIN_KEY;
+    _payload += "\":\"";
+
+    if( __gpio_alert_track.alert_gpio_pin < MAX_DIGITAL_GPIO_PINS ){
+      _payload += "D";
+      _payload += __gpio_alert_track.alert_gpio_pin;
+    }else{
+      _payload += "A";
+      _payload += (__gpio_alert_track.alert_gpio_pin - MAX_DIGITAL_GPIO_PINS);
+    }
+
+    _payload += "\",";
+  }
+
+  _payload += "\"";
   _payload += GPIO_PAYLOAD_DATA_KEY;
   _payload += "\":{";
 
@@ -133,15 +196,27 @@ void GpioServiceProvider::appendGpioJsonPayload( String& _payload ){
       _payload += "},";
     }
   }
-  _payload += "\"A0\":{\"";
-  _payload += GPIO_PAYLOAD_MODE_KEY;
-  _payload += "\":";
-  _payload += this->m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS];
-  _payload += ",\"";
-  _payload += GPIO_PAYLOAD_VALUE_KEY;
-  _payload += "\":";
-  _payload += this->m_gpio_config_copy.gpio_readings[MAX_DIGITAL_GPIO_PINS];
-  _payload += "}}}";
+
+  for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++) {
+
+    _payload += "\"A";
+    _payload += _pin;
+    _payload += "\":{\"";
+    _payload += GPIO_PAYLOAD_MODE_KEY;
+    _payload += "\":";
+    _payload += this->m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS+_pin];
+    _payload += ",\"";
+    _payload += GPIO_PAYLOAD_VALUE_KEY;
+    _payload += "\":";
+    _payload += this->m_gpio_config_copy.gpio_readings[MAX_DIGITAL_GPIO_PINS+_pin];
+    _payload += "}";
+
+    if( ( MAX_ANALOG_GPIO_PINS - _pin ) > 1 ){
+      _payload += ",";
+    }
+  }
+
+  _payload += "}}";
 }
 
 /**
@@ -202,7 +277,7 @@ bool GpioServiceProvider::handleGpioEmailAlert(){
   Logln( F("Handling GPIO email alert") );
   #endif
   String _payload = "";
-  this->appendGpioJsonPayload( _payload );
+  this->appendGpioJsonPayload( _payload, true );
   _payload += "\n\nHello from Esp\n";
   if( nullptr != this->m_wifi ){
     _payload += this->m_wifi->macAddress();
@@ -293,6 +368,7 @@ void GpioServiceProvider::handleGpioOperations(){
         GPIO_ALERT_DURATION_FOR_FAILED < ( _now - __gpio_alert_track.last_alert_millis )
       ) ){
 
+        __gpio_alert_track.alert_gpio_pin = _pin;
         __gpio_alert_track.last_alert_millis = _now;
         switch ( this->m_gpio_config_copy.gpio_alert_channel[_pin] ) {
 
@@ -302,6 +378,10 @@ void GpioServiceProvider::handleGpioOperations(){
             break;
           }
           #endif
+          case HTTP_SERVER:{
+            __gpio_alert_track.is_last_alert_succeed = this->handleGpioHttpRequest(true);
+            break;
+          }
           case NO_ALERT:
           default: break;
         }

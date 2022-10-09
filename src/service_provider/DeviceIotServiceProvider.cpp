@@ -274,7 +274,7 @@ void DeviceIotServiceProvider::configureMQTT(){
 
   strcpy( _mqtt_lwt_configs.will_topic, this->m_device_iot_configs.device_iot_topic );
   // strcpy_P( _mqtt_lwt_configs.will_topic, DEVICE_IOT_MQTT_WILL_TOPIC );
-  strcpy_P( _mqtt_lwt_configs.will_message, PSTR("{\"head\":{\"uid\":\"[mac]\",\"cid\":\"[mac]\",\"packet_type\":\"disconnect\"},\"payload\":{},\"tail\":{}}") );
+  strcpy_P( _mqtt_lwt_configs.will_message, PSTR("{\"head\":{\"uid\":\"[mac]\",\"packet_type\":\"disconnect\"},\"payload\":{},\"tail\":{}}") );
   _mqtt_lwt_configs.will_qos = 1;
   _mqtt_lwt_configs.will_retain = 0;
 
@@ -395,7 +395,7 @@ void DeviceIotServiceProvider::handleSensorData(){
     if( _payload.length()+1 < MQTT_PAYLOAD_BUF_SIZE ){
       _payload.toCharArray( __mqtt_service.m_mqtt_payload, _payload.length()+1);
     }else{
-      strcat_P( __mqtt_service.m_mqtt_payload, PSTR("mqtt data to big to fit in buffer !"));
+      strcat_P( __mqtt_service.m_mqtt_payload, PSTR("mqtt data is too big to fit in buffer !"));
     }
   }else{
     this->m_smaple_index++;

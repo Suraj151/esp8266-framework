@@ -20,6 +20,8 @@ created Date    : 1st June 2019
 #define GPIO_PAYLOAD_DATA_KEY   "data"
 #define GPIO_PAYLOAD_MODE_KEY   "mode"
 #define GPIO_PAYLOAD_VALUE_KEY  "val"
+#define GPIO_PAYLOAD_MAC_KEY    "mac_id"
+#define GPIO_ALERT_PIN_KEY      "alrtkey"
 
 // currently 100 ms is kept as lowest blink time
 #define GPIO_DIGITAL_BLINK_MIN_DURATION_MS 100
@@ -120,7 +122,7 @@ class GpioServiceProvider : public ServiceProvider {
 
     void begin( iWiFiInterface* _wifi, iWiFiClientInterface* _wifi_client );
     void enable_update_gpio_table_from_copy( void );
-    void appendGpioJsonPayload( String& _payload );
+    void appendGpioJsonPayload( String& _payload, bool isAlertPost = false );
     void applyGpioJsonPayload( char* _payload, uint16_t _payload_length );
     #ifdef ENABLE_EMAIL_SERVICE
     bool handleGpioEmailAlert( void );
@@ -128,7 +130,7 @@ class GpioServiceProvider : public ServiceProvider {
     void handleGpioOperations( void );
     void handleGpioModes( int _gpio_config_type=GPIO_MODE_CONFIG );
     uint8_t getGpioFromPinMap( uint8_t _pin );
-    void handleGpioHttpRequest( void );
+    bool handleGpioHttpRequest( bool isAlertPost = false );
     #ifdef EW_SERIAL_LOG
     void printGpioConfigLogs( void );
     #endif
