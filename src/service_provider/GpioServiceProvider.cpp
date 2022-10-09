@@ -97,40 +97,45 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
     __http_service.m_http_client->begin( *this->m_wifi_client, __http_service.m_host )
   ){
 
-    String _payload = "";
-    this->appendGpioJsonPayload( _payload, isAlertPost );
+    String *_payload = new String("");
 
-    #ifdef ENABLE_DEVICE_IOT
+    if( nullptr != _payload ){
 
-    uint8_t mac[6];
-    char macStr[18] = { 0 };
-    wifi_get_macaddr(STATION_IF, mac);
-    sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+      this->appendGpioJsonPayload( *_payload, isAlertPost );
 
-    __http_service.m_http_client->setUserAgent("esp");
-    __http_service.m_http_client->setAuthorization("iot-otp", macStr);
-    __http_service.m_http_client->setTimeout(3*MILLISECOND_DURATION_1000);
-    #else
-    __http_service.m_http_client->setUserAgent("Ewings");
-    __http_service.m_http_client->setAuthorization("user", "password");
-    __http_service.m_http_client->setTimeout(2*MILLISECOND_DURATION_1000);
-    #endif
+      #ifdef ENABLE_DEVICE_IOT
 
-    __http_service.m_http_client->addHeader("Content-Type", "application/json");
+      uint8_t mac[6];
+      char macStr[18] = { 0 };
+      wifi_get_macaddr(STATION_IF, mac);
+      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-    #ifdef EW_SERIAL_LOG
-    Log( F("posting data : ") );
-    Logln( _payload );
-    #endif
+      __http_service.m_http_client->setUserAgent("esp");
+      __http_service.m_http_client->setAuthorization("iot-otp", macStr);
+      __http_service.m_http_client->setTimeout(3*MILLISECOND_DURATION_1000);
+      #else
+      __http_service.m_http_client->setUserAgent("Ewings");
+      __http_service.m_http_client->setAuthorization("user", "password");
+      __http_service.m_http_client->setTimeout(2*MILLISECOND_DURATION_1000);
+      #endif
 
-    int _httpCode = __http_service.m_http_client->POST( _payload );
-    status = __http_service.followHttpRequest( _httpCode );
+      __http_service.m_http_client->addHeader("Content-Type", "application/json");
 
-    if( status ){
+      #ifdef EW_SERIAL_LOG
+      Log( F("posting data : ") );
+      Logln( *_payload );
+      #endif
 
-      status = this->handleGpioHttpRequest();
+      int _httpCode = __http_service.m_http_client->POST( *_payload );
+      status = __http_service.followHttpRequest( _httpCode );
+
+      delete _payload;
+
+      if( status ){
+
+        status = this->handleGpioHttpRequest();
+      }
     }
-
   }else{
     #ifdef EW_SERIAL_LOG
     Logln( F("GPIO Http Request not initializing or failed or Not Configured Correctly") );
@@ -273,17 +278,31 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
  */
 bool GpioServiceProvider::handleGpioEmailAlert(){
 
+  bool status = false;
+
   #ifdef EW_SERIAL_LOG
   Logln( F("Handling GPIO email alert") );
   #endif
-  String _payload = "";
-  this->appendGpioJsonPayload( _payload, true );
-  _payload += "\n\nHello from Esp\n";
-  if( nullptr != this->m_wifi ){
-    _payload += this->m_wifi->macAddress();
+
+  String *_payload = new String("");
+
+  if( nullptr != _payload ){
+
+    this->appendGpioJsonPayload( *_payload, true );
+
+    *_payload += "\n\nRegards\n";
+
+    if( nullptr != this->m_wifi ){
+
+      *_payload += this->m_wifi->macAddress();
+    }
+
+    status = __email_service.sendMail( *_payload );
+
+    delete _payload;
   }
 
-  return __email_service.sendMail( _payload );
+  return status;
 }
 #endif
 

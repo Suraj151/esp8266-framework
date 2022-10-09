@@ -60,41 +60,33 @@ void EmailServiceProvider::handleEmail(){
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling email"));
       #endif
-      String _payload = "";
 
-      // _payload += "MIME-Version: 1.0\n";
-      // _payload += "Content-Type: multipart/mixed;";
-      // _payload += "boundary=\"jncvdcsjnss\"\r\n\n";
-      //
-      // _payload += "--jncvdcsjnss\n";
-      // _payload += "Content-Type: text/plain; charset=utf-8\n";
-      // _payload += "Content-Transfer-Encoding: quoted-printable\r\n\n";
-      //
-      // _payload += "this is test file.\r\n\n";
-      //
-      // _payload += "--jncvdcsjnss\n";
-      // _payload += "Content-Type: text/plain; name=test.txt\n";
-      // _payload += "Content-Transfer-Encoding: base64\n";
-      // _payload += "Content-Disposition: attachment; filename=test.txt\r\n\n";
-      //
-      // _payload += "dGVzdCBmaWxlIAo=\r\n\n";
-      //
-      // _payload += "--jncvdcsjnss--\n";
+      String *_payload = new String("");
 
-      #ifdef ENABLE_GPIO_SERVICE
+      if( nullptr != _payload ){
 
-      __gpio_service.appendGpioJsonPayload( _payload );
-      #endif
+        #ifdef ENABLE_GPIO_SERVICE
 
-      _payload += "\n\nHello from Esp\n";
-      if( nullptr != this->m_wifi ){
-        _payload += this->m_wifi->macAddress();
+        __gpio_service.appendGpioJsonPayload( *_payload );
+        #endif
+
+        *_payload += "\n\nRegards\n";
+
+        if( nullptr != this->m_wifi ){
+
+          *_payload += this->m_wifi->macAddress();
+        }
+
+        if( this->sendMail( *_payload ) ){
+
+          __task_scheduler.clearInterval(this->m_mail_handler_cb_id);
+          this->m_mail_handler_cb_id = 0;
+        }
+
+        delete _payload;
+
       }
 
-      if( this->sendMail( _payload ) ){
-        __task_scheduler.clearInterval(this->m_mail_handler_cb_id);
-        this->m_mail_handler_cb_id = 0;
-      }
     },
     180000
   );

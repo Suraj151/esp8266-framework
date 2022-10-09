@@ -84,19 +84,24 @@ void MqttServiceProvider::handleMqttPublish(){
 
       #ifdef ENABLE_MQTT_DEFAULT_PAYLOAD
 
-        String _payload = "";
+        String *_payload = new String("");
 
-        #ifdef ENABLE_GPIO_SERVICE
+        if( nullptr != _payload ){
 
-          __gpio_service.appendGpioJsonPayload( _payload );
-        #else
+          #ifdef ENABLE_GPIO_SERVICE
 
-          _payload += "Hello from Esp Client : ";
-          _payload += ESP.getChipId();
-        #endif
+            __gpio_service.appendGpioJsonPayload( *_payload );
+          #else
 
-        memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
-        _payload.toCharArray( this->m_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
+            *_payload += "Hello from Esp Client : ";
+            *_payload += ESP.getChipId();
+          #endif
+
+          memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
+          _payload->toCharArray( this->m_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
+
+          delete _payload;
+        }
 
       #else
 

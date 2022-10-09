@@ -90,25 +90,32 @@ class GpioController : public Controller {
 
       y2 = GPIO_MAX_GRAPH_HEIGHT - y2;
 
-      String _response = "{\"x1\":";
-      _response += x1;
-      _response += ",\"y1\":";
-      _response += y1;
-      _response += ",\"x2\":";
-      _response += x2;
-      _response += ",\"y2\":";
-      _response += y2;
-      _response += ",\"r\":";
-      _response += !this->m_route_handler->has_active_session();
-			_response += ",\"d\":";
-			__gpio_service.appendGpioJsonPayload(_response);
-			_response += ",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"BLINK\", \"AOUT\", \"AIN\"]";
-      _response += "}";
+			String *_response = new String("");
 
-      this->_last_monitor_point.x = x2;
-      this->_last_monitor_point.y = y2;
-      this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
-      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _response );
+			if( nullptr != _response ){
+
+				*_response = "{\"x1\":";
+	      *_response += x1;
+	      *_response += ",\"y1\":";
+	      *_response += y1;
+	      *_response += ",\"x2\":";
+	      *_response += x2;
+	      *_response += ",\"y2\":";
+	      *_response += y2;
+	      *_response += ",\"r\":";
+	      *_response += !this->m_route_handler->has_active_session();
+				*_response += ",\"d\":";
+				__gpio_service.appendGpioJsonPayload(*_response);
+				*_response += ",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"BLINK\", \"AOUT\", \"AIN\"]";
+	      *_response += "}";
+
+	      this->_last_monitor_point.x = x2;
+	      this->_last_monitor_point.y = y2;
+	      this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
+	      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, *_response );
+
+				delete _response;
+			}
     }
 
 		/**
