@@ -23,6 +23,9 @@ PROMPT = re.compile(r"[^\s@]+@[^\s:]+:(\([^)]*\))?: ")
 LOGIN_PROMPT = re.compile(r"login: ")
 PASSWORD_PROMPT = re.compile(r"Pass : ")
 
+# either of the two states a target can land in once it answers
+ANY_PROMPT = re.compile(r"login: |[^\s@]+@[^\s:]+:(\([^)]*\))?: ")
+
 CTRL_C = "\x03"
 
 DEFAULT_TIMEOUT = 20.0
@@ -230,6 +233,14 @@ class Shell(object):
             self._buffer = seen + self._buffer
             return self.login(username, password, timeout)
 
-        # nothing yet: a target still coming up, so wait out the banner
-        self.expect(LOGIN_PROMPT, timeout, consume=False)
-        return self.login(username, password, timeout)
+        # nothing yet: a target still coming up, or one busy enough that the
+        # drain above gave up before it answered. it can land on either prompt —
+        # asking to log in, or already logged in when a key opened the session —
+        # so wait for whichever arrives rather than only the login prompt, which
+        # a key authenticated session never sends.
+        seen = self.expect(ANY_PROMPT, timeout, consume=False)
+
+        if LOGIN_PROMPT.search(seen):
+            return self.login(username, password, timeout)
+
+        return seen

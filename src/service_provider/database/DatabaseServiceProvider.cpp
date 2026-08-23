@@ -9,12 +9,13 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "DatabaseServiceProvider.h"
+#include <database/core/DatabaseLayout.h>
+#include <interface/pdi/impl/modules/database/EepromDbStore.h>
+#include <interface/pdi/impl/modules/database/FsDbStore.h>
+#ifdef ENABLE_DB_SEALING
+#include <database/core/DbKey.h>
+#endif
 #include <service_provider/device/FactoryResetServiceProvider.h>
-
-/**
- * @var	GlobalTable	__global_table
- */
-GlobalTable __global_table;
 
 #if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
 /**
@@ -75,7 +76,7 @@ DeviceIotTable __device_iot_table;
 
 #ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
 static void factoryResetOnInvalidConfigs(){
-    if ( !__i_db.isValidConfigs() ){
+    if ( !__db_layout.is_mounted() ){
       SysLogE("\n\nFound invalid configs.. starting factory reset..!\n\n");
       // __database_service.clear_default_tables();
       __factory_reset.factory_reset();
@@ -86,7 +87,7 @@ static void factoryResetOnInvalidConfigs(){
 /**
  * Constructor
  */
-DatabaseServiceProvider::DatabaseServiceProvider() : ServiceProvider(SERVICE_DATABASE, RODT_ATTR("DB"))
+DatabaseServiceProvider::DatabaseServiceProvider() : ServiceProvider(SERVICE_DATABASE, RODT_ATTR("DB")), m_storage_tier(false)
 {
 }
 
@@ -102,8 +103,13 @@ DatabaseServiceProvider::~DatabaseServiceProvider()
  */
 bool DatabaseServiceProvider::initService(void *arg)
 {
-  __i_db.beginConfigs(__i_db.getMaxDBSize());
-  __database.init_database(__i_db.getMaxDBSize());
+  uint8_t _unregistered = __database.init_database();
+  if (0 != _unregistered)
+  {
+    SysLogE("%u config tables did not register, their configs will not persist\n", (unsigned)_unregistered);
+  }
+
+  this->resolve_tiers();
 
   // clear config to default on factory reset event if enabled
   #ifdef CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET
@@ -122,21 +128,162 @@ bool DatabaseServiceProvider::initService(void *arg)
 }
 
 /**
- * clear all tables to their defaults value.
+ * decide which medium the device runs its database on.
+ *
+ * The container on storage is preferred and the eeprom holds the defaults
+ * behind it. A device with no storage, or one whose container cannot be opened,
+ * runs on the eeprom itself.
  */
-void DatabaseServiceProvider::clear_default_tables()
+void DatabaseServiceProvider::resolve_tiers()
 {
-  __database.clear_all();
+  m_storage_tier = false;
+
+#ifdef ENABLE_DB_SEALING
+  // the sealing key lives in the eeprom and is read into ram once, the tier the
+  // device ends up running on does not change where it comes from
+  __i_eeprom_dbstore.init();
+  if (PDI_OK != __db_key.load())
+  {
+    SysLogE("DB sealing key unavailable, secret tables will not load\n");
+  }
+  __i_eeprom_dbstore.deinit();
+#endif
+
+#ifdef ENABLE_STORAGE_SERVICE
+  if (PDI_OK == __i_fs_dbstore.init())
+  {
+    pdi_err_t _live = __db_layout.mount(&__i_fs_dbstore, __database.m_database_tables);
+
+    if (PDI_OK == _live)
+    {
+      m_storage_tier = true;
+
+      // a container that never existed, or one that was wiped, starts from
+      // whatever defaults the eeprom is holding
+      if (__db_layout.was_formatted())
+      {
+        SysLogW("DB container laid down fresh, taking the eeprom defaults\n");
+        this->restore_defaults();
+      }
+    }
+    else
+    {
+      SysLogE("DB container mount failed (%d), running on eeprom instead\n", (int)_live);
+    }
+  }
+#endif
+
+  if (!m_storage_tier)
+  {
+    __i_eeprom_dbstore.init();
+
+    pdi_err_t _live = __db_layout.mount(&__i_eeprom_dbstore, __database.m_database_tables);
+
+    if (PDI_OK != _live)
+    {
+      SysLogE("DB mount failed (%d)\n", (int)_live);
+    }
+  }
+
+  if (__db_layout.is_mounted() && __db_layout.was_formatted())
+  {
+    __db_layout.set_firmware_version(FIRMWARE_VERSION);
+    __db_layout.set_launch_year(LAUNCH_YEAR);
+  }
 }
 
 /**
- * get/fetch global config table from database.
+ * take what the device is running now as the defaults it falls back to.
+ *
+ * @return status
+ */
+bool DatabaseServiceProvider::save_defaults()
+{
+#ifdef ENABLE_STORAGE_SERVICE
+  if (!m_storage_tier)
+  {
+    return false;
+  }
+
+  // the defaults layout lives only for this copy, holding a second one for the
+  // life of the device would cost ram that is idle almost all of that time
+  DbLayout _defaults;
+
+  __i_eeprom_dbstore.init();
+
+  bool _status = PDI_OK == _defaults.mount(&__i_eeprom_dbstore, __database.m_database_tables) &&
+                 PDI_OK == _defaults.copy_from(__db_layout);
+
+  __i_eeprom_dbstore.deinit();
+
+  return _status;
+#else
+  return false;
+#endif
+}
+
+/**
+ * put the defaults the device falls back to back in use.
+ *
+ * @return status
+ */
+bool DatabaseServiceProvider::restore_defaults()
+{
+#ifdef ENABLE_STORAGE_SERVICE
+  if (!m_storage_tier)
+  {
+    return false;
+  }
+
+  DbLayout _defaults;
+
+  __i_eeprom_dbstore.init();
+
+  bool _status = PDI_OK == _defaults.mount(&__i_eeprom_dbstore, __database.m_database_tables) &&
+                 PDI_OK == __db_layout.copy_from(_defaults);
+
+  __i_eeprom_dbstore.deinit();
+
+  return _status;
+#else
+  return false;
+#endif
+}
+
+/**
+ * clear all tables to their defaults value.
+ *
+ * @return status
+ */
+bool DatabaseServiceProvider::clear_default_tables()
+{
+#ifdef ENABLE_STORAGE_SERVICE
+  if (m_storage_tier)
+  {
+    return this->restore_defaults();
+  }
+#endif
+
+  return __database.clear_all();
+}
+
+/**
+ * get/fetch global config values from the database superblock.
  *
  * @return status
  */
 bool DatabaseServiceProvider::get_global_config_table(global_config_table *_table)
 {
-  return __global_table.get(_table);
+  if (!__db_layout.is_mounted())
+  {
+    return false;
+  }
+
+  _table->clear();
+  _table->firmware_version = __db_layout.firmware_version();
+  _table->current_year = __db_layout.launch_year();
+
+  return true;
 }
 
 #if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
@@ -244,13 +391,22 @@ bool DatabaseServiceProvider::get_device_iot_config_table(device_iot_config_tabl
 #endif
 
 /**
- * set global config table in database.
+ * set global config values in the database superblock.
  *
  * @param global_config_table* _table
+ * @return status
  */
-void DatabaseServiceProvider::set_global_config_table(global_config_table *_table)
+bool DatabaseServiceProvider::set_global_config_table(global_config_table *_table)
 {
-  __global_table.set(_table);
+  if (!__db_layout.is_mounted())
+  {
+    return false;
+  }
+
+  __db_layout.set_firmware_version(_table->firmware_version);
+  __db_layout.set_launch_year(_table->current_year);
+
+  return true;
 }
 
 #if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
@@ -258,10 +414,11 @@ void DatabaseServiceProvider::set_global_config_table(global_config_table *_tabl
  * set login credential config table in database.
  *
  * @param login_credential_table* _table
+ * @return status
  */
-void DatabaseServiceProvider::set_login_credential_table(login_credential_table *_table)
+bool DatabaseServiceProvider::set_login_credential_table(login_credential_table *_table)
 {
-  __login_table.set(_table);
+  return __login_table.set(_table);
 }
 #endif
 
@@ -270,10 +427,11 @@ void DatabaseServiceProvider::set_login_credential_table(login_credential_table 
  * set wifi config table in database.
  *
  * @param wifi_config_table* _table
+ * @return status
  */
-void DatabaseServiceProvider::set_wifi_config_table(wifi_config_table *_table)
+bool DatabaseServiceProvider::set_wifi_config_table(wifi_config_table *_table)
 {
-  __wifi_table.set(_table);
+  return __wifi_table.set(_table);
 }
 #endif
 
@@ -282,10 +440,11 @@ void DatabaseServiceProvider::set_wifi_config_table(wifi_config_table *_table)
  * set ota(over the air update) config table in database.
  *
  * @param ota_config_table* _table
+ * @return status
  */
-void DatabaseServiceProvider::set_ota_config_table(ota_config_table *_table)
+bool DatabaseServiceProvider::set_ota_config_table(ota_config_table *_table)
 {
-  __ota_table.set(_table);
+  return __ota_table.set(_table);
 }
 #endif
 
@@ -294,10 +453,11 @@ void DatabaseServiceProvider::set_ota_config_table(ota_config_table *_table)
  * set gpio config table in database.
  *
  * @param gpio_config_table* _table
+ * @return status
  */
-void DatabaseServiceProvider::set_gpio_config_table(gpio_config_table *_table)
+bool DatabaseServiceProvider::set_gpio_config_table(gpio_config_table *_table)
 {
-  __gpio_table.set(_table);
+  return __gpio_table.set(_table);
 }
 #endif
 
@@ -306,30 +466,33 @@ void DatabaseServiceProvider::set_gpio_config_table(gpio_config_table *_table)
  * set mqtt general config table in database.
  *
  * @param mqtt_general_config_table* _table
+ * @return status
  */
-void DatabaseServiceProvider::set_mqtt_general_config_table(mqtt_general_config_table *_table)
+bool DatabaseServiceProvider::set_mqtt_general_config_table(mqtt_general_config_table *_table)
 {
-  __mqtt_general_table.set(_table);
+  return __mqtt_general_table.set(_table);
 }
 
 /**
  * set mqtt lwt config table in database.
  *
  * @param mqtt_lwt_config_table* _table
+ * @return status
  */
-void DatabaseServiceProvider::set_mqtt_lwt_config_table(mqtt_lwt_config_table *_table)
+bool DatabaseServiceProvider::set_mqtt_lwt_config_table(mqtt_lwt_config_table *_table)
 {
-  __mqtt_lwt_table.set(_table);
+  return __mqtt_lwt_table.set(_table);
 }
 
 /**
  * set mqtt pubsub config table in database.
  *
  * @param mqtt_pubsub_config_table* _table
+ * @return status
  */
-void DatabaseServiceProvider::set_mqtt_pubsub_config_table(mqtt_pubsub_config_table *_table)
+bool DatabaseServiceProvider::set_mqtt_pubsub_config_table(mqtt_pubsub_config_table *_table)
 {
-  __mqtt_pubsub_table.set(_table);
+  return __mqtt_pubsub_table.set(_table);
 }
 #endif
 
@@ -338,10 +501,11 @@ void DatabaseServiceProvider::set_mqtt_pubsub_config_table(mqtt_pubsub_config_ta
  * set email config table in database.
  *
  * @param email_config_table* _table
+ * @return status
  */
-void DatabaseServiceProvider::set_email_config_table(email_config_table *_table)
+bool DatabaseServiceProvider::set_email_config_table(email_config_table *_table)
 {
-  __email_table.set(_table);
+  return __email_table.set(_table);
 }
 #endif
 
@@ -350,10 +514,11 @@ void DatabaseServiceProvider::set_email_config_table(email_config_table *_table)
  * set device iot config table in database.
  *
  * @param device_iot_config_table* _table
+ * @return status
  */
-void DatabaseServiceProvider::set_device_iot_config_table(device_iot_config_table *_table)
+bool DatabaseServiceProvider::set_device_iot_config_table(device_iot_config_table *_table)
 {
-  __device_iot_table.set(_table);
+  return __device_iot_table.set(_table);
 }
 #endif
 

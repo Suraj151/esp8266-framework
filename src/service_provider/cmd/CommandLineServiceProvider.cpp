@@ -87,6 +87,7 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
 
   HexdumpCommand::RegisterCommand();
   DfFSCommand::RegisterCommand();
+  DatabaseCommand::RegisterCommand();
   MountCommand::RegisterCommand();
   WcFSCommand::RegisterCommand();
   HeadFSCommand::RegisterCommand();
@@ -221,9 +222,18 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
     {
       char c = terminal->read();
 
+      bool iseol = ('\n' == c || '\r' == c);
+
+      if (iseol && 0 != session->m_lastEol && c != session->m_lastEol) {
+        session->m_lastEol = 0;
+        continue;
+      }
+
+      session->m_lastEol = iseol ? c : 0;
+
       // break command on line ending
-      if (c == '\n' || c == '\r') {
-        
+      if (iseol) {
+
         terminal->write(c);  // echo
         inseq = CMD_TERM_INSEQ_ENTER;
         break;

@@ -48,6 +48,11 @@ created Date    : 16th Aug 2026
 #define MAX_DB_TABLES 15
 
 /**
+ * device can spare the ram the record ciphers need
+ */
+#define DEVICE_SUPPORTS_DB_SEALING
+
+/**
  * services this device offers. each one is turned on as its host backend lands.
  */
 #define ENABLE_STORAGE_SERVICE

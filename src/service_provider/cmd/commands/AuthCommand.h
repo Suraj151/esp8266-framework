@@ -61,11 +61,12 @@ struct LoginCommand : public CommandBase {
 			CommandOption *usernamecmdoptn = RetrieveOption(CMD_OPTION_NAME_U);	
 			CommandOption *passwordcmdoptn = RetrieveOption(CMD_OPTION_NAME_P);	
 
-			bool isUsernameProvided = ( nullptr != usernamecmdoptn && nullptr != usernamecmdoptn->optionval && usernamecmdoptn->optionvalsize );
-			bool isPasswordProvided = ( nullptr != passwordcmdoptn && nullptr != passwordcmdoptn->optionval && passwordcmdoptn->optionvalsize );
+			bool isUsernameProvided = ( nullptr != usernamecmdoptn && nullptr != usernamecmdoptn->optionval && usernamecmdoptn->optionvalsize > 0 );
+			bool isPasswordProvided = ( nullptr != passwordcmdoptn && nullptr != passwordcmdoptn->optionval && passwordcmdoptn->optionvalsize > 0 );
 
 			if( isUsernameProvided ){
-				memcpy(_username, usernamecmdoptn->optionval, usernamecmdoptn->optionvalsize);
+				int16_t _ulen = usernamecmdoptn->optionvalsize < (LOGIN_CONFIGS_BUF_SIZE-1) ? usernamecmdoptn->optionvalsize : (LOGIN_CONFIGS_BUF_SIZE-1);
+				memcpy(_username, usernamecmdoptn->optionval, _ulen);
 				if( !isPasswordProvided ){
 					holdOptionValue(CMD_OPTION_NAME_U);
 				}
@@ -83,7 +84,8 @@ struct LoginCommand : public CommandBase {
 									  terminputaction == CMD_TERM_INSEQ_ENTER;
 
 			if( isPasswordProvided ){
-				memcpy(_password, passwordcmdoptn->optionval, passwordcmdoptn->optionvalsize);
+				int16_t _plen = passwordcmdoptn->optionvalsize < (LOGIN_CONFIGS_BUF_SIZE-1) ? passwordcmdoptn->optionvalsize : (LOGIN_CONFIGS_BUF_SIZE-1);
+				memcpy(_password, passwordcmdoptn->optionval, _plen);
 			}else{
 
 				if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||

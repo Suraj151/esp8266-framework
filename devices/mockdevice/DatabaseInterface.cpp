@@ -27,23 +27,23 @@ DatabaseInterface::~DatabaseInterface()
 {
 }
 
-uint8_t DatabaseInterface::readByte(uint32_t address) const
+uint8_t DatabaseInterface::readByte(uint32_t _address)
 {
-  return address < DATABASE_MAX_SIZE ? m_store[address] : 0;
+  return _address < DATABASE_MAX_SIZE ? m_store[_address] : 0;
 }
 
-void DatabaseInterface::writeByte(uint32_t address, uint8_t value)
+void DatabaseInterface::writeByte(uint32_t _address, uint8_t _value)
 {
-  if (address < DATABASE_MAX_SIZE)
+  if (_address < DATABASE_MAX_SIZE)
   {
-    m_store[address] = value;
+    m_store[_address] = _value;
   }
 }
 
 /**
  * push the store to its backing file when one is attached
  */
-void DatabaseInterface::commit()
+void DatabaseInterface::commitConfigs()
 {
   if (m_backingfile.size() == 0)
   {
@@ -71,24 +71,20 @@ void DatabaseInterface::beginConfigs(uint32_t _size)
 }
 
 /**
+ * close the store, pushing it to its backing file.
+ */
+void DatabaseInterface::endConfigs()
+{
+  commitConfigs();
+}
+
+/**
  * clear store by writing zero to all of its locations.
  */
 void DatabaseInterface::cleanAllConfigs(void)
 {
   memset(m_store, 0, DATABASE_MAX_SIZE);
-  commit();
-}
-
-/**
- * check whether database configs are valid
- *
- * @return bool
- */
-bool DatabaseInterface::isValidConfigs(void)
-{
-  return (readByte(CONFIG_START + 0) == CONFIG_VERSION[0] &&
-          readByte(CONFIG_START + 1) == CONFIG_VERSION[1] &&
-          readByte(CONFIG_START + 2) == CONFIG_VERSION[2]);
+  commitConfigs();
 }
 
 /**
@@ -118,7 +114,7 @@ bool DatabaseInterface::attachBackingFile(const char *path)
     return true;
   }
 
-  commit();
+  commitConfigs();
   return true;
 }
 

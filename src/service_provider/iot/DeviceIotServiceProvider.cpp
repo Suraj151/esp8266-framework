@@ -313,7 +313,7 @@ void DeviceIotServiceProvider::configureMQTT(){
   pdiutil::string auth_user = CHARPTR_WRAP("mac");
   Http_Client::BuildBasicAuthorization(auth_user.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), _mqtt_general_configs.client_id, MQTT_CLIENT_ID_BUF_SIZE);
   // strcpy( _mqtt_general_configs.client_id, this->m_device_iot_configs.device_iot_duid );
-  strcpy( _mqtt_general_configs.username, this->m_device_iot_configs.device_iot_duid );
+  strncpy( _mqtt_general_configs.username, this->m_device_iot_configs.device_iot_duid, MQTT_USERNAME_BUF_SIZE-1 );
   memcpy( _mqtt_general_configs.password, this->m_server_configurable_channel_token, DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE );
   _mqtt_general_configs.keepalive = this->m_server_configurable_mqtt_keep_alive;
   _mqtt_general_configs.clean_session = 1;

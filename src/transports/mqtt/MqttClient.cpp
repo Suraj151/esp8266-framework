@@ -873,7 +873,7 @@ void MQTTClient::InitLWT(char *will_topic, char *will_msg, uint8_t will_qos, uin
     }
   }
 
-  if (nullptr != will_topic)
+  if (nullptr != will_msg)
   {
     _len = strlen(will_msg);
     this->m_mqttClient.connect_info.will_message = pdiutil::safe_new_array<char>(_len + 1);

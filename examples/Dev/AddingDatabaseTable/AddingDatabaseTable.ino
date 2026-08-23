@@ -9,17 +9,13 @@
 // be carefull about table address or else table will not register.
 // it should be on minimum distant from last added table address + last added table size
 // keep safe distance between table addresses accordings their size
-// addresses upto 2499 are reserved for default framework tables so choose addresses from 2500 onwards
-// Eeprom is using only one spi flash sector so we have max size of 4096 bytes only.
-// hence put only importanat configs in tables
+// ids 1 to 9 belong to the framework tables, so take one from 10 onwards. An id
+// is permanent, never give a new table the id a removed one had.
+// The database is a few kilobytes, so put only important configs in tables.
 
 #define MAX_STUDENTS			5
 #define STUDENT_NAME_MAX_SIZE	20
-#if defined(DEVICE_ARDUINOUNO)
-#define STUDENT_TABLE_ADDRESS	800
-#else
-#define STUDENT_TABLE_ADDRESS	2500
-#endif
+#define STUDENT_TABLE_ID		10
 
 enum sex{ MALE,	FEMALE };
 
@@ -39,7 +35,7 @@ const student_table PROGMEM _student_table_defaults = {NULL, 0};
 /**
  * StudentTable class should extends public DatabaseTable as its base/parent class
  */
-class StudentTable : public DatabaseTable<STUDENT_TABLE_ADDRESS, student_table> {};
+class StudentTable : public DatabaseTable<STUDENT_TABLE_ID, student_table> {};
 
 /**
  * this should be defined before framework initialization

@@ -34,9 +34,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(usage=usage)
 
-    parser.add_argument('--schema', '-s', 
-                        help='schema file to process',
-                        default='../src/database/config/DBTableSchema.json' 
+    parser.add_argument('--schema', '-s',
+                        help='schema file to process, one of devices/<device>/config/DBTableSchema.json',
+                        required=True
                         )
     parser.add_argument('--outpath', '-o', 
                         help='folder path to store auto generated files',

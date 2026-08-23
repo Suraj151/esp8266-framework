@@ -16,9 +16,11 @@ created Date    : 23rd July 2026
 /**
  * echo command
  *
- * Prints its argument, or with a '>' redirection writes it to a file:
+ * Prints its argument, or with a redirection writes it to a file. A single
+ * operator replaces the file, a doubled one appends to it:
  *   echo hello
  *   echo 1 > /sys/class/gpio/5/value
+ *   echo second line >> /tmp/notes
  */
 struct EchoCommand : public CommandBase {
 
@@ -39,7 +41,7 @@ struct EchoCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("echo <text> [> <file>]  print text or write it to a file");
+		return RODT_ATTR("echo <text> [>|>> <file>]  print text, write it to a file or append it");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -82,10 +84,13 @@ struct EchoCommand : public CommandBase {
 
 #ifdef ENABLE_STORAGE_SERVICE
 		if( gt >= 0 ){
-			// left of '>' is the text, right is the target path
+			// a doubled operator appends, a single one replaces
+			bool append = (gt + 1) < bloblen && blob[gt+1] == '>';
+
+			// left of the operator is the text, right is the target path
 			int16_t textend = gt;
 			while( textend > 0 && blob[textend-1] == ' ' ) textend--;
-			int16_t pathstart = gt + 1;
+			int16_t pathstart = gt + (append ? 2 : 1);
 			while( pathstart < bloblen && blob[pathstart] == ' ' ) pathstart++;
 
 			pdiutil::string filepath = resolveArgPathStr(blob + pathstart, bloblen - pathstart);
@@ -96,7 +101,7 @@ struct EchoCommand : public CommandBase {
 			pdiutil::string payload(blob, textend);
 			payload += "\n";
 
-			int iStatus = __i_fs.writeFile(filepath.c_str(), payload.c_str(), payload.size(), false);
+			int iStatus = __i_fs.writeFile(filepath.c_str(), payload.c_str(), payload.size(), append);
 			if( iStatus < 0 ){
 				m_terminal->putln();
 				m_terminal->write_ro(RODT_ATTR("Failed : "));

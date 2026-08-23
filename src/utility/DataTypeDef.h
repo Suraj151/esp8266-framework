@@ -801,7 +801,7 @@ enum session_state_t : uint8_t {
 
 struct session_t {
     session_t() : m_sid(0), m_state(SESSION_STATE_FREE), m_terminal(nullptr), m_loginAt(0), m_lastActivityAt(0),
-                  m_cursor(0),
+                  m_cursor(0), m_lastEol(0),
 #ifdef ENABLE_STORAGE_SERVICE
                   m_historyIdx(-1), m_prevHistorySize(0), m_prevArgSize(0),
                   m_umask(FILE_UMASK_DEFAULT),
@@ -821,6 +821,7 @@ struct session_t {
         m_lastActivityAt = 0;
         m_linebuf.clear();
         m_cursor = 0;
+        m_lastEol = 0;
 #ifdef ENABLE_STORAGE_SERVICE
         m_historyIdx = -1;
         m_prevHistorySize = 0;
@@ -848,6 +849,7 @@ struct session_t {
 
     pdiutil::string m_linebuf;
     uint16_t m_cursor;
+    char m_lastEol;
 #ifdef ENABLE_STORAGE_SERVICE
     int16_t m_historyIdx;
     int16_t m_prevHistorySize;

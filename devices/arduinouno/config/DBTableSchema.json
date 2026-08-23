@@ -8,36 +8,32 @@
             "onlyHeader": true,
             "$defItems": [
                 {
-                    "defItemName": "GlobalTable",
-                    "defItemDesc": "Global table handles global config load/store operations",
-                    "defItemArg": "global_config_table",
-                    "defItemAddressKey": "GLOBAL_CONFIG_TABLE_ADDRESS",
-                    "defItemAddressValue": "CONFIG_START",
-                    "defItemExtVar": "__global_table"
-                },
-                {
                     "defItemName": "GpioTable",
                     "defItemDesc": "GPIO table handles GPIO configs load/store operations",
                     "defItemArg": "gpio_config_table",
-                    "defItemAddressKey": "GPIO_CONFIG_TABLE_ADDRESS",
-                    "defItemAddressValue": "500",
-                    "defItemExtVar": "__gpio_table"
+                    "defItemIdKey": "GPIO_TABLE_ID",
+                    "defItemIdValue": "4",
+                    "defItemExtVar": "__gpio_table",
+                    "defItemVersion": "1",
+                    "defItemSecret": "false"
                 },
                 {
                     "defItemName": "LoginTable",
                     "defItemDesc": "Login table handles credential configs load/store operations",
                     "defItemArg": "login_credential_table",
-                    "defItemAddressKey": "LOGIN_CREDENTIAL_TABLE_ADDRESS",
-                    "defItemAddressValue": "200",
-                    "defItemExtVar": "__login_table"
+                    "defItemIdKey": "LOGIN_TABLE_ID",
+                    "defItemIdValue": "1",
+                    "defItemExtVar": "__login_table",
+                    "defItemVersion": "1",
+                    "defItemSecret": "true"
                 }
             ],
             "includes": [
                 "<database/core/DatabaseTable.h>"
             ],
-            "macrodefines":[
+            "macrodefines": [
                 {
-                    "macroDefine": "$$defItemAddressKey$$ $$defItemAddressValue$$"
+                    "macroDefine": "$$defItemIdKey$$ $$defItemIdValue$$"
                 }
             ],
             "parent": {
@@ -47,14 +43,15 @@
                 "template": {
                     "isDeclaration": false,
                     "args": [
-                        "$$defItemAddressKey$$",
-                        "$$defItemArg$$"
+                        "$$defItemIdKey$$",
+                        "$$defItemArg$$",
+                        "$$defItemVersion$$",
+                        "$$defItemSecret$$"
                     ]
                 }
             },
-            "members": [
-            ],
-            "postclassdeclaration":[
+            "members": [],
+            "postclassdeclaration": [
                 {
                     "name": "$$defItemExtVar$$",
                     "preprop": "extern ",

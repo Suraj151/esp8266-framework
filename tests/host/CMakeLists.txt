@@ -42,6 +42,7 @@ file(GLOB PDI_UTILITY_SOURCES
 file(GLOB PDI_IMPL_SOURCES
   ${PDI_ROOT}/src/interface/pdi/impl/log/*.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/middlewares/*.cpp
+  ${PDI_ROOT}/src/interface/pdi/impl/modules/database/*.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/modules/storage/*.cpp
 )
 

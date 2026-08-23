@@ -102,7 +102,7 @@ The **[Detailed Documentation](#detailed-documentation)** below is the in-tree r
 - **[2. Build & Toolchain](#2-build--toolchain)** — install, switch board, autogen scripts, vendored externals.
 - **[3. Configuration System](#3-configuration-system)** — every `ENABLE_*` flag and what depends on it.
 - **[4. Task Scheduler](#4-task-scheduler)** — three modes, four policies, and how to choose.
-- **[5. Database Layer](#5-database-layer)** — schema model, address-based store, JSON codegen.
+- **[5. Database Layer](#5-database-layer)** — record store, storage and eeprom tiers, sealed records, JSON codegen.
 - **[6. Service Providers](#6-service-providers)** — per-service init flow, CLI and web surface, events.
 - **[7. Command Line / Terminal](#7-command-line--terminal)** — full CLI reference and how to add a command.
 - **[8. Web Server](#8-web-server)** — request lifecycle, routes, views, adding a page.
@@ -420,7 +420,7 @@ Three things line up so that a first build needs no scripts:
 
 Running `DeviceSetup.py` for another board overrides all three: the generated `DeviceSetup.h` wins over the fallback and fresh table headers replace the placeholders. To come back to ESP32, either re-run the script with `-d esp32` or delete `devices/DeviceSetup.h` and let the fallback take over again.
 
-Because the fallback is silent, a build flashed onto an ESP8266 or an UNO without running the script compiles happily with ESP32 table addresses and feature flags. Run the script whenever you leave the ESP32 default, and again whenever you come back — `git checkout src/database/tables/` restores the placeholders if the generated ones are still lying around.
+Because the fallback is silent, a build flashed onto an ESP8266 or an UNO without running the script compiles happily with the ESP32's table set and feature flags. Run the script whenever you leave the ESP32 default, and again whenever you come back — `git checkout src/database/tables/` restores the placeholders if the generated ones are still lying around.
 
 #### 2.5.1 Per-port capability flags
 
@@ -534,7 +534,7 @@ Every flag acts as a triple gate: which interface the device exposes, which serv
 
 ### 3.4 The shape of a service config
 
-Every per-service config follows the same six-part shape, which is what lets the database layer and the web forms treat them uniformly. WiFi is the canonical example:
+Every per-service config follows the same five-part shape, which is what lets the database layer and the web forms treat them uniformly. WiFi is the canonical example:
 
 ```cpp
 #define WIFI_CONFIGS_BUF_SIZE 30
@@ -553,11 +553,10 @@ struct wifi_configs {                     // 4. the persisted struct
   char sta_ssid[WIFI_CONFIGS_BUF_SIZE];   //    fixed-size members only
 };
 
-const int wifi_config_size = sizeof(wifi_configs) + 5;  // 5. size on NVM
-using wifi_config_table = wifi_configs;                 // 6. canonical alias
+using wifi_config_table = wifi_configs;   // 5. canonical alias
 ```
 
-The `+ 5` is the per-table framing on NVM — table id and checksum. Boot sums those sizes across every registered table and checks the total against what the database interface reports as available.
+The struct carries no size constant of its own. A table declares `sizeof(Table)` when it registers, and the database engine reserves the slot from that — framing, growth room and the seal a credential table needs are all its business, not the config header's. [§5](#5-database-layer) covers how a record is laid out and how the total is checked against the medium at build time.
 
 ### 3.5 What each config file carries
 
@@ -828,72 +827,82 @@ Start, stop and restart need root. Ownership is tracked per service rather than 
 ---
 ## 5. Database Layer
 
-This is where framework configuration goes to survive a reboot. It is not a key-value store, not relational, and not a filesystem — it is a fixed-address, fixed-size, type-safe table store sized for the few kilobytes of EEPROM-emulated flash a small MCU can spare. Every persisted struct from [§3](#3-configuration-system) reaches NVM through it.
+This is where framework configuration goes to survive a reboot. It is not a key-value store, not relational, and not a filesystem — it is a small record store sized for the few kilobytes a small MCU can spare, holding the critical state a device cannot be reconfigured without: credentials, WiFi, GPIO, OTA, MQTT, email, IoT. Everything else is human-readable config under `/etc/<feature>/<feature>.conf`.
 
 It follows the same three tiers as everything else:
 
 ```
-  service   DatabaseServiceProvider     get_*_table / set_*_table, factory-reset wiring
+  service   DatabaseServiceProvider     get_*_table / set_*_table, tier and factory-reset wiring
       │                                 ← the only surface other services touch
-  engine    Database + DatabaseTable    registry, address checks, typed get/set/clear
-      │                                 ← owns no bytes, just knows who lives where
-  port      iDatabaseInterface          raw read, write and checksum at an address
+  engine    Database + DatabaseTable     registry of what exists and how big it is
+            DbLayout                     superblock, directory, records, sealing
+      │                                 ← decides where a record lives
+  port      iDbStoreInterface            flat byte device: read, write, flush, capacity
+            iDatabaseInterface           the eeprom underneath one of those stores
 ```
 
 The per-table classes are generated from a JSON schema and live in `src/database/tables/`. Nothing there is hand-edited.
 
 ### 5.1 Mental model
 
-NVM is one flat byte space owned by the port:
+A table is identified by an **id that never changes and is never reused**. Nothing declares a byte address. The engine lays the records out itself:
 
 ```
-0          5                                                                  end
-├──────────┼──────────┬──────────┬──────────┬──────────┬──────────┬──── ... ──┤
-│ reserved │ Global   │ Login    │ WiFi     │ OTA      │ Gpio     │           │
-│  prefix  │  @5      │  @50     │  @150    │  @300    │  @500    │  unused   │
-└──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──── ... ──┘
+  0        5            17                        212                        end
+  ├────────┼────────────┼─────────────────────────┼──────── ... ──────┬───────┤
+  │reserved│ superblock │ directory[MAX_TABLES]   │ records, packed   │ free  │
+  └────────┴────────────┴─────────────────────────┴──────── ... ──────┴───────┘
 ```
 
-A table occupies `[address, address + sizeof(T) + 5)`, where the five bytes are the framing the port writes — a table id and a checksum. Addresses are fixed in the generated header. The engine's only check at registration time is whether a table overlaps its neighbour or runs past the end of the region. There is no allocator, no relocation, no defragmentation, and that is the whole point.
+The superblock carries a magic, the format revision, the firmware version, the launch year and a checksum. The directory is fixed at `MAX_DB_TABLES` entries — so adding a table never shifts a record — and each entry holds the table id, the version that wrote it, the offset, the slot capacity, the bytes actually written, a checksum and a flag byte.
 
-### 5.2 The port
+Because placement is derived, a struct that grows does not push a neighbour into it. On the next boot the engine notices the geometry no longer matches, repacks by id, and carries every payload across.
 
-The device side opens, erases and validates the NVM region and reports its size. It also supplies the three template methods that actually move typed bytes — `saveConfig<T>`, `loadConfig<T>`, `clearConfig<T>`. Templates cannot be virtual, so the base interface documents them as a contract and every port defines them inline in its own header. The singleton is `__i_db`.
+### 5.2 Two tiers
 
-### 5.3 The engine
+A device with storage runs on a container file and keeps the eeprom as the defaults behind it:
 
-Tables register themselves before `main()` runs. Each generated table inherits an abstract layer whose constructor pushes the instance into a static array, so by the time the database service starts, it already knows every table that exists in this build.
+| tier | medium | role |
+|---|---|---|
+| live | `/etc/database/pdi.db`, `0600 root` in a `0700 root` directory | everything the device is running |
+| defaults | eeprom | what it falls back to when the container is wiped or reset |
+
+`resolve_tiers()` prefers the container and falls back to running directly on the eeprom when there is no storage service or the container cannot be opened. A container that never existed, or one that was wiped, is rebuilt from the eeprom defaults on the next boot.
+
+The eeprom is opened only for the length of a defaults copy, so on a device running the container tier it holds no RAM at all — on esp8266 that is 4 KB that used to be a permanent shadow buffer.
+
+A single container file is used rather than one file per table: LittleFS runs a 4096-byte block and a 64-byte inline limit, so most tables would each claim a whole block. One container costs one block, and every write is an in-place `editFile()` at its offset, which keeps the mode and owner the file was created with.
+
+### 5.3 The ports
+
+`iDbStoreInterface` is a flat byte device — `read`, `write`, `flush`, `capacity`, plus `init`/`deinit` for opening and releasing the medium. Two implementations ship: `EepromDbStore`, which compares bytes before staging them so an unchanged record never dirties the medium, and `FsDbStore`, which keeps the container at its full length so a read never runs past the end of the file.
+
+Underneath the eeprom store, `iDatabaseInterface` is what a board port provides: `readByte`, `writeByte`, `commitConfigs`, `beginConfigs`, `endConfigs` and the region size. The singleton is `__i_db`.
+
+### 5.4 The engine
+
+Tables register themselves before `main()` runs. Each generated table inherits an abstract layer whose constructor pushes the instance into a static array, so by the time the database service starts it already knows every table in this build.
 
 ```cpp
-class WiFiTable : public DatabaseTable<WIFI_CONFIG_TABLE_ADDRESS, wifi_config_table> {};
+class WiFiTable : public DatabaseTable<WIFI_TABLE_ID, wifi_config_table, 1, true> {};
 extern WiFiTable __wifi_table;
 ```
 
-The template supplies `boot()` — which registers the address and size with the engine — plus typed `get`, `set` and `clear` that forward to the port.
+The template arguments are the id, the backing struct, the struct's layout version and whether the record holds a credential. The template supplies `boot()` — which registers id, size, version and secrecy — plus typed `get`, `set` and `clear` that go through `DbLayout`.
 
-The engine itself, the `__database` singleton, keeps the registry and enforces three rules when a table registers: the address must sit past the previous table's tail with a two-byte gap, the new tail must fit inside the region, and the table count must stay within `MAX_DB_TABLES`. A table that fails any of them is skipped, which shows up as a table quietly returning defaults. If that happens after a schema edit, the address map is where to look.
+`__database` is the registry and enforces two rules: a table must carry a non-zero id nobody else has taken, and the count must stay within `MAX_DB_TABLES`. `DbLayout` then decides whether they fit the medium. A table that fails either shows up as a `SysLogE` at boot and a table that refuses to persist.
 
-### 5.4 The service
+A table registering itself a second time keeps its entry rather than colliding with it, so a service that initialises more than once — a restart, a factory reset — comes back with its tables intact. Only a *different* table reaching for an id already held is a conflict.
 
-`DatabaseServiceProvider` is what the rest of the framework calls. It defines the table globals, each behind the matching `ENABLE_*` flag; it owns the boot sequence; and it exposes one typed `get_*_table` / `set_*_table` pair per persisted struct.
+Whether the records fit at all is settled at build time — `src/database/core/DatabaseLayout.h` sums every record, seals included, and fails the build against both the eeprom and the container.
 
-```cpp
-__i_db.beginConfigs(__i_db.getMaxDBSize());       // port mounts NVM
-__database.init_database(__i_db.getMaxDBSize());  // every table boots and registers
+### 5.5 The service
 
-if (AUTO_FACTORY_RESET_ON_INVALID_CONFIGS) {
-    __task_scheduler.setInterval([&]{
-        if (!__i_db.isValidConfigs()) { clear_default_tables(); __factory_reset.factory_reset(); }
-    }, 5000, now);
-}
-if (CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET) {
-    __utl_event.add_event_listener(EVENT_FACTORY_RESET, [&]{ clear_default_tables(); });
-}
-```
+`DatabaseServiceProvider` is what the rest of the framework calls. It defines the table globals, each behind the matching `ENABLE_*` flag; it resolves the tiers at boot; and it exposes one typed `get_*_table` / `set_*_table` pair per persisted struct, plus `save_defaults()` and `restore_defaults()`.
 
-Services go through those accessors rather than touching `__i_db` or a table global directly. That keeps the dependency one-way: a service depends on the database service, never on the port or on the generated layout.
+Services go through those accessors rather than touching a store or a table global directly. That keeps the dependency one-way: a service depends on the database service, never on the port or the generated layout.
 
-### 5.5 Where the tables come from
+### 5.6 Where the tables come from
 
 ```
   devices/<board>/config/DBTableSchema.json      ← you edit this
@@ -905,85 +914,87 @@ Services go through those accessors rather than touching `__i_db` or a table glo
   src/database/tables/<TableName>.h              ← generated, never edited
 ```
 
-Each `defItems` entry names the C++ class, the backing struct alias, the address macro and its value, and the global the framework links against. A generated table is a body-less subclass of the template — all the behaviour lives in the template, so copying an existing entry is genuinely all it takes.
+Each `defItems` entry names the C++ class, the backing struct alias, the id macro and its value, the struct version, whether the record is sealed, and the global the framework links against. A generated table is a body-less subclass of the template.
 
-The default map on the ESP ports:
+| Table | Id | Backing struct | Sealed | Present when |
+|---|---|---|---|---|
+| Login | 1 | `login_credential_table` | yes | auth or web server |
+| WiFi | 2 | `wifi_config_table` | yes | WiFi |
+| OTA | 3 | `ota_config_table` | no | OTA |
+| GPIO | 4 | `gpio_config_table` | no | GPIO |
+| MQTT general | 5 | `mqtt_general_config_table` | yes | MQTT |
+| MQTT LWT | 6 | `mqtt_lwt_config_table` | no | MQTT |
+| MQTT pub/sub | 7 | `mqtt_pubsub_config_table` | no | MQTT |
+| Email | 8 | `email_config_table` | yes | email |
+| Device IoT | 9 | `device_iot_config_table` | yes | IoT |
 
-| Table | Address | Backing struct | Present when |
-|---|---|---|---|
-| Global | 5 | `global_config_table` | always |
-| Login | 50 | `login_credential_table` | auth or web server |
-| WiFi | 150 | `wifi_config_table` | WiFi |
-| OTA | 300 | `ota_config_table` | OTA |
-| GPIO | 500 | `gpio_config_table` | GPIO |
-| MQTT general | 700 | `mqtt_general_config_table` | MQTT |
-| MQTT LWT | 1500 | `mqtt_lwt_config_table` | MQTT |
-| MQTT pub/sub | 1700 | `mqtt_pubsub_config_table` | MQTT |
-| Email | 2000 | `email_config_table` | email |
-| Device IoT | 2600 | `device_iot_config_table` | IoT |
-
-The gaps are growth room. Adding a field to the WiFi struct is free until it reaches `300 - 150 - 5 = 145` bytes; past that, OTA has to move and existing devices need to be reset.
-
-### 5.6 Boot, end to end
-
-```
-  static init        every table global is constructed
-                     └─ pushes itself into the pre-registration array
-
-  initialize()       __database_service.initService()
-                       ├─ port mounts NVM
-                       ├─ engine reserves its registry
-                       ├─ every pre-registered table boot()s
-                       │     └─ address checked, then accepted
-                       ├─ optional 5 s validity watchdog → reset on corruption
-                       └─ optional listener: factory reset → clear to defaults
-```
-
-After that, any service can ask for a table and trust what comes back.
+Global configuration is not a table. The firmware version and launch year live in the superblock, reached through `get_global_config_table` / `set_global_config_table`.
 
 ### 5.7 Read and write semantics
 
-Reads are whole-struct — put a `T` on the stack, read into it, change what you need, write it back. Writes land immediately; there is no journal and no commit phase, so on a flash-backed port every `set` is a flash write. Batch your changes rather than writing per field.
+Reads are whole-struct — put a default-constructed `T` on the stack, read into it, change what you need, write it back. Passing a default-constructed struct matters: a record written by a shorter, older version of the struct only covers the bytes it had, and everything past that keeps the default it came in with.
 
-Structs are `memcpy`'d raw, which is what makes serialisation free and also means an NVM image belongs to the toolchain that wrote it. Nothing about the layout is portable across ABIs.
+That is the growth rule, and it is the reason **new fields go at the end of a struct**. An appended field needs no migration code at all. Anything else — a field changing meaning or moving — bumps the table's version and overrides `migrate()`. A struct that *shrank* returns the record to its defaults, since the stored bytes no longer describe it.
 
-The engine is single-threaded. If contextual execution is on and two lanes touch the same table, guard it with a mutex.
+Writes land immediately; there is no journal. Structs are `memcpy`'d raw, so an image belongs to the toolchain that wrote it. The engine is single-threaded; if contextual execution is on and two lanes touch the same table, guard it with a mutex.
 
-### 5.8 Factory reset
+### 5.8 Sealed records
 
-Two switches shape the behaviour. `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` runs a five-second validity check and, on a bad checksum, clears the tables and fires the reset — which is how a device recovers from corrupted flash instead of sitting there bricked. `CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET` makes the reset event write default structs back rather than leaving zeros.
+Sealing is a device capability. `ENABLE_DB_SEALING` resolves against `DEVICE_SUPPORTS_DB_SEALING`, so a board that cannot spare the RAM the ciphers need — the AES key schedule and the HMAC state come to roughly 600 bytes of stack — builds without them, and every record carries a checksum instead. On a board that declares it, a table marked secret has its record sealed on the way to the medium: a fresh 16-byte nonce, AES-128-CTR ciphertext, then a truncated HMAC-SHA256 tag over the nonce and the ciphertext. The tag is checked before anything is decrypted, and before anything reaches the caller's buffer, so a tampered record cannot land on top of the defaults it is holding.
 
-The reset event is public, so any service can hook it to drop its own caches.
+The key is 16 bytes at the top of the eeprom, above the capacity the store reports, created from the hardware RNG the first time a device boots. Nothing in the shell or over SFTP can reach the eeprom, so copying `pdi.db` off the device yields ciphertext for every credential. This does not defend against someone dumping the flash itself.
 
-### 5.9 Adding a table
+Plain records carry a checksum instead — enough to catch a rotted byte, and there is no point paying for a tag on a record with nothing to hide.
+
+Nothing in the read or write path allocates, and the whole engine costs one 75-byte object plus at most 70 bytes of stack on an UNO. A repack moves only the records whose offset actually changes, so appending a table or growing the last one asks for no memory at all.
+
+### 5.9 Factory reset and defaults
+
+`db save` takes what the device is running now as the defaults the eeprom holds, which is how a provisioned device is made to come back to its provisioned state rather than a blank one. A factory reset restores those defaults; on a device with no storage tier it clears every record, which reads back as the struct defaults.
+
+Two switches shape the behaviour. `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` runs a five-second check and fires the reset when the database will not mount. `CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET` hooks the reset event to put the defaults back. The reset event is public, so any service can hook it to drop its own caches.
+
+### 5.10 From the terminal
+
+```
+  db status     which medium is live, how much of it the records take
+  db list       one line per record, sealed ones marked
+  db verify     read every record past its checksum or tag
+  db save       take what is running now as the defaults
+  db restore    put those defaults back in use
+```
+
+`db` never prints a record's contents, so a sealed credential stays sealed.
+
+### 5.11 Adding a table
 
 Say you want a metrics service to persist a host and a port.
 
 1. Define the struct in `src/config/MetricsConfig.h` following the [§3.4](#34-the-shape-of-a-service-config) shape — POD, fixed-size members, a `clear()` the constructor calls:
    ```cpp
    struct metrics_configs { char host[40]; uint16_t port; };
-   const int metrics_config_size = sizeof(metrics_configs) + 5;
    using metrics_config_table = metrics_configs;
    ```
-2. Pick an address past the last table's tail: `prev_addr + prev_size + 5 < yours`.
+2. Take the next unused id. Ids are permanent — never reuse one a removed table had.
 3. Add a `defItems` entry to every board schema that should carry it:
    ```json
    {
      "defItemName": "MetricsTable",
      "defItemDesc": "Metrics table handles metrics service configs",
      "defItemArg": "metrics_config_table",
-     "defItemAddressKey": "METRICS_CONFIG_TABLE_ADDRESS",
-     "defItemAddressValue": "3000",
+     "defItemIdKey": "METRICS_TABLE_ID",
+     "defItemIdValue": "10",
+     "defItemVersion": "1",
+     "defItemSecret": "false",
      "defItemExtVar": "__metrics_table"
    }
    ```
 4. Regenerate with `python3 scripts/DeviceSetup.py -d <board>`.
 5. Add the include, the global and the accessor pair to the database service, guarded by your feature flag, mirroring any existing table.
-6. Raise `MAX_DB_TABLES` if you have run out of slots.
+6. Add its size to `src/database/core/DatabaseLayout.h` so the build keeps checking that everything fits.
+7. Raise `MAX_DB_TABLES` if you have run out of slots.
 
-Keep schema addresses strictly ascending. The overlap check compares against the most recently registered table, so a table declared out of order slips past it.
-
-Changing a struct changes the on-flash layout, which invalidates the checksum on every device already in the field — they come up and reset to defaults. Bump `CONFIG_VERSION` when you do that, so it reads as a decision rather than an accident.
+Adding the table does not disturb any other record — the directory has a fixed number of slots and the engine repacks by id on the next boot.
 
 ---
 ## 6. Service Providers
@@ -1310,7 +1321,7 @@ Subscribe with `__utl_event.add_event_listener(name, [&](void* e){ … })`, publ
 Say you want a metrics service.
 
 1. Add `ENABLE_METRICS_SERVICE` to the device config and a `service_t` value behind the same flag.
-2. Add the persisted struct ([§3.4](#34-the-shape-of-a-service-config)) and its table ([§5.9](#59-adding-a-table)).
+2. Add the persisted struct ([§3.4](#34-the-shape-of-a-service-config)) and its table ([§5.11](#511-adding-a-table)).
 3. Write the provider, scheduling through the base wrappers so the task is named, owned and tracked:
    ```cpp
    MetricsServiceProvider() : ServiceProvider(SERVICE_METRICS, RODT_ATTR("Metrics")) {}
@@ -1371,7 +1382,7 @@ Line editing happens in-process, so the CLI recognises control sequences byte by
 
 | Sequence | Action |
 |---|---|
-| Enter | submit the line |
+| Enter | submit the line — `\r`, `\n`, or the two in sequence all count as one |
 | Backspace, Delete | edit |
 | ←, → | move within the line |
 | ↑, ↓ | walk history (needs storage) |
@@ -1380,6 +1391,8 @@ Line editing happens in-process, so the CLI recognises control sequences byte by
 | Tab | complete, cycling through matching command names |
 | Esc | cancel the line; inside `fedit`, open the save/cancel/delete menu |
 | Ctrl+C, Ctrl+Z | abort the running command |
+
+Clients disagree about what Enter is: a raw serial terminal sends `\n`, telnet sends CR LF. Both endings are accepted, and a pair is taken as the single key press it represents rather than as a key press followed by an empty line — the two halves may arrive in separate reads, so which ending was taken is remembered on the session.
 
 A long-running command receives these mid-execution by overriding `executeTermInputAction`.
 
@@ -1459,7 +1472,7 @@ History is persisted only when storage is available, in a file capped at 25 line
 | pwd | | Print the working directory. |
 | rm \<path> | | Remove a file or directory; needs write permission. e.g. **rm /home/notes.txt** |
 | cat \<file> | | Print a file; needs read permission. e.g. **cat /proc/uptime** |
-| echo \<text> [> \<file>] | | Print text, or write it to a file with `>` — a single write, so it works on synthetic nodes too. e.g. **echo 1 > /sys/class/gpio/5/value** |
+| echo \<text> [>\|>> \<file>] | | Print text, or send it to a file: `>` replaces in a single write, so it works on synthetic nodes too, and `>>` appends, which is how a multi-line file is built from the shell. e.g. **echo 1 > /sys/class/gpio/5/value**, **echo second line >> /home/notes.txt** |
 | fedit \<file> | | Scrolling in-place line editor. A status bar shows the path; ←/→/Home/End/Backspace edit the active line, ↑/↓ move through the file, Enter splits at the cursor. Esc opens the menu: **!w** save, **!c** cancel, **!d** delete line. Edits stream to a temp copy and commit on save. e.g. **fedit /home/notes.txt** |
 | head \<file> [N] | | First N lines, default 10, in constant memory. |
 | tail \<file> [N] | | Last N lines, default 10, in constant memory. |
@@ -2192,21 +2205,17 @@ Turn the console log gates off before running this one, or the framework's own o
 The normal database flow goes through the JSON schema and the generator. This example takes the escape hatch: declare a table subclass directly in the sketch and let the same static-init mechanism register it.
 
 ```cpp
-#if defined(DEVICE_ARDUINOUNO)
-#define STUDENT_TABLE_ADDRESS  800
-#else
-#define STUDENT_TABLE_ADDRESS  2500     // the framework owns everything below this
-#endif
+#define STUDENT_TABLE_ID  10            // 1..9 belong to the framework tables
 
 struct student_table { student_t students[MAX_STUDENTS]; int student_count; };
 
-class StudentTable : public DatabaseTable<STUDENT_TABLE_ADDRESS, student_table> {};
+class StudentTable : public DatabaseTable<STUDENT_TABLE_ID, student_table> {};
 StudentTable __student_table;           // registers itself at static-init
 ```
 
 After `initialize()`, the sketch builds a value and calls `set`, and a five-second task reads it back with `get` and prints it.
 
-Three things it teaches. Pick an address above the framework's range — 2500 on the ESP ports, 800 on UNO. Keep the struct POD, fixed-size arrays and scalars only, because it is written to NVM as raw bytes. And accept the trade: a table declared in the sketch never passes through the generator, so tooling that walks generated tables will not see it.
+Three things it teaches. Take an id nothing else holds and keep it — the engine finds the record by id, and reusing one a removed table had hands the new table the old one's bytes. Keep the struct POD, fixed-size arrays and scalars only, because it is written as raw bytes. And accept the trade: a table declared in the sketch never passes through the generator, so `DatabaseLayout.h` will not include it in the build-time size check.
 
 ### 11.4 `AddingController`
 
@@ -2670,7 +2679,7 @@ Enabling TLS turns this layer on implicitly, because both SSL backends need more
 
 ### 14.7 Per-board database schema
 
-Each port carries its own table schema describing what lives in NVM on that board, tuned to its capacity. The setup script turns it into C++ table sources. Format is in [§5.5](#55-where-the-tables-come-from).
+Each port carries its own table schema describing what lives in NVM on that board, tuned to its capacity. The setup script turns it into C++ table sources. Format is in [§5.6](#56-where-the-tables-come-from).
 
 ### 14.8 Porting, step by step
 
@@ -2808,7 +2817,7 @@ Every section above has its own "how do I add one of these" part. This one is th
 | add a hardware capability across all ports | a portable interface | [§13.6](#136-adding-an-interface) |
 | add a framework-level feature | a service provider | [§6.5](#65-writing-a-new-service) |
 | speak a new wire protocol | a transport | [§10.5](#105-adding-a-transport) |
-| persist new configuration | a database table | [§5.9](#59-adding-a-table) |
+| persist new configuration | a database table | [§5.11](#511-adding-a-table) |
 | add a screen to the portal | a controller and a page | [§8.10](#810-adding-a-page) |
 | add a terminal command | a command class | [§7.11](#711-adding-a-command) |
 | persist something only your sketch cares about | the database escape hatch | [§11.3](#113-addingdatabasetable) |
@@ -2855,7 +2864,7 @@ That split is what makes a transport reusable from a sketch, or from a second se
 
 Two paths, depending on who needs to see it.
 
-A framework table — one that has to round-trip on every port and show up in tooling — means defining the struct in a config header, picking a free address, adding a schema entry for each board that carries it, regenerating, and adding the accessor pair to the database service. [§5.9](#59-adding-a-table) has the detail.
+A framework table — one that has to round-trip on every port and show up in tooling — means defining the struct in a config header, picking an id nothing else uses, adding a schema entry for each board that carries it, regenerating, and adding the accessor pair to the database service. [§5.11](#511-adding-a-table) has the detail.
 
 A sketch-local table skips all of that: declare a `DatabaseTable<ADDR, my_struct>` subclass in the `.ino` and let static-init register it, as in [§11.3](#113-addingdatabasetable). It never passes through the generator, so framework tooling will not see it.
 
@@ -3006,7 +3015,7 @@ Short entries; the explanations live in the sections they point at.
 ### 18.1 Build and flash
 
 **The build succeeds for ESP8266 or UNO but the device misbehaves.**
-The setup script was never run for that target, so the ESP32 fallback produced an ESP32-shaped binary — right code, wrong table addresses and flags. Run `python3 DeviceSetup.py -d <board>` and rebuild ([§2.5](#25-how-the-esp32-default-works)).
+The setup script was never run for that target, so the ESP32 fallback produced an ESP32-shaped binary — right code, wrong table set and flags. Run `python3 DeviceSetup.py -d <board>` and rebuild ([§2.5](#25-how-the-esp32-default-works)).
 
 **The build succeeds but `srvc list` is empty and no access point appears.**
 Same cause seen from the other end: `devices/DeviceSetup.h` still names the previous board. Re-run the script, or delete the file to fall back to ESP32.
@@ -3023,7 +3032,7 @@ The toolchain is missing the GCC extensions PdiSTL relies on. Use a GCC-based to
 ### 18.2 Boot and runtime
 
 **The device factory-resets every five seconds.**
-NVM is invalid — a corrupt checksum, or a struct that changed shape since the last flash. With auto-reset on, one cycle recovers it. If it loops, a table has outgrown its address slot ([§5.9](#59-adding-a-table)).
+NVM is invalid — a corrupt checksum, or a struct that changed shape since the last flash. With auto-reset on, one cycle recovers it. If it loops, a table no longer fits the space reserved for it ([§5.11](#511-adding-a-table)).
 
 **Boot stops after the banner and no access point appears.**
 The station connect is timing out against stale credentials. Hold the flash button for six or seven seconds to factory-reset, join the access point, and set fresh ones.

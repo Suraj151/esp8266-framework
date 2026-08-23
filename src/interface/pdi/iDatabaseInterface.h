@@ -34,22 +34,17 @@ public:
   virtual ~iDatabaseInterface() {}
 
   virtual void beginConfigs(uint32_t _size) = 0;
+  virtual void endConfigs() = 0;
   virtual void cleanAllConfigs() = 0;
-  virtual bool isValidConfigs() = 0;
   virtual uint32_t getMaxDBSize() = 0;
 
   /**
-   * Below template methods are must to define by derived
+   * Byte level access to the config store. The database engine frames its own
+   * records on top of these, writes stay buffered until commitConfigs().
    */
-
-  // template <typename T>
-  // void saveConfig(uint16_t _address, T *_object);
-
-  // template <typename T>
-  // void loadConfig(uint16_t _address, T *_object);
-
-  // template <typename T>
-  // void clearConfig(uint16_t _address);
+  virtual uint8_t readByte(uint32_t _address) = 0;
+  virtual void writeByte(uint32_t _address, uint8_t _value) = 0;
+  virtual void commitConfigs() = 0;
 };
 
 // derived class must define this

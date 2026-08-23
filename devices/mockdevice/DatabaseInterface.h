@@ -40,8 +40,8 @@ public:
   virtual ~DatabaseInterface();
 
   void beginConfigs(uint32_t _size) override;
+  void endConfigs() override;
   void cleanAllConfigs() override;
-  bool isValidConfigs() override;
   uint32_t getMaxDBSize() override;
 
   /**
@@ -55,69 +55,14 @@ public:
    */
   void detachBackingFile();
 
-  /**
-   * template to save table in database by their address from table object
-   *
-   * @param   uint16_t  	_address
-   * @param   type of database table struct  _object
-   */
-  template <typename T>
-  void saveConfig(uint16_t _address, T *_object)
-  {
-    bool _data_written = false;
-    for (size_t i = 0; i < sizeof((*_object)); i++)
-    {
-      if ((char)readByte(_address + i) != *((char *)&(*_object) + i))
-      {
-        _data_written = true;
-        writeByte(_address + i, *((char *)&(*_object) + i));
-      }
-    }
-    if (_data_written)
-    {
-      commit();
-    }
-  }
-
-  /**
-   * template to load table from database by their address in table object
-   *
-   * @param   uint16_t  	_address
-   * @param   type of database table struct  _object
-   */
-  template <typename T>
-  void loadConfig(uint16_t _address, T *_object)
-  {
-    if (isValidConfigs())
-    {
-      for (size_t i = 0; i < sizeof((*_object)); i++)
-      {
-        *((char *)&(*_object) + i) = readByte(_address + i);
-      }
-    }
-  }
-
-  /**
-   * template to clear tables in database by their address
-   *
-   * @param   uint16_t  	_address
-   */
-  template <typename T>
-  void clearConfig(uint16_t _address)
-  {
-    T _t;
-    saveConfig(_address, &_t);
-    _ClearObject(&_t);
-  }
+  uint8_t readByte(uint32_t _address) override;
+  void writeByte(uint32_t _address, uint8_t _value) override;
+  void commitConfigs() override;
 
 private:
   uint8_t m_store[DATABASE_MAX_SIZE];
   uint32_t m_size;
   pdiutil::string m_backingfile;
-
-  uint8_t readByte(uint32_t address) const;
-  void writeByte(uint32_t address, uint8_t value);
-  void commit();
 };
 
 #endif // _MOCKDEVICE_DATABASE_INTERFACE_H_

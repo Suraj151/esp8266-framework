@@ -21,18 +21,23 @@ def multiline(t):
     """
     A file with more than one line in it, and the lines themselves.
 
-    Nothing in the shell can make one: echo's only redirection truncates, so
-    `>>` writes to a file called `>` rather than appending. The user store is
-    therefore the only multi-line file a target is likely to have, and a target
-    with a single account has none at all — those tests skip rather than assert
-    something weaker and call it coverage.
+    Built here rather than borrowed from the user store, which only has a
+    second line on a target that happens to have a second account — head and
+    tail then went untested on every single account board. `echo >>` appends,
+    so the file is made to order and the assertions are the same everywhere.
     """
-    path = "/etc/passwd"
+    path = t.workspace(W + "multi") + "/lines.txt"
+    wanted = ["first line", "second line", "third line"]
+
+    t.run("echo %s > %s" % (wanted[0], path))
+    for line in wanted[1:]:
+        t.run("echo %s >> %s" % (line, path))
+
     body = t.run("cat %s" % path)
-    lines = [line for line in body.splitlines() if ":" in line]
+    lines = [line.strip() for line in body.splitlines() if line.strip() in wanted]
 
     if len(lines) < 2:
-        raise Skip("no multi-line file on this target; echo cannot append")
+        raise Skip("this target could not be given a multi-line file")
 
     return path, lines
 
@@ -129,7 +134,7 @@ def cat_missing(t):
     expect_not_in("absent content", t.run("cat absent.txt"), "cat of a missing file")
 
 
-@test("head prints from the top", needs=("cat", "head"))
+@test("head prints from the top", needs=("cat", "head", "echo", "mkdir", "rm"))
 def head_top(t):
     path, lines = multiline(t)
 
@@ -138,7 +143,7 @@ def head_top(t):
     expect_not_in(lines[-1], out, "head stopped before the last line")
 
 
-@test("tail prints from the bottom", needs=("cat", "tail"))
+@test("tail prints from the bottom", needs=("cat", "tail", "echo", "mkdir", "rm"))
 def tail_bottom(t):
     path, lines = multiline(t)
 
@@ -147,7 +152,7 @@ def tail_bottom(t):
     expect_not_in(lines[0], out, "tail stopped after the first line")
 
 
-@test("head and tail agree with the whole file", needs=("cat", "head", "tail", "wc"))
+@test("head and tail agree with the whole file", needs=("cat", "head", "tail", "wc", "echo", "mkdir", "rm"))
 def head_tail_span(t):
     path, lines = multiline(t)
 

@@ -25,8 +25,8 @@ struct CountingTable : public DatabaseTableAbstractLayer
 
     CountingTable() : boots(0), clears(0) {}
 
-    void boot() override { boots++; }
-    void clear() override { clears++; }
+    bool boot() override { boots++; return true; }
+    bool clear() override { clears++; return true; }
 
     void forget()
     {
@@ -38,13 +38,15 @@ struct CountingTable : public DatabaseTableAbstractLayer
 static CountingTable s_table_one;
 static CountingTable s_table_two;
 
-static struct_tables makeTable(uint16_t address, uint16_t size,
-                               DatabaseTableAbstractLayer *instance = nullptr)
+static struct_tables makeTable(uint16_t id, uint16_t size,
+                               DatabaseTableAbstractLayer *instance = nullptr,
+                               uint16_t version = 1)
 {
     struct_tables table;
     memset(&table, 0, sizeof(table));
-    table.m_table_address = address;
+    table.m_table_id = id;
     table.m_table_size = size;
+    table.m_table_version = version;
     table.m_instance = instance;
     return table;
 }
@@ -55,114 +57,93 @@ TEST(database, starts_with_no_tables)
     ASSERT_EQ(db.m_database_tables.size(), (size_t)0);
 }
 
-TEST(database, last_table_of_an_empty_database_is_zeroed)
+TEST(database, registers_a_table)
 {
     Database db;
-    struct_tables last = db.get_last_table();
 
-    ASSERT_EQ(last.m_table_address, (uint16_t)0);
-    ASSERT_EQ(last.m_table_size, (uint16_t)0);
-}
-
-TEST(database, registers_a_table_that_fits)
-{
-    Database db;
-    db.init_database(4096);
-
-    struct_tables table = makeTable(100, 50);
+    struct_tables table = makeTable(1, 50);
     ASSERT_TRUE(db.register_table(table));
     ASSERT_EQ(db.m_database_tables.size(), (size_t)1);
 }
 
-TEST(database, registers_successive_non_overlapping_tables)
+TEST(database, refuses_a_table_with_no_id)
 {
     Database db;
-    db.init_database(4096);
 
-    struct_tables first = makeTable(100, 50);
-    struct_tables second = makeTable(200, 50);
-    struct_tables third = makeTable(300, 50);
-
-    ASSERT_TRUE(db.register_table(first));
-    ASSERT_TRUE(db.register_table(second));
-    ASSERT_TRUE(db.register_table(third));
-    ASSERT_EQ(db.m_database_tables.size(), (size_t)3);
-}
-
-TEST(database, refuses_a_table_that_overlaps_the_previous_one)
-{
-    Database db;
-    db.init_database(4096);
-
-    struct_tables first = makeTable(100, 100);
-    struct_tables overlapping = makeTable(150, 50);
-
-    ASSERT_TRUE(db.register_table(first));
-    ASSERT_FALSE(db.register_table(overlapping));
-    ASSERT_EQ(db.m_database_tables.size(), (size_t)1);
-}
-
-TEST(database, refuses_a_table_starting_at_the_previous_end)
-{
-    Database db;
-    db.init_database(4096);
-
-    struct_tables first = makeTable(100, 50);
-    struct_tables abutting = makeTable(150, 50);
-
-    ASSERT_TRUE(db.register_table(first));
-    ASSERT_FALSE(db.register_table(abutting));
-}
-
-TEST(database, refuses_a_table_that_runs_past_the_database_size)
-{
-    Database db;
-    db.init_database(512);
-
-    struct_tables toobig = makeTable(400, 200);
-    ASSERT_FALSE(db.register_table(toobig));
-}
-
-TEST(database, refuses_every_table_when_the_size_is_zero)
-{
-    Database db;
-    db.init_database(0);
-
-    struct_tables table = makeTable(10, 10);
+    struct_tables table = makeTable(DB_TABLE_ID_NONE, 50);
     ASSERT_FALSE(db.register_table(table));
 }
 
-TEST(database, last_table_reports_the_highest_address)
+TEST(database, refuses_a_table_with_no_size)
 {
     Database db;
-    db.init_database(4096);
 
-    struct_tables first = makeTable(100, 50);
-    struct_tables second = makeTable(200, 60);
-    struct_tables third = makeTable(400, 70);
+    struct_tables table = makeTable(1, 0);
+    ASSERT_FALSE(db.register_table(table));
+}
 
-    db.register_table(first);
-    db.register_table(second);
-    db.register_table(third);
+/**
+ * Two tables sharing an id would share a record, so the second one is refused
+ * rather than quietly overwriting the first.
+ */
+TEST(database, refuses_a_second_table_claiming_the_same_id)
+{
+    Database db;
 
-    struct_tables last = db.get_last_table();
-    ASSERT_EQ(last.m_table_address, (uint16_t)400);
-    ASSERT_EQ(last.m_table_size, (uint16_t)70);
+    struct_tables first = makeTable(4, 50);
+    struct_tables duplicate = makeTable(4, 80);
+
+    ASSERT_TRUE(db.register_table(first));
+    ASSERT_FALSE(db.register_table(duplicate));
+    ASSERT_EQ(db.m_database_tables.size(), (size_t)1);
+}
+
+/**
+ * Ids are what identify a table now, so the order tables boot in carries no
+ * meaning at all and every one of them still reaches the registry.
+ */
+TEST(database, registers_every_table_whatever_order_ids_arrive_in)
+{
+    Database db;
+
+    const uint16_t ids[] = {8, 2, 9, 4, 1, 5, 6, 7, 3};
+
+    for (uint8_t i = 0; i < (sizeof(ids) / sizeof(ids[0])); i++)
+    {
+        struct_tables table = makeTable(ids[i], 40);
+        ASSERT_TRUE(db.register_table(table));
+    }
+
+    ASSERT_EQ(db.m_database_tables.size(), (size_t)9);
+}
+
+TEST(database, refuses_tables_past_the_registry_limit)
+{
+    Database db;
+
+    for (uint16_t i = 0; i < MAX_TABLES; i++)
+    {
+        struct_tables table = makeTable((uint16_t)(i + 1), 50);
+        ASSERT_TRUE(db.register_table(table));
+    }
+
+    struct_tables overflowing = makeTable((uint16_t)(MAX_TABLES + 1), 50);
+    ASSERT_FALSE(db.register_table(overflowing));
+    ASSERT_EQ(db.m_database_tables.size(), (size_t)MAX_TABLES);
 }
 
 TEST(database, clear_all_reaches_every_registered_instance)
 {
     Database db;
-    db.init_database(4096);
     s_table_one.forget();
     s_table_two.forget();
 
-    struct_tables first = makeTable(100, 50, &s_table_one);
-    struct_tables second = makeTable(200, 50, &s_table_two);
+    struct_tables first = makeTable(1, 50, &s_table_one);
+    struct_tables second = makeTable(2, 50, &s_table_two);
 
     db.register_table(first);
     db.register_table(second);
-    db.clear_all();
+    ASSERT_TRUE(db.clear_all());
 
     ASSERT_EQ(s_table_one.clears, 1);
     ASSERT_EQ(s_table_two.clears, 1);
@@ -171,11 +152,10 @@ TEST(database, clear_all_reaches_every_registered_instance)
 TEST(database, clear_all_skips_a_table_with_no_instance)
 {
     Database db;
-    db.init_database(4096);
     s_table_one.forget();
 
-    struct_tables headless = makeTable(100, 50, nullptr);
-    struct_tables attached = makeTable(200, 50, &s_table_one);
+    struct_tables headless = makeTable(1, 50, nullptr);
+    struct_tables attached = makeTable(2, 50, &s_table_one);
 
     db.register_table(headless);
     db.register_table(attached);
@@ -190,87 +170,106 @@ TEST(database, init_boots_every_registered_table_instance)
     s_table_one.forget();
     s_table_two.forget();
 
-    db.init_database(4096);
+    ASSERT_EQ(db.init_database(), (uint8_t)0);
 
     ASSERT_EQ(s_table_one.boots, 1);
     ASSERT_EQ(s_table_two.boots, 1);
 }
 
+/**
+ * A table that cannot register is counted, because its configs will not
+ * persist and the service layer has to be able to say so.
+ */
+TEST(database, init_counts_a_table_that_refuses_to_boot)
+{
+    struct RefusingTable : public DatabaseTableAbstractLayer
+    {
+        bool boot() override { return false; }
+        bool clear() override { return true; }
+    };
+
+    static RefusingTable refusing;
+    Database db;
+
+    ASSERT_GE(db.init_database(), (uint8_t)1);
+}
+
 TEST(database, clear_all_on_an_empty_database_is_harmless)
 {
     Database db;
-    db.init_database(4096);
-    db.clear_all();
+    ASSERT_TRUE(db.clear_all());
     ASSERT_EQ(db.m_database_tables.size(), (size_t)0);
-}
-
-/**
- * Tables boot in instance creation order, which the schema does not keep in
- * address order. Every one of them still has to reach the registry, because
- * clear_all only walks registered tables and a factory reset runs through it.
- */
-TEST(database, registers_every_table_when_addresses_arrive_out_of_order)
-{
-    Database db;
-    db.init_database(4096);
-
-    const uint16_t addresses[] = {2000, 5, 2600, 500, 50, 700, 1500, 1700, 300, 150};
-    const uint16_t size = 40;
-
-    for (uint8_t i = 0; i < (sizeof(addresses) / sizeof(addresses[0])); i++)
-    {
-        struct_tables table = makeTable(addresses[i], size);
-        ASSERT_TRUE(db.register_table(table));
-    }
-
-    ASSERT_EQ(db.m_database_tables.size(), (size_t)10);
-}
-
-TEST(database, refuses_a_table_overlapping_one_registered_earlier_out_of_order)
-{
-    Database db;
-    db.init_database(4096);
-
-    struct_tables high = makeTable(2000, 40);
-    struct_tables low = makeTable(100, 40);
-    struct_tables clashesWithLow = makeTable(120, 40);
-
-    ASSERT_TRUE(db.register_table(high));
-    ASSERT_TRUE(db.register_table(low));
-    ASSERT_FALSE(db.register_table(clashesWithLow));
-}
-
-TEST(database, refuses_a_table_that_straddles_an_existing_one)
-{
-    Database db;
-    db.init_database(4096);
-
-    struct_tables inner = makeTable(500, 40);
-    struct_tables straddling = makeTable(480, 200);
-
-    ASSERT_TRUE(db.register_table(inner));
-    ASSERT_FALSE(db.register_table(straddling));
-}
-
-/**
- * How many tables can exist is capped where the instances are counted, not
- * here, so a full set of well spaced tables all reach the registry.
- */
-TEST(database, accepts_a_full_set_of_well_spaced_tables)
-{
-    Database db;
-    db.init_database(65000);
-
-    for (uint16_t i = 0; i < MAX_TABLES; i++)
-    {
-        struct_tables table = makeTable((uint16_t)(100 + (i * 100)), 50);
-        ASSERT_TRUE(db.register_table(table));
-    }
-
-    ASSERT_EQ(db.m_database_tables.size(), (size_t)MAX_TABLES);
 }
 
 TEST(database, the_instance_registry_is_capped_at_max_tables)
 {
     ASSERT_LE(DatabaseTableAbstractLayer::m_total_instances, (int)MAX_TABLES);
+}
+
+/**
+ * A service that initialises twice must keep the tables it already has. The
+ * registry used to refuse the second registration, which left every table
+ * marked unregistered and every get() returning false for the rest of the run.
+ */
+TEST(database, registering_the_same_instance_again_keeps_it)
+{
+    Database db;
+
+    struct_tables first = makeTable(4, 50, &s_table_one);
+    struct_tables again = makeTable(4, 50, &s_table_one);
+
+    ASSERT_TRUE(db.register_table(first));
+    ASSERT_TRUE(db.register_table(again));
+    ASSERT_EQ(db.m_database_tables.size(), (size_t)1);
+}
+
+TEST(database, re_registering_refreshes_the_descriptor)
+{
+    Database db;
+
+    struct_tables first = makeTable(4, 50, &s_table_one, 1);
+    struct_tables grown = makeTable(4, 80, &s_table_one, 2);
+
+    ASSERT_TRUE(db.register_table(first));
+    ASSERT_TRUE(db.register_table(grown));
+
+    ASSERT_EQ(db.m_database_tables.size(), (size_t)1);
+    ASSERT_EQ(db.m_database_tables[0].m_table_size, (uint16_t)80);
+    ASSERT_EQ(db.m_database_tables[0].m_table_version, (uint16_t)2);
+}
+
+TEST(database, another_instance_may_not_take_a_registered_id)
+{
+    Database db;
+
+    struct_tables first = makeTable(4, 50, &s_table_one);
+    struct_tables other = makeTable(4, 50, &s_table_two);
+
+    ASSERT_TRUE(db.register_table(first));
+    ASSERT_FALSE(db.register_table(other));
+    ASSERT_EQ(db.m_database_tables.size(), (size_t)1);
+}
+
+/**
+ * A full registry has no room for a new table but always has room for one it is
+ * already holding, so reinitialising a device whose tables fill it still works.
+ */
+TEST(database, a_full_registry_still_takes_a_table_it_already_holds)
+{
+    Database db;
+
+    struct_tables first = makeTable(1, 50, &s_table_one);
+    ASSERT_TRUE(db.register_table(first));
+
+    for (uint16_t i = 1; i < MAX_TABLES; i++)
+    {
+        struct_tables table = makeTable((uint16_t)(i + 1), 50, &s_table_two);
+        ASSERT_TRUE(db.register_table(table));
+    }
+
+    ASSERT_EQ(db.m_database_tables.size(), (size_t)MAX_TABLES);
+
+    struct_tables again = makeTable(1, 50, &s_table_one);
+    ASSERT_TRUE(db.register_table(again));
+    ASSERT_EQ(db.m_database_tables.size(), (size_t)MAX_TABLES);
 }

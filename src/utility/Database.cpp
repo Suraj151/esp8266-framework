@@ -16,10 +16,8 @@ DatabaseTableAbstractLayer *DatabaseTableAbstractLayer::m_instances[MAX_TABLES] 
 
 /**
  * @brief Constructor for the Database class.
- *
- * Initializes the database object and sets the maximum database size to 0.
  */
-Database::Database() : m_max_db_size(0)
+Database::Database()
 {
 }
 
@@ -33,23 +31,28 @@ Database::~Database()
 }
 
 /**
- * @brief Initializes the database with a specified size.
+ * @brief Boots every table instance so each one registers itself.
  *
- * This method sets the maximum size of the database and reserves memory for
- * the database tables. It also initializes all registered database table
- * instances by calling their `boot` method.
+ * Instances add themselves to a static list as they are constructed, this walks
+ * that list once the registry is ready to receive them.
  *
- * @param _size The maximum size of the database in bytes.
+ * @return Number of table instances that failed to register.
  */
-void Database::init_database(uint32_t _size)
+uint8_t Database::init_database()
 {
-    m_max_db_size = _size;
+    uint8_t _failed = 0;
+
     this->m_database_tables.reserve(MAX_TABLES);
 
     for (size_t i = 0; i < DatabaseTableAbstractLayer::m_total_instances; i++)
     {
-        DatabaseTableAbstractLayer::m_instances[i]->boot();
+        if (!DatabaseTableAbstractLayer::m_instances[i]->boot())
+        {
+            _failed++;
+        }
     }
+
+    return _failed;
 }
 
 /**
@@ -57,83 +60,64 @@ void Database::init_database(uint32_t _size)
  *
  * This method iterates through all registered database tables and calls their
  * `clear` method to reset their data.
+ *
+ * @return True when every registered table reached its defaults.
  */
-void Database::clear_all()
+bool Database::clear_all()
 {
+    bool _status = true;
+
     for (uint8_t i = 0; i < this->m_database_tables.size(); i++)
     {
         if (nullptr != this->m_database_tables[i].m_instance)
         {
-            this->m_database_tables[i].m_instance->clear();
+            _status = this->m_database_tables[i].m_instance->clear() && _status;
         }
     }
+
+    return _status;
 }
 
 /**
- * @brief Registers a new table in the database.
+ * @brief Registers a table in the registry.
  *
- * This method adds a new table to the database if its address and size do not
- * overlap with existing tables and if it fits within the maximum database size.
+ * A table is rejected when it carries no id, when the registry is full, or when
+ * its id is already held by a different table, so two tables can never share an
+ * identity. Registering the same instance again is how a service reinitialises
+ * and keeps its entry, so it succeeds and refreshes the descriptor in place.
  *
- * @param _table The table structure to register.
- * @return True if the table was successfully registered, false otherwise.
+ * @param _table The table descriptor to register.
+ * @return True if the table is registered, false otherwise.
  */
 bool Database::register_table(struct_tables &_table)
 {
-    if ((uint32_t)(_table.m_table_address + _table.m_table_size + 2) >= m_max_db_size)
+    if (DB_TABLE_ID_NONE == _table.m_table_id || 0 == _table.m_table_size)
     {
         return false;
     }
 
-    // tables boot in instance creation order, not in address order, so the new
-    // span is checked against every registered one instead of only the last
     for (uint8_t i = 0; i < this->m_database_tables.size(); i++)
     {
-        uint32_t _existing_end = (uint32_t)this->m_database_tables[i].m_table_address +
-                                 this->m_database_tables[i].m_table_size + 2;
-        uint32_t _new_end = (uint32_t)_table.m_table_address + _table.m_table_size + 2;
-
-        bool _clear = (_existing_end < _table.m_table_address) ||
-                      (_new_end < this->m_database_tables[i].m_table_address);
-
-        if (!_clear)
+        if (this->m_database_tables[i].m_table_id == _table.m_table_id)
         {
-            return false;
+            if (nullptr == _table.m_instance ||
+                this->m_database_tables[i].m_instance != _table.m_instance)
+            {
+                return false;
+            }
+
+            this->m_database_tables[i] = _table;
+            return true;
         }
+    }
+
+    if (this->m_database_tables.size() >= MAX_TABLES)
+    {
+        return false;
     }
 
     this->m_database_tables.push_back(_table);
     return true;
-}
-
-/**
- * @brief Retrieves the last registered table from the database.
- *
- * This method finds and returns the table with the highest address in the
- * database. If no tables are registered, it returns an empty table structure.
- *
- * @return The structure of the last registered table.
- */
-struct_tables Database::get_last_table()
-{
-    struct_tables _last;
-    memset(&_last, 0, sizeof(struct_tables));
-
-    if (0 == this->m_database_tables.size())
-    {
-        return _last;
-    }
-
-    uint8_t _last_add = 0;
-    for (uint8_t i = 1; i < this->m_database_tables.size(); i++)
-    {
-        if (this->m_database_tables[_last_add].m_table_address < this->m_database_tables[i].m_table_address)
-        {
-            _last_add = i;
-        }
-    }
-
-    return this->m_database_tables[_last_add];
 }
 
 /**

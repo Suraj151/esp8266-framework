@@ -168,6 +168,49 @@ TEST(cmdfs, echo_writes_to_a_file_when_redirected)
     scrub(shell, "/w_echo");
 }
 
+TEST(cmdfs, echo_appends_with_a_doubled_redirection)
+{
+    pditest::Shell shell;
+    workspace(shell, "/w_append");
+
+    shell.run("echo first line > note.txt");
+    shell.run("echo second line >> note.txt");
+
+    std::string out = shell.run("cat note.txt");
+    ASSERT_TRUE(saw(out, "first line"));
+    ASSERT_TRUE(saw(out, "second line"));
+
+    scrub(shell, "/w_append");
+}
+
+TEST(cmdfs, a_single_redirection_still_replaces_the_file)
+{
+    pditest::Shell shell;
+    workspace(shell, "/w_replace");
+
+    shell.run("echo first line > note.txt");
+    shell.run("echo second line > note.txt");
+
+    std::string out = shell.run("cat note.txt");
+    ASSERT_FALSE(saw(out, "first line"));
+    ASSERT_TRUE(saw(out, "second line"));
+
+    scrub(shell, "/w_replace");
+}
+
+TEST(cmdfs, appending_to_a_file_that_is_not_there_creates_it)
+{
+    pditest::Shell shell;
+    workspace(shell, "/w_appendnew");
+
+    shell.run("echo only line >> fresh.txt");
+
+    ASSERT_TRUE(__i_fs.isFileExist("/w_appendnew/fresh.txt"));
+    ASSERT_TRUE(saw(shell.run("cat fresh.txt"), "only line"));
+
+    scrub(shell, "/w_appendnew");
+}
+
 TEST(cmdfs, cat_prints_the_contents)
 {
     pditest::Shell shell;

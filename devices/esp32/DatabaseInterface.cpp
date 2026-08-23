@@ -21,6 +21,14 @@ void DatabaseInterface::beginConfigs(uint32_t _size)
 }
 
 /**
+ * close the eeprom, committing anything staged and releasing its buffer.
+ */
+void DatabaseInterface::endConfigs()
+{
+  EEPROM.end();
+}
+
+/**
  * clear eeprom by writing zero ot its all locations.
  */
 void DatabaseInterface::cleanAllConfigs(void)
@@ -33,18 +41,6 @@ void DatabaseInterface::cleanAllConfigs(void)
 }
 
 /**
- * check whether database configs are valid
- *
- * @return bool
- */
-bool DatabaseInterface::isValidConfigs(void)
-{
-  return (EEPROM.read(CONFIG_START + 0) == CONFIG_VERSION[0] &&
-          EEPROM.read(CONFIG_START + 1) == CONFIG_VERSION[1] &&
-          EEPROM.read(CONFIG_START + 2) == CONFIG_VERSION[2]);
-}
-
-/**
  * maximum database size can be stored
  *
  * @return max db size
@@ -52,6 +48,36 @@ bool DatabaseInterface::isValidConfigs(void)
 uint32_t DatabaseInterface::getMaxDBSize()
 {
     return DATABASE_MAX_SIZE;
+}
+
+/**
+ * read one byte from the config store.
+ *
+ * @param   uint32_t  _address
+ * @return  byte at the address
+ */
+uint8_t DatabaseInterface::readByte(uint32_t _address)
+{
+  return EEPROM.read(_address);
+}
+
+/**
+ * stage one byte into the config store, commitConfigs() persists it.
+ *
+ * @param   uint32_t  _address
+ * @param   uint8_t   _value
+ */
+void DatabaseInterface::writeByte(uint32_t _address, uint8_t _value)
+{
+  EEPROM.write(_address, _value);
+}
+
+/**
+ * persist every staged byte.
+ */
+void DatabaseInterface::commitConfigs()
+{
+  EEPROM.commit();
 }
 
 DatabaseInterface __i_db;

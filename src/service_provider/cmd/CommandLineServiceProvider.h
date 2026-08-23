@@ -57,6 +57,7 @@ created Date    : 1st June 2019
 #include "commands/PingCommand.h"
 #include "commands/HexdumpCommand.h"
 #include "commands/DfFSCommand.h"
+#include "commands/DatabaseCommand.h"
 #include "commands/MountCommand.h"
 #include "commands/WcFSCommand.h"
 #include "commands/HeadFSCommand.h"

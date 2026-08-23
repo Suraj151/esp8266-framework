@@ -13,7 +13,6 @@ created Date    : 1st Jan 2023
 
 #include <service_provider/ServiceProvider.h>
 
-#include <database/tables/GlobalTable.h>
 #if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
 #include <database/tables/LoginTable.h>
 #endif
@@ -55,7 +54,26 @@ public:
   ~DatabaseServiceProvider();
 
   bool initService(void *arg = nullptr) override;
-  void clear_default_tables();
+
+  /**
+   * reset every table to the defaults the device falls back to.
+   */
+  bool clear_default_tables();
+
+  /**
+   * take what the device is running now as the defaults it falls back to.
+   */
+  bool save_defaults();
+
+  /**
+   * put the defaults the device falls back to back in use.
+   */
+  bool restore_defaults();
+
+  /**
+   * whether the live database is the container on storage.
+   */
+  bool is_storage_tier() const { return m_storage_tier; }
 
   bool get_global_config_table(global_config_table *_table);
 #if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
@@ -86,34 +104,43 @@ public:
   bool get_device_iot_config_table(device_iot_config_table *_table);
 #endif
 
-  void set_global_config_table(global_config_table *_table);
+  bool set_global_config_table(global_config_table *_table);
 #if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
-  void set_login_credential_table(login_credential_table *_table);
+  bool set_login_credential_table(login_credential_table *_table);
 #endif
 #ifdef ENABLE_WIFI_SERVICE  
-  void set_wifi_config_table(wifi_config_table *_table);
+  bool set_wifi_config_table(wifi_config_table *_table);
 #endif
 #ifdef ENABLE_OTA_SERVICE  
-  void set_ota_config_table(ota_config_table *_table);
+  bool set_ota_config_table(ota_config_table *_table);
 #endif
 
 #ifdef ENABLE_GPIO_SERVICE
-  void set_gpio_config_table(gpio_config_table *_table);
+  bool set_gpio_config_table(gpio_config_table *_table);
 #endif
 
 #ifdef ENABLE_MQTT_SERVICE
-  void set_mqtt_general_config_table(mqtt_general_config_table *_table);
-  void set_mqtt_lwt_config_table(mqtt_lwt_config_table *_table);
-  void set_mqtt_pubsub_config_table(mqtt_pubsub_config_table *_table);
+  bool set_mqtt_general_config_table(mqtt_general_config_table *_table);
+  bool set_mqtt_lwt_config_table(mqtt_lwt_config_table *_table);
+  bool set_mqtt_pubsub_config_table(mqtt_pubsub_config_table *_table);
 #endif
 
 #ifdef ENABLE_EMAIL_SERVICE
-  void set_email_config_table(email_config_table *_table);
+  bool set_email_config_table(email_config_table *_table);
 #endif
 
 #ifdef ENABLE_DEVICE_IOT
-  void set_device_iot_config_table(device_iot_config_table *_table);
+  bool set_device_iot_config_table(device_iot_config_table *_table);
 #endif
+
+private:
+  void resolve_tiers();
+
+  /**
+   * @var bool m_storage_tier
+   * @brief Whether the live database is the container on storage.
+   */
+  bool m_storage_tier;
 };
 
 extern DatabaseServiceProvider __database_service;

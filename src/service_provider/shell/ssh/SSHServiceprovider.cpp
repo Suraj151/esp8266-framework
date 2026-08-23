@@ -2150,6 +2150,14 @@ bool LWSSH::SSHServer::handleChannelSftpBolusChunks(pdiutil::vector<uint8_t> &bo
 
         memset(sftpheader, 0, 28);
 
+        // a chunk shorter than the header carries no request to act on
+        if( boluschunk.size() < 28 ){
+
+            m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr;
+            boluschunk.clear();
+            return false;
+        }
+
         // If the first chunk is not SSH_FXP_WRITE, handle it normally and stop further chunk receiving
         if( boluschunk[4] != SSH_FXP_WRITE ){
 

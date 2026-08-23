@@ -27,6 +27,11 @@ Created Date    : 1st June 2019
 #endif
 
 /**
+ * @brief Id reserved for "no table", so a real table id is never zero.
+ */
+#define DB_TABLE_ID_NONE 0
+
+/**
  * @class DatabaseTableAbstractLayer
  * @brief Abstract layer for database tables.
  *
@@ -68,16 +73,20 @@ public:
      *
      * This method must be overridden by derived classes to provide specific
      * initialization logic for the table.
+     *
+     * @return True when the table reached the database, false otherwise.
      */
-    virtual void boot() = 0;
+    virtual bool boot() = 0;
 
     /**
      * @brief Clears the table data.
      *
      * This method must be overridden by derived classes to provide specific
      * logic for clearing the table data.
+     *
+     * @return True when the defaults reached storage, false otherwise.
      */
-    virtual void clear() = 0;
+    virtual bool clear() = 0;
 
     /**
      * @var DatabaseTableAbstractLayer* m_instances[MAX_TABLES]
@@ -94,25 +103,27 @@ public:
 
 /**
  * @struct struct_tables
- * @brief Represents a database table structure.
+ * @brief Describes one registered database table.
  *
- * This structure contains metadata about a database table, including its
- * address, size, and associated instance.
+ * A table is identified by an id that never changes and never gets reused, so
+ * where its record lives is left entirely to the layout engine.
  */
 struct struct_tables
 {
-    uint16_t m_table_address; ///< Address of the table in memory.
-    uint16_t m_table_size;    ///< Size of the table in bytes.
+    uint16_t m_table_id;      ///< Stable identity of the table.
+    uint16_t m_table_size;    ///< Size of the table struct in bytes.
+    uint16_t m_table_version; ///< Layout version of the table struct.
+    bool m_table_secret;      ///< Whether the record holds a credential.
     DatabaseTableAbstractLayer *m_instance; ///< Pointer to the table instance.
 };
 
 /**
  * @class Database
- * @brief Manages database tables.
+ * @brief Registry of the tables compiled into this build.
  *
- * The Database class provides methods for initializing the database, registering
- * tables, retrieving the last table, and clearing all tables. It maintains a
- * collection of registered tables and enforces a maximum database size.
+ * The registry holds what each table is and how big it is. Placing those
+ * records on a medium belongs to the layout engine, which reads this registry
+ * when it mounts a store.
  */
 class Database
 {
@@ -135,34 +146,23 @@ public:
     ~Database();
 
     /**
-     * @brief Initializes the database with a specified size.
-     * @param _size The maximum size of the database in bytes.
+     * @brief Boots every table instance so each one registers itself.
+     * @return Number of table instances that failed to register.
      */
-    void init_database(uint32_t _size);
+    uint8_t init_database(void);
 
     /**
-     * @brief Registers a new table in the database.
-     * @param _table The table structure to register.
+     * @brief Registers a new table in the registry.
+     * @param _table The table descriptor to register.
      * @return True if the table was successfully registered, false otherwise.
      */
     bool register_table(struct_tables &_table);
 
     /**
-     * @brief Retrieves the last registered table.
-     * @return The structure of the last registered table.
-     */
-    struct_tables get_last_table(void);
-
-    /**
      * @brief Clears all tables in the database.
+     * @return True when every registered table reached its defaults.
      */
-    void clear_all(void);
-
-    /**
-     * @var uint32_t m_max_db_size
-     * @brief Maximum size of the database in bytes.
-     */
-    uint32_t m_max_db_size;
+    bool clear_all(void);
 };
 
 /**

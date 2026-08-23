@@ -64,6 +64,20 @@ created Date    : 1st June 2019
 #endif
 
 /**
+ * enable/disable sealing of the config records that hold a credential. A sealed
+ * record is encrypted and carries a tag, under a key kept in the eeprom, so a
+ * copy of the database taken off the device reveals nothing. Records that hold
+ * no credential carry a checksum either way. Supported only on devices that
+ * declare DEVICE_SUPPORTS_DB_SEALING, the ciphers and their state cost more ram
+ * than a small device has to spare.
+ */
+#define ENABLE_DB_SEALING
+
+#if defined(ENABLE_DB_SEALING) && !defined(DEVICE_SUPPORTS_DB_SEALING)
+#undef ENABLE_DB_SEALING
+#endif
+
+/**
  * enable/disable concurrency in task scheduling. By default kept disabled.
  * use only if you aware on the task context handling.
  *

@@ -259,8 +259,11 @@ class LoginController : public Controller {
         return false;
       }
 
+      uint16_t _plen = strlen(_password);
+      _plen = _plen < (LOGIN_CONFIGS_BUF_SIZE-1) ? _plen : (LOGIN_CONFIGS_BUF_SIZE-1);
+
       memset( _creds.password, 0, LOGIN_CONFIGS_BUF_SIZE );
-      memcpy( _creds.password, _password, strlen(_password) );
+      memcpy( _creds.password, _password, _plen );
       this->m_web_resource->m_db_conn->set_login_credential_table( &_creds );
 
       return true;

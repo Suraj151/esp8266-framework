@@ -371,3 +371,71 @@ TEST(termedit, a_masked_prompt_does_not_echo_what_is_typed)
 
     shell.type(KEY_CTRL_C);
 }
+
+/* --------------------------------------------------------- line endings */
+
+static size_t promptsIn(const std::string &out)
+{
+    size_t seen = 0;
+    for (size_t at = out.find('@'); at != std::string::npos; at = out.find('@', at + 1))
+    {
+        seen++;
+    }
+    return seen;
+}
+
+TEST(termedit, a_lone_line_feed_is_one_enter)
+{
+    pditest::Shell shell;
+    std::string out = shell.type("pwd\n");
+
+    ASSERT_TRUE(saw(out, "/"));
+    ASSERT_EQ(promptsIn(out), 1u);
+}
+
+TEST(termedit, a_lone_carriage_return_is_one_enter)
+{
+    pditest::Shell shell;
+    std::string out = shell.type("pwd\r");
+
+    ASSERT_TRUE(saw(out, "/"));
+    ASSERT_EQ(promptsIn(out), 1u);
+}
+
+TEST(termedit, a_carriage_return_line_feed_pair_is_one_enter)
+{
+    pditest::Shell shell;
+    std::string out = shell.type("pwd\r\n");
+
+    ASSERT_TRUE(saw(out, "/"));
+    ASSERT_EQ(promptsIn(out), 1u);
+}
+
+TEST(termedit, a_line_feed_carriage_return_pair_is_one_enter)
+{
+    pditest::Shell shell;
+    std::string out = shell.type("pwd\n\r");
+
+    ASSERT_TRUE(saw(out, "/"));
+    ASSERT_EQ(promptsIn(out), 1u);
+}
+
+TEST(termedit, the_pair_is_split_across_reads_and_still_one_enter)
+{
+    pditest::Shell shell;
+
+    std::string first = shell.type("pwd\r");
+    std::string second = shell.type("\n");
+
+    ASSERT_TRUE(saw(first, "/"));
+    ASSERT_EQ(promptsIn(first) + promptsIn(second), 1u);
+}
+
+TEST(termedit, two_of_the_same_ending_stay_two_enters)
+{
+    pditest::Shell shell;
+    std::string out = shell.type("pwd\n\n");
+
+    ASSERT_TRUE(saw(out, "/"));
+    ASSERT_EQ(promptsIn(out), 2u);
+}
