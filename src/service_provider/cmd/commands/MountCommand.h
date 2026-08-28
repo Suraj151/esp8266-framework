@@ -12,6 +12,7 @@ created Date    : 20th July 2026
 #define _MOUNT_COMMAND_H_
 
 #include "CommandCommon.h"
+#include <helpers/ProcHelper.h>
 
 #ifdef ENABLE_STORAGE_SERVICE
 
@@ -60,14 +61,28 @@ struct MountCommand : public CommandBase {
 		m_terminal->write_pad_ro(RODT_ATTR("TYPE"),   4, COL_TYPE);
 		m_terminal->writeln_ro(RODT_ATTR("NAME"));
 
+#ifdef ENABLE_PROCFS
+		pdiutil::string name, prefix, type;
+
+		readProcLines(PROC_MOUNT_PREFIX "/mounts", [&](pdiutil::string &line) -> bool {
+			if( !procLineField(line, 0, name) ) return true;
+			procLineField(line, 1, prefix);
+			procLineField(line, 2, type);
+			m_terminal->write_pad(prefix.c_str(), COL_PREFIX);
+			m_terminal->write_pad(type.c_str(), COL_TYPE);
+			m_terminal->writeln(name.c_str());
+			return true;
+		});
+#else
 		for( uint8_t i = 0; i < __i_fs.getMountCount(); i++ ){
 			const vfs_mount_t *m = __i_fs.getMount(i);
 			if( nullptr == m ) continue;
 			m_terminal->write_pad(m->m_prefix, COL_PREFIX);
-			const char *tlabel = typeLabel(m->m_type);
+			const char *tlabel = VfsTypeToString(m->m_type);
 			m_terminal->write_pad_ro(tlabel, (uint32_t)strlen_ro(tlabel), COL_TYPE);
 			m_terminal->writeln(m->m_name);
 		}
+#endif
 
 		return CMD_RESULT_OK;
 	}
@@ -76,19 +91,6 @@ private:
 
 	static constexpr uint8_t COL_PREFIX = 12;
 	static constexpr uint8_t COL_TYPE   = 10;
-
-	static const char* typeLabel(vfs_type_t t){
-		switch(t){
-			case VFS_TYPE_LITTLEFS: return RODT_ATTR("littlefs");
-			case VFS_TYPE_SPIFFS:   return RODT_ATTR("spiffs");
-			case VFS_TYPE_SD:       return RODT_ATTR("sd");
-			case VFS_TYPE_TMPFS:    return RODT_ATTR("tmpfs");
-			case VFS_TYPE_PROCFS:   return RODT_ATTR("procfs");
-			case VFS_TYPE_SYSFS:    return RODT_ATTR("sysfs");
-			case VFS_TYPE_DEVFS:    return RODT_ATTR("devfs");
-			default:                return RODT_ATTR("unknown");
-		}
-	}
 };
 
 #endif

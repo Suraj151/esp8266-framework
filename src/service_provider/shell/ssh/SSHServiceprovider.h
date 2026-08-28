@@ -58,11 +58,12 @@ public:
      */
     bool getSSHKeyPairs(SSHKeyAlgorithm type, pdiutil::vector<uint8_t>& pubkey, pdiutil::vector<uint8_t>& privkey, bool privkeyInSeedPlusPubkeyformat = false);
 
-private:
+protected:
     iServerInterface* m_server;
     LWSSHSession* m_sessions[SSH_MAX_SESSIONS]; // concurrent session pool
     LWSSHSession* m_session;                    // session currently being serviced
     bool m_handling = false;                    // re-entrancy guard for handle()
+    uint32_t m_poolfullsince = 0;               // when the pool was first found full
 
     // Create SSH_CONFIG_FILE with default policy when it is missing.
     void createDefaultSshConfig();

@@ -22,10 +22,14 @@ python3 tests/run_tests.py --tier system --features        # feature suites vs t
 python3 tests/run_tests.py --device ssh:pdiStack@<ip>   --password <pw>
 python3 tests/run_tests.py --device telnet:<ip>         --password <pw>
 python3 tests/run_tests.py --device serial:/dev/ttyUSB0 --password <pw>
+
+python3 tests/run_tests.py --tier fuzz                     # 60s per harness, needs clang
+python3 tests/run_tests.py --tier fuzz --fuzz-seconds 600   # a longer soak
+python3 tests/run_tests.py --fuzz-target fuzz_http --verbose
 ```
 
 `--tier` is repeatable and defaults to `unit` and `system`; naming a `--device` adds the device
-tier. `--user`, `--key`, `--timeout` and `--keep-going` do what they sound like. `--reset` power
+tier, and naming a `--fuzz-target` adds the fuzz tier. `--user`, `--key`, `--timeout` and `--keep-going` do what they sound like. `--reset` power
 cycles a serial target before testing, which drops its network for a while, so it is off by
 default.
 
@@ -92,8 +96,9 @@ copies and undefined shifts fail the run rather than passing quietly.
 | `unit` | Native host binary linking the framework against the mock device |
 | `system` | The whole stack running as a host process (`pdid`) you can ssh, sftp and curl |
 | `device` | The same feature suites over serial, telnet or ssh against real hardware, one transport at a time or all of them interleaved |
+| `fuzz` | libFuzzer harnesses over the parsers a peer reaches before any credential check — see [fuzz/README.md](fuzz/README.md) |
 
-The unit tier asserts on functions. The other two drive the framework the way a user does — through
+The unit tier asserts on functions. The next two drive the framework the way a user does — through
 a shell, an ssh channel, the web portal, an mqtt broker — and the same feature suites run against
 both, so the host process catches most of it in seconds and the board confirms it for real.
 

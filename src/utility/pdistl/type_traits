@@ -259,8 +259,8 @@ namespace pdistd{
 		{ };
 
 
-	template <typename _Tp> class _UCXXEXPORT __is_signed : public integral_constant<bool, _Tp(-1) < _Tp(0)> {};
-	template <typename _Tp> class _UCXXEXPORT __is_unsigned : public integral_constant<bool, !(_Tp(-1) < _Tp(0))> {};
+	template <typename _Tp> class _UCXXEXPORT __is_signed_type : public integral_constant<bool, _Tp(-1) < _Tp(0)> {};
+	template <typename _Tp> class _UCXXEXPORT __is_unsigned_type : public integral_constant<bool, !(_Tp(-1) < _Tp(0))> {};
 }
 
 #pragma GCC visibility pop

@@ -50,14 +50,14 @@ struct WcFSCommand : public CommandBase {
 		if(nullptr != m_terminal){
 			CommandOption *cmdoptn = &m_options[0];
 			pdiutil::string filename = resolveArgPath(cmdoptn);
-			if( !filename.empty() ){
+			if( !filename.empty() || isInputRedirected() ){
 				{
 					uint32_t bytes = 0;
 					uint32_t lines = 0;
 					uint32_t words = 0;
 					bool in_word = false;
 
-					int iStatus = __i_fs.readFile(filename.c_str(), 250, [&](char *data, uint32_t size)->bool{
+					int iStatus = readCommandInput(filename, m_terminal, [&](char *data, uint32_t size)->bool{
 						for(uint32_t i = 0; i < size; i++){
 							bytes++;
 							char c = data[i];
@@ -89,8 +89,10 @@ struct WcFSCommand : public CommandBase {
 						m_terminal->write((int32_t)words);
 						m_terminal->write(' ');
 						m_terminal->write((int32_t)bytes);
-						m_terminal->write(' ');
-						m_terminal->write(filename.c_str());
+						if( !filename.empty() ){
+							m_terminal->write(' ');
+							m_terminal->write(filename.c_str());
+						}
 					}
 				}
 			}else{

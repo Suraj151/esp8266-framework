@@ -87,17 +87,17 @@ public:
     return (used >= TMPFS_MAX_BYTES) ? 0 : (TMPFS_MAX_BYTES - used);
   }
 
-  pdiutil::string getPWD() const override { return pdiutil::string("/tmp"); }
+  pdiutil::string getPWD() const override { return pdiutil::string(TMP_MOUNT_PREFIX); }
   bool setPWD(const char *path) override { return false; }
-  pdiutil::string getLastPWD() const override { return pdiutil::string("/tmp"); }
+  pdiutil::string getLastPWD() const override { return pdiutil::string(TMP_MOUNT_PREFIX); }
 
   void appendFileSeparator(char *path) override {}
   void appendFileSeparator(pdiutil::string &path) override {}
   bool updatePathNotations(const char *path, pdiutil::string &updatedpath) override { return false; }
   bool changeDirectory(const char *path) override { return false; }
-  const char *getRootDirectory() const override { return "/tmp"; }
-  const char *getHomeDirectory() const override { return "/tmp"; }
-  const char *getTempDirectory() const override { return "/tmp"; }
+  const char *getRootDirectory() const override { return TMP_MOUNT_PREFIX; }
+  const char *getHomeDirectory() const override { return TMP_MOUNT_PREFIX; }
+  const char *getTempDirectory() const override { return TMP_MOUNT_PREFIX; }
   bool setHomeDirectory(pdiutil::string &homedir) override { return false; }
 
   mimetype_t getFileMimeType(const pdiutil::string &path) override { return MIME_TYPE_TEXT_PLAIN; }

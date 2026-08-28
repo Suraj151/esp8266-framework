@@ -11,6 +11,7 @@ created Date    : 18th July 2026
 #define _SESSION_MANAGER_H_
 
 #include <service_provider/ServiceProvider.h>
+#include "SessionStdio.h"
 
 /**
  * SessionManager
@@ -43,7 +44,36 @@ public:
   static uint16_t getCurrentGid();
 #endif
 
+#ifdef ENABLE_CMD_SERVICE
+  /**
+   * Descriptor table of the given session, or of the current one when null.
+   * An owned stream is deleted when the slot is reassigned or released.
+   */
+  static iTerminalInterface *getFd(uint8_t fd, session_t *s = nullptr);
+  static bool setFd(uint8_t fd, iTerminalInterface *stream, bool owned, session_t *s = nullptr);
+  static int8_t allocFd(iTerminalInterface *stream, bool owned, session_t *s = nullptr);
+  static void closeFd(uint8_t fd, session_t *s = nullptr);
+
+  /**
+   * Point stdin, stdout and stderr back at the session terminal, releasing
+   * whatever a redirect left behind. Every command dispatch ends here.
+   */
+  static void resetStdio(session_t *s = nullptr);
+  static void releaseFds(session_t *s);
+
+  /**
+   * The terminal a command of this session holds while a redirect is live.
+   * Writes follow fd 1 and reads fd 0, so output moves without the prompt.
+   * Null when nothing is claimed, meaning the session terminal serves directly.
+   */
+  static SessionStdio *stdioFor(session_t *s);
+#endif
+
 private:
+
+#ifdef ENABLE_CMD_SERVICE
+  static void releaseTableIfIdle(session_t *s);
+#endif
 
   static session_t m_sessions[PDI_MAX_SESSIONS];
   static session_t *m_current;

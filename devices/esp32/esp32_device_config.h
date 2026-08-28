@@ -43,8 +43,9 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define CMD_OPTION_MAX              6   ///< Maximum number of options for a command.
 #define CMD_OPTION_SIZE_MAX         3   ///< Maximum size of an option.
 
-#define PDI_MAX_SESSIONS            6
+#define PDI_MAX_SESSIONS            7
 #define SSH_MAX_SESSIONS            4
+#define TELNET_MAX_SESSIONS         2
 #define TCP_WRITE_DRAIN_TIMEOUT_MS  (MILLISECOND_DURATION_1000/2)
 
 /**

@@ -27,6 +27,9 @@ created Date    : 1st June 2019
 #endif
 
 #ifdef ENABLE_NETWORK_SERVICE
+#if defined(ENABLE_NETWORK_SERVICE) && defined(ENABLE_WIFI_SERVICE)
+#include <interface/pdi/impl/modules/netif/WiFiNetif.h>
+#endif
 #include <service_provider/network/NameResolver.h>
 #endif
 
@@ -95,16 +98,16 @@ void PDIStack::initialize(){
   #ifdef ENABLE_STORAGE_SERVICE
   __i_fs.mount(FILE_SEPARATOR, &__i_rootfs, "rootfs", VFS_TYPE_LITTLEFS);
   #ifdef ENABLE_PROCFS
-  __i_fs.mount("/proc", &__i_procfs, "procfs", VFS_TYPE_PROCFS);
+  __i_fs.mount(PROC_MOUNT_PREFIX, &__i_procfs, "procfs", VFS_TYPE_PROCFS);
   #endif
   #ifdef ENABLE_SYSFS
-  __i_fs.mount("/sys", &__i_sysfs, "sysfs", VFS_TYPE_SYSFS);
+  __i_fs.mount(SYS_MOUNT_PREFIX, &__i_sysfs, "sysfs", VFS_TYPE_SYSFS);
   #endif
   #ifdef ENABLE_DEVFS
-  __i_fs.mount("/dev", &__i_devfs, "devfs", VFS_TYPE_DEVFS);
+  __i_fs.mount(DEV_MOUNT_PREFIX, &__i_devfs, "devfs", VFS_TYPE_DEVFS);
   #endif
   #ifdef ENABLE_TMPFS
-  __i_fs.mount("/tmp", &__i_tmpfs, "tmpfs", VFS_TYPE_TMPFS);
+  __i_fs.mount(TMP_MOUNT_PREFIX, &__i_tmpfs, "tmpfs", VFS_TYPE_TMPFS);
   #endif
   __i_fs.init();
   #endif
@@ -143,6 +146,7 @@ void PDIStack::initialize(){
 
   #ifdef ENABLE_WIFI_SERVICE
   __wifi_service.initService( &__i_wifi );
+  registerWiFiNetifs();
   #endif
 
   #ifdef ENABLE_OTA_SERVICE

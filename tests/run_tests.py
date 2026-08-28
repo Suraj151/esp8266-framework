@@ -7,6 +7,7 @@ Tiers
   unit    native host build of the framework against the mock device
   system  the whole stack running as a host process, driven through its shell
   device  the same feature suite over serial or ssh against real hardware (pending)
+  fuzz    libFuzzer harnesses over the parsers that face the network pre-auth
 """
 
 import argparse
@@ -18,8 +19,20 @@ import sys
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 HOST_DIR = os.path.join(TESTS_DIR, "host")
 BUILD_DIR = os.path.join(TESTS_DIR, ".build")
+FUZZ_DIR = os.path.join(TESTS_DIR, "fuzz")
+FUZZ_BUILD_DIR = os.path.join(TESTS_DIR, ".build-fuzz")
 
-TIERS = ("unit", "system", "device")
+TIERS = ("unit", "system", "device", "fuzz")
+
+# one per parser that a peer reaches before any credential is checked
+FUZZ_TARGETS = (
+    "fuzz_ssh_wire",
+    "fuzz_sftp",
+    "fuzz_http",
+    "fuzz_shell",
+    "fuzz_dbrecord",
+    "fuzz_config",
+)
 
 GREEN = "\033[32m"
 RED = "\033[31m"
@@ -78,6 +91,125 @@ def build():
         say("%s%d compiler warning(s); build/ holds the full log%s" % (DIM, len(warnings), RESET))
 
     return True
+
+
+def configure_fuzz():
+    """libFuzzer ships with clang, so the whole tree is built by clang here."""
+
+    if not require_tool("cmake"):
+        return False
+
+    if shutil.which("clang++") is None:
+        fail("clang++ not found on PATH; the fuzz tier cannot be built with gcc")
+        return False
+
+    args = [
+        "cmake",
+        "-S", HOST_DIR,
+        "-B", FUZZ_BUILD_DIR,
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DCMAKE_C_COMPILER=clang",
+        "-DCMAKE_CXX_COMPILER=clang++",
+        "-DPDI_BUILD_FUZZ=ON",
+    ]
+
+    result = subprocess.run(args, capture_output=True, text=True)
+    if result.returncode != 0:
+        fail("fuzz cmake configure failed")
+        say(result.stdout)
+        say(result.stderr)
+        return False
+
+    return True
+
+
+def build_fuzz(targets):
+    args = ["cmake", "--build", FUZZ_BUILD_DIR, "-j", str(os.cpu_count() or 2)]
+    for target in targets:
+        args += ["--target", target]
+
+    result = subprocess.run(args, capture_output=True, text=True)
+    if result.returncode != 0:
+        fail("fuzz build failed")
+        say(result.stdout)
+        say(result.stderr)
+        return False
+
+    return True
+
+
+def run_fuzz(targets, seconds, verbose, list_only):
+    """Run each harness for a bounded time and report anything it saved."""
+
+    if list_only:
+        for target in targets:
+            say("fuzz.%s" % target)
+        return 0
+
+    if not configure_fuzz():
+        return 1
+    if not build_fuzz(targets):
+        return 1
+
+    subprocess.run([sys.executable, os.path.join(FUZZ_DIR, "MakeCorpus.py")],
+                   capture_output=True, text=True)
+
+    environment = dict(os.environ)
+    # the framework keeps service state alive on purpose, so the leak check at
+    # exit would report it against every harness
+    environment["ASAN_OPTIONS"] = "detect_leaks=0:abort_on_error=0"
+    environment["UBSAN_OPTIONS"] = "halt_on_error=1:print_stacktrace=1"
+
+    failed = 0
+    for target in targets:
+        binary = os.path.join(FUZZ_BUILD_DIR, "fuzz", target)
+        if not os.path.exists(binary):
+            fail("%s missing at %s" % (target, binary))
+            failed += 1
+            continue
+
+        corpus = os.path.join(FUZZ_DIR, "corpus", target)
+        findings = os.path.join(FUZZ_DIR, "findings", target)
+        os.makedirs(corpus, exist_ok=True)
+        os.makedirs(findings, exist_ok=True)
+
+        args = [
+            binary,
+            corpus,
+            "-max_total_time=%d" % seconds,
+            "-max_len=4096",
+            # a single allocation past this is still caught, and the headroom
+            # keeps a large corpus under the sanitizer from reading as a finding
+            "-rss_limit_mb=4096",
+            "-timeout=10",
+            "-print_final_stats=1",
+            "-artifact_prefix=%s%s" % (findings, os.sep),
+        ]
+
+        result = subprocess.run(args, env=environment, capture_output=True, text=True)
+        summary = [line for line in result.stderr.splitlines()
+                   if line.startswith("stat::") or line.startswith("#") and "DONE" in line]
+
+        if result.returncode != 0:
+            fail("  fail %s" % target)
+            # a whole run's log is thousands of lines; the report and the saved
+            # input are at the end of it
+            say("\n".join(result.stderr.splitlines()[-60:]))
+            failed += 1
+        else:
+            say("  %sok%s   %s" % (GREEN, RESET, target))
+            if verbose:
+                for line in summary:
+                    say("       %s%s%s" % (DIM, line, RESET))
+
+    say("")
+    if failed:
+        fail("%d of %d harnesses found something; see tests/fuzz/findings"
+             % (failed, len(targets)))
+        return 1
+
+    say("%s%d harnesses clean%s at %ds each" % (GREEN, len(targets), RESET, seconds))
+    return 0
 
 
 def run_unit(feature, verbose, list_only):
@@ -169,6 +301,10 @@ def run_features(shell, feature, verbose, timeout, username, password, descripti
              % (began_at, ended_at))
         fail("these results are void; re-run once the target stays up")
         return 1
+
+    if began_at is None or ended_at is None:
+        say("")
+        fail("the target's uptime could not be read, so a restart cannot be ruled out")
 
     return 1 if failed else 0
 
@@ -273,15 +409,37 @@ def run_device_interleaved(specs, feature, verbose, timeout, username, password,
             % (DIM, len(lanes), ", ".join(lane.label for lane in lanes), RESET))
         _, failed, _ = registry.run_interleaved(lanes, only=feature, verbose=verbose)
 
+        # A lane that died takes the restart check with it, and a check that
+        # cannot run is not a check that passed: say so rather than going quiet
+        # exactly when a restart is most likely.
+        confirmed = 0
+        unreadable = []
+
         for lane, before in zip(lanes, began):
             label = lane.label
             after = read_uptime(lane.target.shell, timeout)
-            if before is not None and after is not None and after < before:
+
+            if before is None or after is None:
+                unreadable.append(label)
+                continue
+
+            if after < before:
                 say("")
                 fail("the target restarted during this run (seen on %s): %ds -> %ds"
                      % (label, before, after))
                 fail("these results are void; re-run once the target stays up")
                 return 1
+
+            confirmed += 1
+
+        if 0 == confirmed:
+            say("")
+            fail("no transport could be asked whether the target restarted (%s)"
+                 % ", ".join(unreadable) if unreadable else "no lane answered")
+            fail("a restart cannot be ruled out, so read this tally with that in mind")
+        elif unreadable:
+            say("%s%s could not be asked about a restart; %d transport(s) say it stayed up%s"
+                % (DIM, ", ".join(unreadable), confirmed, RESET))
 
         return 1 if failed else 0
     finally:
@@ -337,11 +495,17 @@ def main():
                         help="reset a serial target before testing; drops its network for a while")
     parser.add_argument("--input-delay", type=float, default=None,
                         help="seconds to pause before each send on a serial target")
+    parser.add_argument("--fuzz-target", action="append", choices=FUZZ_TARGETS,
+                        help="run one fuzz harness instead of all of them. Repeatable")
+    parser.add_argument("--fuzz-seconds", type=int, default=60,
+                        help="seconds to spend in each fuzz harness")
     args = parser.parse_args()
 
     tiers = args.tier if args.tier else ["unit", "system"]
     if args.device and "device" not in tiers:
         tiers.append("device")
+    if args.fuzz_target and "fuzz" not in tiers:
+        tiers.append("fuzz")
 
     failures = []
     built = False
@@ -416,6 +580,17 @@ def main():
                 failures.append("device")
                 if not args.keep_going:
                     return code
+
+    if "fuzz" in tiers:
+        if not args.list:
+            say("")
+            say("%sfuzz%s" % (DIM, RESET))
+        code = run_fuzz(args.fuzz_target if args.fuzz_target else list(FUZZ_TARGETS),
+                        args.fuzz_seconds, args.verbose, args.list)
+        if code != 0:
+            failures.append("fuzz")
+            if not args.keep_going:
+                return code
 
     if failures:
         fail("failing tiers: %s" % ", ".join(failures))

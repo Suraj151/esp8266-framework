@@ -725,10 +725,10 @@ void HttpServerInterfaceImpl::parseRequest(){
                             // If the file already exists, delete it
                             __i_instance.getFileSystemInstance().deleteFile(tempFilePath.c_str());
                         }
-                        uint8_t filewritecounter = 0;
                         #else
                         pdiutil::string tempFilePath = argfilename;
                         #endif
+                        uint8_t filewritecounter = 0;
                         
                         bool found_boundary = false;
                         part.clear();

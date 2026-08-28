@@ -14,6 +14,12 @@ Created Date    : 21st July 2026
 
 #include "ProcFs.h"
 #include <interface/pdi.h>
+#include <utility/DataTypeConversions.h>
+#include <utility/TaskRecord.h>
+
+#ifdef ENABLE_NETWORK_SERVICE
+#include <interface/pdi/impl/modules/netif/NetifRegistry.h>
+#endif
 
 namespace {
 
@@ -32,46 +38,163 @@ ProcFsNullStorage s_proc_null_storage;
 // function body. String literals here already live in RODATA/IROM.
 const char* const s_proc_files[] = {
     "uptime",
-    "version"
+    "version",
+    "meminfo",
+    "mounts",
+    "stat"
 };
 
 const uint8_t s_proc_file_count = sizeof(s_proc_files) / sizeof(s_proc_files[0]);
+
+const char* const s_proc_task_files[] = {
+    "stat",
+    "cmdline",
+    "status"
+};
+
+const uint8_t s_proc_task_file_count = sizeof(s_proc_task_files) / sizeof(s_proc_task_files[0]);
+
+#ifdef ENABLE_NETWORK_SERVICE
+const char* const s_proc_net_files[] = {
+    "route",
+    "dev"
+};
+
+const uint8_t s_proc_net_file_count = sizeof(s_proc_net_files) / sizeof(s_proc_net_files[0]);
+#endif
+
+/**
+ * Append a decimal number, which every field of a task node is built from.
+ */
+void appendNumber(pdiutil::string& out, int64_t value) {
+    char buf[24];
+    Int64ToString(value, buf, sizeof(buf), 0);
+    out += buf;
+}
+
+/**
+ * Append a keyed byte count, the shape every memory line is built from.
+ */
+void appendMemLine(pdiutil::string& out, const char* key, uint32_t bytes) {
+    out += CHARPTR_WRAP_RO(key);
+    out += ":\t";
+    appendNumber(out, (int64_t)bytes);
+    out += " B\n";
+}
 
 }
 
 ProcFs __i_procfs;
 
-ProcFs::ProcFs() : iFileSystemInterface(s_proc_null_storage) {}
+ProcFs::ProcFs() : SynthFs(s_proc_null_storage, PROC_MOUNT_PREFIX) {}
 
-const char* ProcFs::normalizePath(const char* path) const {
-    if (!path) return "";
-    while (*path == '/') path++;
-    return path;
+/**
+ * Which node the path names, and for a task node which task it belongs to.
+ */
+ProcFs::proc_node_t ProcFs::classify(const char* path, int32_t& taskid_out,
+                                     uint8_t& leaf_out) const {
+    const char* p = normalizePath(path);
+    taskid_out = -1;
+    leaf_out = 0;
+
+    if (*p == '\0') return PROC_ROOT;
+
+    for (uint8_t i = 0; i < s_proc_file_count; ++i) {
+        const char* cursor = p;
+        if (matchSegment(cursor, s_proc_files[i]) && *cursor == '\0') {
+            return PROC_TOPFILE;
+        }
+    }
+
+#ifdef ENABLE_NETWORK_SERVICE
+    {
+        const char* cursor = p;
+        if (matchSegment(cursor, "net")) {
+            if (*cursor == '\0') return PROC_NETDIR;
+            if (!nextSegment(cursor)) return PROC_INVALID;
+
+            for (uint8_t i = 0; i < s_proc_net_file_count; ++i) {
+                const char* leafcursor = cursor;
+                if (matchSegment(leafcursor, s_proc_net_files[i]) && *leafcursor == '\0') {
+                    leaf_out = i;
+                    return PROC_NETFILE;
+                }
+            }
+
+            return PROC_INVALID;
+        }
+    }
+#endif
+
+    int32_t id = numberSegment(p);
+    if (id < 0 || nullptr == __task_scheduler.get_task((pdiutil::task_id_t)id)) {
+        return PROC_INVALID;
+    }
+    taskid_out = id;
+
+    if (*p == '\0') return PROC_TASKDIR;
+    if (!nextSegment(p)) return PROC_INVALID;
+
+    for (uint8_t i = 0; i < s_proc_task_file_count; ++i) {
+        const char* cursor = p;
+        if (matchSegment(cursor, s_proc_task_files[i]) && *cursor == '\0') {
+            leaf_out = i;
+            return PROC_TASKFILE;
+        }
+    }
+
+    return PROC_INVALID;
 }
 
-pdiutil::string ProcFs::basename(const char* path) {
-    if (!path) return pdiutil::string();
-    const char* last = path;
-    for (const char* p = path; *p; ++p) {
-        if (*p == '/') last = p + 1;
+SynthFs::synth_node_t ProcFs::resolve(const char* path) {
+    int32_t taskid;
+    uint8_t leaf;
+
+    switch (classify(path, taskid, leaf)) {
+        case PROC_ROOT:
+        case PROC_TASKDIR:
+        case PROC_NETDIR:
+            return SYNTH_DIR;
+        case PROC_TOPFILE:
+        case PROC_TASKFILE:
+        case PROC_NETFILE:
+            return SYNTH_FILE;
+        default:
+            return SYNTH_NONE;
     }
-    return pdiutil::string(last);
 }
 
-pdiutil::string ProcFs::generateContent(const char* path) {
-    const char* norm = normalizePath(path);
-    char buf[128];
-    buf[0] = '\0';
+pdiutil::string ProcFs::render(const char* path) {
+    int32_t taskid;
+    uint8_t leaf;
+    proc_node_t node = classify(path, taskid, leaf);
 
-    if (strcmp_ro(norm, RODT_ATTR("uptime")) == 0) {
-        uint32_t ms = __i_dvc_ctrl.millis_now();
-        uint32_t sec = ms / 1000UL;
-        uint32_t frac = (ms % 1000UL) / 10;
-        pdiutil::string fmt = CHARPTR_WRAP("%u.%02u %u.%02u\n");
-        __snprintf(buf, sizeof(buf), fmt.c_str(), sec, frac, sec, frac);
-        return pdiutil::string(buf);
-    }
-    if (strcmp_ro(norm, RODT_ATTR("version")) == 0) {
+    if (PROC_TOPFILE == node) {
+        const char* norm = normalizePath(path);
+        char buf[128];
+        buf[0] = '\0';
+
+        if (strcmp_ro(norm, RODT_ATTR("uptime")) == 0) {
+            uint32_t ms = __i_dvc_ctrl.millis_now();
+            uint32_t sec = ms / 1000UL;
+            uint32_t frac = (ms % 1000UL) / 10;
+            pdiutil::string fmt = CHARPTR_WRAP("%u.%02u %u.%02u\n");
+            __snprintf(buf, sizeof(buf), fmt.c_str(), sec, frac, sec, frac);
+            return pdiutil::string(buf);
+        }
+
+        if (strcmp_ro(norm, RODT_ATTR("meminfo")) == 0) {
+            return renderMemInfo();
+        }
+
+        if (strcmp_ro(norm, RODT_ATTR("mounts")) == 0) {
+            return renderMounts();
+        }
+
+        if (strcmp_ro(norm, RODT_ATTR("stat")) == 0) {
+            return renderStat();
+        }
+
         // RELEASE / CONFIG_VERSION land in IROM on esp8266; __vsnprintf's %s
         // reads char-by-char with plain *p and faults there. Marshal to RAM
         // first via CHARPTR_WRAP (same trick already used for format strings).
@@ -81,123 +204,235 @@ pdiutil::string ProcFs::generateContent(const char* path) {
         __snprintf(buf, sizeof(buf), fmt.c_str(), rel.c_str(), cfg.c_str());
         return pdiutil::string(buf);
     }
-    return pdiutil::string();
-}
 
-int ProcFs::readFile(const char* path, uint64_t size, pdiutil::function<bool(char*, uint32_t)> readbackfn, uint64_t offset, const char* readUntilMatchStr, bool* didmatchfound) {
-    if (!path || !readbackfn) return PDI_ERR_INVALID_ARG;
-    pdiutil::string content = generateContent(path);
-    if (content.empty()) return PDI_ERR_NOT_FOUND;
-    if (offset >= content.length()) return 0;
-
-    // `size` is the per-iteration chunk limit, not a total cap — loop the
-    // callback until the whole content is delivered or it returns false.
-    uint32_t total = content.length() - (uint32_t)offset;
-    uint32_t chunk = (size > 0 && size < total) ? (uint32_t)size : total;
-    uint32_t done = 0;
-    while (done < total) {
-        uint32_t n = total - done;
-        if (n > chunk) n = chunk;
-        if (!readbackfn((char*)content.c_str() + offset + done, n)) break;
-        done += n;
+#ifdef ENABLE_NETWORK_SERVICE
+    if (PROC_NETFILE == node) {
+        return (0 == leaf) ? renderNetRoute() : renderNetDev();
     }
-    return (int)done;
+#endif
+
+    if (PROC_TASKFILE != node) return pdiutil::string();
+
+    task_t* task = __task_scheduler.get_task((pdiutil::task_id_t)taskid);
+    if (nullptr == task) return pdiutil::string();
+
+    pdiutil::string out;
+
+    if (1 == leaf) {
+        out += taskDisplayName(task);
+        out += "\n";
+        return out;
+    }
+
+    pdiutil::string line;
+    taskStatLine(task, line);
+
+    if (0 == leaf) {
+        return line;
+    }
+
+    pdiutil::string state, policy, mode;
+    taskStatField(line, 2, state);
+    taskStatField(line, 10, policy);
+    taskStatField(line, 11, mode);
+
+    out += CHARPTR_WRAP("Name:\t");
+    out += taskDisplayName(task);
+    out += CHARPTR_WRAP("\nPid:\t");
+    appendNumber(out, task->m_task_id);
+    out += CHARPTR_WRAP("\nState:\t");
+    out += state;
+    out += CHARPTR_WRAP("\nOwner:\t");
+    appendNumber(out, task->m_owner);
+    out += CHARPTR_WRAP("\nPrio:\t");
+    appendNumber(out, task->m_task_priority);
+    out += CHARPTR_WRAP("\nNice:\t");
+    appendNumber(out, task->m_nice);
+    out += CHARPTR_WRAP("\nPolicy:\t");
+    out += policy;
+    out += CHARPTR_WRAP("\nMode:\t");
+    out += mode;
+    out += CHARPTR_WRAP("\nRuns:\t");
+    appendNumber(out, (int64_t)task->m_run_count);
+    out += CHARPTR_WRAP("\nExecUs:\t");
+    appendNumber(out, (int64_t)task->m_total_exec_us);
+    out += CHARPTR_WRAP("\nIntvlMs:\t");
+    appendNumber(out, (int64_t)task->m_duration);
+    out += "\n";
+
+    return out;
 }
 
-int64_t ProcFs::getFileSize(const char* path) {
-    pdiutil::string content = generateContent(path);
-    return content.empty() ? PDI_ERR_NOT_FOUND : (int64_t)content.length();
+/**
+ * What the heap holds, and how much of it is in one piece. The gap between the
+ * two is the fragmentation a long running board suffers from.
+ */
+pdiutil::string ProcFs::renderMemInfo() {
+    pdiutil::string out;
+    appendMemLine(out, RODT_ATTR("MemFree"), __i_dvc_ctrl.get_free_heap());
+    appendMemLine(out, RODT_ATTR("MemMaxBlock"), __i_dvc_ctrl.get_max_free_block());
+    return out;
 }
 
-bool ProcFs::isFileExist(const char* path) {
-    const char* norm = normalizePath(path);
+/**
+ * One line per mount, in the order the dispatcher searches them.
+ */
+pdiutil::string ProcFs::renderMounts() {
+    pdiutil::string out;
+
+    for (uint8_t i = 0; i < __i_fs.getMountCount(); ++i) {
+        const vfs_mount_t* mount = __i_fs.getMount(i);
+        if (nullptr == mount) continue;
+
+        out += mount->m_name;
+        out += " ";
+        out += mount->m_prefix;
+        out += " ";
+        out += CHARPTR_WRAP_RO(VfsTypeToString(mount->m_type));
+        out += CHARPTR_WRAP(" rw 0 0\n");
+    }
+
+    return out;
+}
+
+/**
+ * Cumulative scheduler counters. The cpu figures are microseconds rather than
+ * the jiffies linux counts in, because every reader turns them into a ratio.
+ */
+pdiutil::string ProcFs::renderStat() {
+    uint64_t busy = 0;
+    uint16_t running = 0;
+    uint32_t switches = 0;
+    uint16_t tasks = 0;
+
+    for (uint16_t i = 0; i < __task_scheduler.getTaskSlots(); ++i) {
+        task_t* task = __task_scheduler.getTaskByIndex(i);
+        if (nullptr == task) continue;
+        busy += task->m_total_exec_us;
+        switches += task->m_run_count;
+        tasks++;
+        if (TASK_STATE_RUNNING == task->m_state) running++;
+    }
+
+    uint64_t elapsed = (uint64_t)__i_dvc_ctrl.micros_now();
+    uint64_t idle = (elapsed > busy) ? (elapsed - busy) : 0;
+
+    pdiutil::string out = CHARPTR_WRAP("cpu 0 0 ");
+    appendNumber(out, (int64_t)busy);
+    out += " ";
+    appendNumber(out, (int64_t)idle);
+    out += CHARPTR_WRAP("\nctxt ");
+    appendNumber(out, (int64_t)switches);
+    out += CHARPTR_WRAP("\nprocesses ");
+    appendNumber(out, (int64_t)tasks);
+    out += CHARPTR_WRAP("\nprocs_running ");
+    appendNumber(out, (int64_t)running);
+    out += CHARPTR_WRAP("\nbtime 0\n");
+
+    return out;
+}
+
+#ifdef ENABLE_NETWORK_SERVICE
+/**
+ * The gateway each registered interface routes through.
+ */
+pdiutil::string ProcFs::renderNetRoute() {
+    pdiutil::string out = CHARPTR_WRAP("Iface\tDestination\tGateway\tMask\n");
+
+    for (uint8_t i = 0; i < __netif_registry.count(); ++i) {
+        iNetifInterface* netif = __netif_registry.at(i);
+        if (nullptr == netif) continue;
+
+        netif_info_t info;
+        if (!netif->getInfo(info) || !info.m_up) continue;
+
+        out += CHARPTR_WRAP_RO(netif->name());
+        out += CHARPTR_WRAP("\t0.0.0.0\t");
+        out += pdiutil::string(info.m_gateway);
+        out += "\t";
+        out += pdiutil::string(info.m_netmask);
+        out += "\n";
+    }
+
+    return out;
+}
+
+/**
+ * Per interface traffic, for the interfaces that can count it.
+ */
+pdiutil::string ProcFs::renderNetDev() {
+    pdiutil::string out = CHARPTR_WRAP("Iface\tRxBytes\tRxPackets\tRxErrs\tTxBytes\tTxPackets\tTxErrs\n");
+
+    for (uint8_t i = 0; i < __netif_registry.count(); ++i) {
+        iNetifInterface* netif = __netif_registry.at(i);
+        if (nullptr == netif) continue;
+
+        // an interface that cannot count is left out rather than listed with
+        // zeroes, which would read as an idle link
+        netif_counters_t counters;
+        if (!netif->getCounters(counters)) continue;
+
+        out += CHARPTR_WRAP_RO(netif->name());
+        out += "\t";
+        appendNumber(out, (int64_t)counters.m_rx_bytes);
+        out += "\t";
+        appendNumber(out, (int64_t)counters.m_rx_packets);
+        out += "\t";
+        appendNumber(out, (int64_t)counters.m_rx_errors);
+        out += "\t";
+        appendNumber(out, (int64_t)counters.m_tx_bytes);
+        out += "\t";
+        appendNumber(out, (int64_t)counters.m_tx_packets);
+        out += "\t";
+        appendNumber(out, (int64_t)counters.m_tx_errors);
+        out += "\n";
+    }
+
+    return out;
+}
+#endif
+
+int ProcFs::listChildren(const char* path, pdiutil::vector<file_info_t>& items) {
+    int32_t taskid;
+    uint8_t leaf;
+    proc_node_t node = classify(path, taskid, leaf);
+
+    if (PROC_TASKDIR == node) {
+        for (uint8_t i = 0; i < s_proc_task_file_count; ++i) {
+            addEntry(items, s_proc_task_files[i], FILE_TYPE_REG, 0444);
+        }
+        return (int)items.size();
+    }
+
+#ifdef ENABLE_NETWORK_SERVICE
+    if (PROC_NETDIR == node) {
+        for (uint8_t i = 0; i < s_proc_net_file_count; ++i) {
+            addEntry(items, s_proc_net_files[i], FILE_TYPE_REG, 0444);
+        }
+        return (int)items.size();
+    }
+#endif
+
+    if (PROC_ROOT != node) return STORAGE_ERROR_NOT_A_DIRECTORY;
+
     for (uint8_t i = 0; i < s_proc_file_count; ++i) {
-        if (strcmp(norm, s_proc_files[i]) == 0) return true;
+        addEntry(items, s_proc_files[i], FILE_TYPE_REG, 0444,
+                 getFileSize(s_proc_files[i]));
     }
-    return false;
-}
 
-bool ProcFs::isDirExist(const char* path) {
-    const char* norm = normalizePath(path);
-    return (norm[0] == '\0');
-}
+#ifdef ENABLE_NETWORK_SERVICE
+    addEntry(items, "net", FILE_TYPE_DIR, 0555);
+#endif
 
-bool ProcFs::isDirectory(const char* path) {
-    return isDirExist(path);
-}
-
-int ProcFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern) {
-    const char* norm = normalizePath(path);
-    if (norm[0] != '\0') return STORAGE_ERROR_NOT_A_DIRECTORY;
-
-    for (uint8_t i = 0; i < s_proc_file_count; ++i) {
-        file_info_t info;
-        memset(&info, 0, sizeof(info));
-        info.m_type = FILE_TYPE_REG;
-        info.m_size = getFileSize(s_proc_files[i]);
-        // Callers (ls) delete[] m_name — allocate a heap copy of the literal
-        // so the free path is safe.
-        uint32_t nlen = strlen(s_proc_files[i]);
-        info.m_name = pdiutil::safe_new_array<char>(nlen + 1);
-        if (nullptr == info.m_name) continue;
-        memcpy(info.m_name, s_proc_files[i], nlen);
-        info.m_name[nlen] = '\0';
-        info.m_perms = 0444;
-        info.m_uid = 0;
-        info.m_gid = 0;
-        info.m_ctime = 0;
-        info.m_mtime = 0;
-        items.push_back(info);
+    char numbuf[12];
+    for (uint16_t i = 0; i < __task_scheduler.getTaskSlots(); ++i) {
+        task_t* task = __task_scheduler.getTaskByIndex(i);
+        if (nullptr == task) continue;
+        Uint32ToString((uint32_t)task->m_task_id, numbuf, sizeof(numbuf));
+        addEntry(items, numbuf, FILE_TYPE_DIR, 0555);
     }
+
     return (int)items.size();
-}
-
-int ProcFs::getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t size) {
-    if (!buffer || size == 0) return PDI_ERR_INVALID_ARG;
-    if (type == FILE_ATTR_PERMS && size >= sizeof(uint16_t)) {
-        *(uint16_t*)buffer = 0444;
-        return sizeof(uint16_t);
-    }
-    if (type == FILE_ATTR_UID && size >= sizeof(uint16_t)) {
-        *(uint16_t*)buffer = 0;
-        return sizeof(uint16_t);
-    }
-    if (type == FILE_ATTR_GID && size >= sizeof(uint16_t)) {
-        *(uint16_t*)buffer = 0;
-        return sizeof(uint16_t);
-    }
-    return STORAGE_ERROR_ATTR_NOT_FOUND;
-}
-
-pdi_err_t ProcFs::getFileMeta(const char* path, file_info_t& out) {
-    const char* norm = normalizePath(path);
-    // Per iFileSystemInterface contract, m_name is left untouched. Do not
-    // assign a static/IROM literal or a caller-borrowed pointer here — some
-    // callers assume m_name (when set) is heap-owned and will delete[] it.
-
-    if (norm[0] == '\0') {
-        out.m_type  = FILE_TYPE_DIR;
-        out.m_size  = 0;
-        out.m_perms = 0555;
-        out.m_uid   = 0;
-        out.m_gid   = 0;
-        out.m_ctime = 0;
-        out.m_mtime = 0;
-        return 0;
-    }
-
-    if (isFileExist(norm)) {
-        out.m_type  = FILE_TYPE_REG;
-        out.m_size  = getFileSize(norm);
-        out.m_perms = 0444;
-        out.m_uid   = 0;
-        out.m_gid   = 0;
-        out.m_ctime = 0;
-        out.m_mtime = 0;
-        return 0;
-    }
-
-    return PDI_ERR_NOT_FOUND;
 }
 
 #endif

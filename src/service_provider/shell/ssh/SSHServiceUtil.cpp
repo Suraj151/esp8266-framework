@@ -74,8 +74,8 @@ int LWSSH::parse_received_packet(LWSSHSession* session, ssh_packet &packet){
         session->m_client->read();
     }
 
-    bool bStatus = (packet.payload.size() == payload_length && packet.payload[0] < 101);
-    
+    bool bStatus = (!packet.payload.empty() && packet.payload.size() == payload_length && packet.payload[0] < 101);
+
     session->packets_seq_num_ctos++;
 
     return bStatus ? 0 : PDI_ERR_CORRUPT;
@@ -302,15 +302,15 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     __i_dvc_ctrl.yield();
 
     // Parse payload
-    uint8_t padding_length = packetvec[4];
+    uint8_t padding_length = packetvec.size() > 4 ? packetvec[4] : 0;
     uint32_t payload_length = packet_length - padding_length - 1;
 
     packet.payload.clear();
-    for (uint32_t i = 0; i < payload_length; ++i) {
+    for (uint32_t i = 0; i < payload_length && (5 + i) < packetvec.size(); ++i) {
         packet.payload.push_back(packetvec[5 + i]);
     }
 
-    bool bStatus = (packet.payload.size() == payload_length && packet.payload[0] < 101);
+    bool bStatus = (!packet.payload.empty() && packet.payload.size() == payload_length && packet.payload[0] < 101);
     
     return bStatus ? 0 : PDI_ERR_CORRUPT;
 }
@@ -329,10 +329,10 @@ bool LWSSH::parse_name_list(const pdiutil::vector<uint8_t>& payload, uint32_t& o
     if (offset + 4 > payload.size()) return false;
     uint32_t len = (payload[offset] << 24) | (payload[offset+1] << 16) | (payload[offset+2] << 8) | payload[offset+3];
     offset += 4;
-    if (offset + len > payload.size()) return false;
+    if (len > (payload.size() - offset)) return false;
     pdiutil::string names(reinterpret_cast<const char*>(&payload[offset]), len);
     offset += len;
-    uint32_t start = 0, end;
+    pdiutil::string::size_type start = 0, end;
     while ((end = names.find(',', start)) != pdiutil::string::npos) {
         name_list.push_back(names.substr(start, end - start));
         start = end + 1;
@@ -637,7 +637,7 @@ bool LWSSH::read_ssh_string(const pdiutil::vector<uint8_t>& payload, pdiutil::st
     if (offset + 4 > payload.size()) return false;
     uint32_t len = (payload[offset] << 24) | (payload[offset+1] << 16) | (payload[offset+2] << 8) | payload[offset+3];
     offset += 4;
-    if (offset + len > payload.size()) return false;
+    if (len > (payload.size() - offset)) return false;
     str.assign((const char*)&payload[offset], len);
     offset += len;
     return true;
@@ -654,7 +654,7 @@ bool LWSSH::read_ssh_string(const pdiutil::vector<uint8_t>& payload, pdiutil::ve
     if (offset + 4 > payload.size()) return false;
     uint32_t len = (payload[offset] << 24) | (payload[offset+1] << 16) | (payload[offset+2] << 8) | payload[offset+3];
     offset += 4;
-    if (offset + len > payload.size()) return false;
+    if (len > (payload.size() - offset)) return false;
     for (uint32_t i = 0; i < len; i++){
         str.push_back(payload[offset+i]);
     }
@@ -1620,7 +1620,7 @@ bool LWSSH::parse_channel_request(const pdiutil::vector<uint8_t> &payload, SSHCh
     uint32_t str_len = (payload[offset] << 24) | (payload[offset+1] << 16) |
                        (payload[offset+2] << 8) | payload[offset+3];
     offset += 4;
-    if (offset + str_len > payload.size()) return false;
+    if (str_len > (payload.size() - offset)) return false;
     req.request_type.assign((const char*)&payload[offset], str_len);
     offset += str_len;
 
@@ -1698,7 +1698,7 @@ bool LWSSH::parse_channel_data_request(const pdiutil::vector<uint8_t> &payload, 
     uint32_t data_len = (payload[offset] << 24) | (payload[offset+1] << 16) |
                         (payload[offset+2] << 8) | payload[offset+3];
     offset += 4;
-    if (offset + data_len > payload.size()) return false;
+    if (data_len > (payload.size() - offset)) return false;
     datareq.data.assign(payload.begin() + offset, payload.begin() + offset + data_len);
     offset += data_len;
 

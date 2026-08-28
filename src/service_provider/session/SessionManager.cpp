@@ -11,6 +11,7 @@ created Date    : 18th July 2026
 #include "SessionManager.h"
 #ifdef ENABLE_CMD_SERVICE
 #include <service_provider/cmd/CommandLineServiceProvider.h>
+#include <utility/SafeAlloc.h>
 #endif
 
 session_t SessionManager::m_sessions[PDI_MAX_SESSIONS];
@@ -30,6 +31,10 @@ session_t *SessionManager::attach(iTerminalInterface *terminal) {
 
   for (uint8_t i = 0; i < PDI_MAX_SESSIONS; i++) {
     if (SESSION_STATE_FREE == m_sessions[i].m_state) {
+#ifdef ENABLE_CMD_SERVICE
+      // a slot freed without going through detach still holds its descriptors
+      releaseFds(&m_sessions[i]);
+#endif
       m_sessions[i].clear();
       m_sessions[i].m_sid = i + 1;
       m_sessions[i].m_state = SESSION_STATE_PRELOGIN;
@@ -54,6 +59,7 @@ void SessionManager::detach(iTerminalInterface *terminal) {
     // a command still waiting for input belongs to this session, not to the
     // next terminal that is handed the slot
     __cmd_service.releaseSession(s);
+    releaseFds(s);
 #endif
     s->clear();
     if (m_current == s) {
@@ -67,6 +73,7 @@ void SessionManager::detachCurrent() {
   if (nullptr != m_current) {
 #ifdef ENABLE_CMD_SERVICE
     __cmd_service.releaseSession(m_current);
+    releaseFds(m_current);
 #endif
     m_current->clear();
     m_current = nullptr;
@@ -186,6 +193,174 @@ uint16_t SessionManager::getCurrentUid() {
 uint16_t SessionManager::getCurrentGid() {
   session_t *s = current();
   return (nullptr != s) ? s->m_gid : (uint16_t)0;
+}
+
+#endif
+
+#ifdef ENABLE_CMD_SERVICE
+
+/**
+ * The stream a descriptor resolves to, falling back to the session terminal
+ * for the standard three when nothing has claimed them.
+ */
+iTerminalInterface *SessionManager::getFd(uint8_t fd, session_t *s) {
+
+  if (nullptr == s) s = current();
+  if (nullptr == s || fd >= PDI_MAX_FDS) {
+    return nullptr;
+  }
+
+  if (nullptr != s->m_fdtable && nullptr != s->m_fdtable->m_fds[fd]) {
+    return s->m_fdtable->m_fds[fd];
+  }
+
+  return (fd <= PDI_FD_STDERR) ? s->m_terminal : nullptr;
+}
+
+/**
+ * Claims a descriptor, taking the table on first use. An owned stream is
+ * deleted when the slot is reassigned or released.
+ */
+bool SessionManager::setFd(uint8_t fd, iTerminalInterface *stream, bool owned, session_t *s) {
+
+  if (nullptr == s) s = current();
+  if (nullptr == s || fd >= PDI_MAX_FDS) {
+    return false;
+  }
+
+  closeFd(fd, s);
+
+  if (nullptr == stream) {
+    return true;
+  }
+
+  if (nullptr == s->m_fdtable) {
+    s->m_fdtable = pdiutil::safe_new<fd_table_t>();
+    if (nullptr == s->m_fdtable) {
+      return false;
+    }
+  }
+
+  s->m_fdtable->m_fds[fd] = stream;
+  if (owned) {
+    s->m_fdtable->m_owned |= (uint8_t)(1 << fd);
+  }
+  return true;
+}
+
+/**
+ * Claims the first free slot above the standard three, or -1 when none is
+ * left.
+ */
+int8_t SessionManager::allocFd(iTerminalInterface *stream, bool owned, session_t *s) {
+
+  if (nullptr == s) s = current();
+  if (nullptr == s || nullptr == stream) {
+    return -1;
+  }
+
+  for (uint8_t fd = PDI_FD_STDERR + 1; fd < PDI_MAX_FDS; fd++) {
+    if (nullptr == s->m_fdtable || nullptr == s->m_fdtable->m_fds[fd]) {
+      return setFd(fd, stream, owned, s) ? (int8_t)fd : (int8_t)-1;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Releases one descriptor, deleting its stream when owned, and drops the
+ * table once the last slot clears.
+ */
+void SessionManager::closeFd(uint8_t fd, session_t *s) {
+
+  if (nullptr == s) s = current();
+  if (nullptr == s || fd >= PDI_MAX_FDS || nullptr == s->m_fdtable) {
+    return;
+  }
+
+  fd_table_t *t = s->m_fdtable;
+
+  if (t->m_owned & (uint8_t)(1 << fd)) {
+    iTerminalInterface *owned_stream = t->m_fds[fd];
+    t->m_owned &= (uint8_t)~(1 << fd);
+    t->m_fds[fd] = nullptr;
+    pdiutil::safe_delete(owned_stream);
+  } else {
+    t->m_fds[fd] = nullptr;
+  }
+
+  releaseTableIfIdle(s);
+}
+
+/**
+ * Points the standard three back at the session terminal, releasing whatever
+ * a redirect left behind.
+ */
+void SessionManager::resetStdio(session_t *s) {
+
+  if (nullptr == s) s = current();
+  if (nullptr == s || nullptr == s->m_fdtable) {
+    return;
+  }
+
+  closeFd(PDI_FD_STDIN, s);
+  closeFd(PDI_FD_STDOUT, s);
+  closeFd(PDI_FD_STDERR, s);
+}
+
+/**
+ * Frees the table and its adapter once no slot is claimed.
+ */
+void SessionManager::releaseTableIfIdle(session_t *s) {
+
+  if (nullptr == s || nullptr == s->m_fdtable || !s->m_fdtable->isIdle()) {
+    return;
+  }
+
+  pdiutil::safe_delete(s->m_fdtable->m_stdio);
+  pdiutil::safe_delete(s->m_fdtable);
+}
+
+/**
+ * The adapter a command of this session writes through while a redirect is
+ * live, or null when the terminal already serves directly.
+ */
+SessionStdio *SessionManager::stdioFor(session_t *s) {
+
+  if (nullptr == s) s = current();
+
+  if (nullptr == s || nullptr == s->m_fdtable) {
+    return nullptr;
+  }
+
+  if (nullptr == s->m_fdtable->m_stdio) {
+    s->m_fdtable->m_stdio = pdiutil::safe_new<SessionStdio>();
+  }
+
+  if (nullptr != s->m_fdtable->m_stdio) {
+    s->m_fdtable->m_stdio->bind(s);
+  }
+  return s->m_fdtable->m_stdio;
+}
+
+/**
+ * Releases every descriptor the session holds along with its table, so
+ * nothing outlives the session.
+ */
+void SessionManager::releaseFds(session_t *s) {
+
+  if (nullptr == s || nullptr == s->m_fdtable) {
+    return;
+  }
+
+  for (uint8_t fd = 0; fd < PDI_MAX_FDS; fd++) {
+    closeFd(fd, s);
+  }
+
+  if (nullptr != s->m_fdtable) {
+    pdiutil::safe_delete(s->m_fdtable->m_stdio);
+    pdiutil::safe_delete(s->m_fdtable);
+  }
 }
 
 #endif

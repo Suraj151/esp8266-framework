@@ -32,4 +32,14 @@ created Date    : 1st June 2019
 #define DNS_RESOLVE_TIMEOUT_MS 5000
 #endif
 
+// Every link a port can bring up takes a slot in the netif registry. WiFi
+// accounts for two of them, station and soft ap.
+#ifndef NETIF_MAX_REGISTERED
+#define NETIF_MAX_REGISTERED 4
+#endif
+
+#ifndef NETIF_NAME_MAX
+#define NETIF_NAME_MAX 8
+#endif
+
 #endif

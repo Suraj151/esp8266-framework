@@ -243,7 +243,7 @@ class LoginController : public Controller {
 		 */
 		bool updatePassword( const char* _username, const char* _password ){
 
-#ifdef ENABLE_STORAGE_SERVICE
+#ifdef ENABLE_AUTH_SERVICE
       pdiutil::string _shadow = CHARPTR_WRAP(USER_STORE_SHADOW_PATH);
       if( __i_fs.isFileExist( _shadow.c_str() ) ){
         return __user_store_service.setPassword( _username, _password );
@@ -304,7 +304,7 @@ class LoginController : public Controller {
 
             uint16_t _uid = 0;
             uint16_t _gid = 0;
-#ifdef ENABLE_STORAGE_SERVICE
+#ifdef ENABLE_AUTH_SERVICE
             user_record_t _record;
             if( __user_store_service.findUserByName( _username.c_str(), _record ) ){
               _uid = _record.m_uid;

@@ -243,10 +243,10 @@ TEST(scheduler, unique_ids_do_not_collide_while_tasks_are_live)
 }
 
 /**
- * Ids are handed out as the lowest free integer, so the id of a reaped task is
- * immediately available again. Pinned here until generational ids land.
+ * The id of a reaped task is not handed to the next task registered, so a
+ * caller still holding it cannot reach whatever came after it.
  */
-TEST(scheduler, id_of_a_reaped_task_is_handed_out_again)
+TEST(scheduler, id_of_a_reaped_task_is_not_handed_out_again)
 {
     TaskScheduler scheduler;
     pditest::FakeClock clock;
@@ -259,14 +259,14 @@ TEST(scheduler, id_of_a_reaped_task_is_handed_out_again)
     ASSERT_EQ(scheduler.is_registered_task(oneshot), (int16_t)-1);
 
     pdiutil::task_id_t replacement = scheduler.setInterval(bumpB, 10, clock.millis_now());
-    ASSERT_EQ(replacement, oneshot);
+    ASSERT_NE(replacement, oneshot);
 }
 
 /**
- * Consequence of the reuse above: a caller holding the stale id retargets the
- * task that took the slot over, replacing a live callback.
+ * A caller holding the id of a task that has gone gets a task of its own, and
+ * the task registered after it keeps the callback it was given.
  */
-TEST(scheduler, stale_id_retargets_the_task_that_took_the_slot)
+TEST(scheduler, a_stale_id_does_not_retarget_the_task_that_followed_it)
 {
     TaskScheduler scheduler;
     pditest::FakeClock clock;
@@ -287,7 +287,40 @@ TEST(scheduler, stale_id_retargets_the_task_that_took_the_slot)
     runFor(scheduler, clock, 50);
 
     ASSERT_GT(s_counter_a, 0);
-    ASSERT_EQ(s_counter_b, 0);
+    ASSERT_GT(s_counter_b, 0);
+}
+
+/**
+ * Ids run out eventually and start again from one. A task still holding a low
+ * id must be stepped over rather than duplicated.
+ */
+TEST(scheduler, an_id_still_in_use_is_skipped_when_ids_start_again)
+{
+    TaskScheduler scheduler;
+    pditest::FakeClock clock;
+    scheduler.setUtilityInterface(&clock);
+
+    pdiutil::task_id_t keeper = scheduler.setInterval(bumpA, 1000, clock.millis_now());
+    ASSERT_EQ(keeper, (pdiutil::task_id_t)1);
+
+    bool wrapped = false;
+    pdiutil::task_id_t previous = keeper;
+
+    for (int32_t i = 0; i < MAX_TASK_ID + 4; i++)
+    {
+        pdiutil::task_id_t id = scheduler.setInterval(bumpB, 1000, clock.millis_now());
+        ASSERT_TRUE(id > 0);
+        ASSERT_NE(id, keeper);
+
+        if (id < previous) wrapped = true;
+        previous = id;
+
+        scheduler.remove_task(id);
+        scheduler.remove_expired_tasks();
+    }
+
+    ASSERT_TRUE(wrapped);
+    ASSERT_EQ(scheduler.is_registered_task(keeper) >= 0, true);
 }
 
 TEST(scheduler, a_finalizer_runs_with_the_task_when_it_is_reaped)

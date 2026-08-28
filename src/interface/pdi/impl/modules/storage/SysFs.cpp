@@ -17,6 +17,10 @@ Created Date    : 23rd July 2026
 #include <utility/DataTypeConversions.h>
 #include <config/GpioConfig.h>
 
+#ifdef ENABLE_NETWORK_SERVICE
+#include <interface/pdi/impl/modules/netif/NetifRegistry.h>
+#endif
+
 #ifdef ENABLE_GPIO_SERVICE
 #include <service_provider/device/GpioServiceProvider.h>
 #include <service_provider/database/DatabaseServiceProvider.h>
@@ -39,38 +43,45 @@ SysFsNullStorage s_sys_null_storage;
 const char* const s_sys_leaf_names[] = { "value", "mode" };
 const uint8_t s_sys_leaf_count = sizeof(s_sys_leaf_names) / sizeof(s_sys_leaf_names[0]);
 
-bool segEquals(const char*& p, const char* lit) {
-    uint32_t n = strlen(lit);
-    if (strncmp(p, lit, n) != 0) return false;
-    char after = p[n];
-    if (after != '\0' && after != '/') return false;
-    p += n;
-    return true;
-}
+#ifdef ENABLE_NETWORK_SERVICE
+// Leaf node names under a network interface directory. An interface answers
+// every one of them, saying down and 0.0.0.0 where it has nothing better.
+const char* const s_sys_net_leaf_names[] = {
+    "address", "operstate", "ip", "netmask", "gateway", "ssid", "rssi"
+};
+const uint8_t s_sys_net_leaf_count = sizeof(s_sys_net_leaf_names) / sizeof(s_sys_net_leaf_names[0]);
 
-int16_t parseSeg(const char*& p) {
-    if (*p < '0' || *p > '9') return PDI_ERR_INVALID_ARG;
-    int16_t v = 0;
-    while (*p >= '0' && *p <= '9') {
-        v = (int16_t)(v * 10 + (*p - '0'));
-        p++;
-        if (v > 1000) return PDI_ERR_RANGE;
-    }
-    return v;
-}
+// a station reports the last two; an access point has no association to
+// describe, so its directory stops before them
+const uint8_t s_sys_net_common_leaf_count = 5;
+#endif
 
 }
+
+#ifdef ENABLE_NETWORK_SERVICE
+/**
+ * How many leaves an interface's directory holds. Only a station has an
+ * association to describe, so an access point's stops before ssid and rssi.
+ */
+static uint8_t netLeafCount(uint8_t index) {
+    iNetifInterface* netif = __netif_registry.at(index);
+    if (nullptr == netif) return 0;
+
+    netif_info_t info;
+    if (!netif->getInfo(info)) return s_sys_net_common_leaf_count;
+
+    return (NETIF_KIND_WIFI_STA == info.m_kind) ? s_sys_net_leaf_count
+                                                : s_sys_net_common_leaf_count;
+}
+#endif
 
 SysFs __i_sysfs;
 
-SysFs::SysFs() : iFileSystemInterface(s_sys_null_storage) {}
+SysFs::SysFs() : SynthFs(s_sys_null_storage, SYS_MOUNT_PREFIX) {}
 
-const char* SysFs::normalizePath(const char* path) const {
-    if (!path) return "";
-    while (*path == '/') path++;
-    return path;
-}
-
+/**
+ * Whether the pin exists on this board and is safe to drive.
+ */
 bool SysFs::isValidPin(uint8_t pin) const {
 #ifdef ENABLE_GPIO_SERVICE
     return pin < MAX_GPIO_PINS && !__i_dvc_ctrl.isExceptionalGpio(pin);
@@ -80,48 +91,128 @@ bool SysFs::isValidPin(uint8_t pin) const {
 #endif
 }
 
-SysFs::NodeKind SysFs::classify(const char* path, int16_t& pin_out) const {
+/**
+ * Which node the path names, plus the pin or interface index behind it and
+ * which of that node's leaves it is.
+ */
+SysFs::NodeKind SysFs::classify(const char* path, int16_t& index_out,
+                                uint8_t& leaf_out) const {
     const char* p = normalizePath(path);
-    pin_out = -1;
+    index_out = -1;
+    leaf_out = 0;
 
     if (*p == '\0') return SYS_ROOT;
-    if (!segEquals(p, "class")) return SYS_INVALID;
+    if (!matchSegment(p, "class")) return SYS_INVALID;
     if (*p == '\0') return SYS_CLASS;
-    p++; // consume '/'
-    if (!segEquals(p, "gpio")) return SYS_INVALID;
-    if (*p == '\0') return SYS_GPIODIR;
-    p++; // consume '/'
+    if (!nextSegment(p)) return SYS_INVALID;
 
-    int16_t pin = parseSeg(p);
-    if (pin < 0 || !isValidPin((uint8_t)pin)) return SYS_INVALID;
-    pin_out = pin;
-    if (*p == '\0') return SYS_PIN;
-    if (*p != '/') return SYS_INVALID;
-    p++; // consume '/'
+    if (matchSegment(p, "gpio")) {
+        if (*p == '\0') return SYS_GPIODIR;
+        if (!nextSegment(p)) return SYS_INVALID;
 
-    if (strcmp(p, "value") == 0) return SYS_VALUE;
-    if (strcmp(p, "mode") == 0) return SYS_MODE;
+        int32_t pin = numberSegment(p);
+        if (pin < 0 || !isValidPin((uint8_t)pin)) return SYS_INVALID;
+        index_out = (int16_t)pin;
+        if (*p == '\0') return SYS_PIN;
+        if (!nextSegment(p)) return SYS_INVALID;
+
+        for (uint8_t i = 0; i < s_sys_leaf_count; ++i) {
+            const char* cursor = p;
+            if (matchSegment(cursor, s_sys_leaf_names[i]) && *cursor == '\0') {
+                leaf_out = i;
+                return (0 == i) ? SYS_VALUE : SYS_MODE;
+            }
+        }
+
+        return SYS_INVALID;
+    }
+
+#ifdef ENABLE_NETWORK_SERVICE
+    if (matchSegment(p, "net")) {
+        if (*p == '\0') return SYS_NETDIR;
+        if (!nextSegment(p)) return SYS_INVALID;
+
+        int16_t found = -1;
+        for (uint8_t i = 0; i < __netif_registry.count(); ++i) {
+            iNetifInterface* netif = __netif_registry.at(i);
+            if (nullptr == netif) continue;
+            const char* cursor = p;
+            if (matchSegment(cursor, netif->name()) && (*cursor == '\0' || *cursor == '/')) {
+                found = (int16_t)i;
+                p = cursor;
+                break;
+            }
+        }
+
+        if (found < 0) return SYS_INVALID;
+        index_out = found;
+        if (*p == '\0') return SYS_NETIF;
+        if (!nextSegment(p)) return SYS_INVALID;
+
+        for (uint8_t i = 0; i < netLeafCount((uint8_t)found); ++i) {
+            const char* cursor = p;
+            if (matchSegment(cursor, s_sys_net_leaf_names[i]) && *cursor == '\0') {
+                leaf_out = i;
+                return SYS_NETATTR;
+            }
+        }
+
+        return SYS_INVALID;
+    }
+#endif
+
     return SYS_INVALID;
 }
 
-pdiutil::string SysFs::basename(const char* path) {
-    if (!path) return pdiutil::string();
-    const char* last = path;
-    for (const char* p = path; *p; ++p) {
-        if (*p == '/') last = p + 1;
+SynthFs::synth_node_t SysFs::resolve(const char* path) {
+    int16_t index;
+    uint8_t leaf;
+
+    switch (classify(path, index, leaf)) {
+        case SYS_ROOT:
+        case SYS_CLASS:
+        case SYS_GPIODIR:
+        case SYS_PIN:
+        case SYS_NETDIR:
+        case SYS_NETIF:
+            return SYNTH_DIR;
+        case SYS_VALUE:
+        case SYS_MODE:
+        case SYS_NETATTR:
+            return SYNTH_FILE;
+        default:
+            return SYNTH_NONE;
     }
-    return pdiutil::string(last);
 }
 
-pdiutil::string SysFs::generateContent(const char* path) {
+/**
+ * The permission bits a node carries. Read-only trees keep the default.
+ */
+uint16_t SysFs::permsFor(const char* path, synth_node_t kind) {
+    if (SYNTH_DIR == kind) return 0555;
+
+    int16_t index;
+    uint8_t leaf;
+    return (SYS_NETATTR == classify(path, index, leaf)) ? 0444 : 0666;
+}
+
+pdiutil::string SysFs::render(const char* path) {
+    int16_t index;
+    uint8_t leaf;
+    NodeKind k = classify(path, index, leaf);
+
+#ifdef ENABLE_NETWORK_SERVICE
+    if (SYS_NETATTR == k) {
+        return renderNetAttr((uint8_t)index, leaf);
+    }
+#endif
+
 #ifdef ENABLE_GPIO_SERVICE
-    int16_t pin;
-    NodeKind k = classify(path, pin);
     if (k != SYS_VALUE && k != SYS_MODE) return pdiutil::string();
 
     uint32_t v = (k == SYS_VALUE)
-                     ? (uint32_t)__gpio_service.m_gpio_config_copy.gpio_readings[pin]
-                     : (uint32_t)__gpio_service.m_gpio_config_copy.gpio_mode[pin];
+                     ? (uint32_t)__gpio_service.m_gpio_config_copy.gpio_readings[index]
+                     : (uint32_t)__gpio_service.m_gpio_config_copy.gpio_mode[index];
 
     char buf[12];
     Uint32ToString(v, buf, sizeof(buf));
@@ -129,7 +220,6 @@ pdiutil::string SysFs::generateContent(const char* path) {
     out += "\n";
     return out;
 #else
-    (void)path;
     return pdiutil::string();
 #endif
 }
@@ -137,7 +227,8 @@ pdiutil::string SysFs::generateContent(const char* path) {
 int SysFs::writeFile(const char* path, const char* content, uint32_t size, bool append) {
 #ifdef ENABLE_GPIO_SERVICE
     int16_t pin;
-    NodeKind k = classify(path, pin);
+    uint8_t leaf;
+    NodeKind k = classify(path, pin, leaf);
     if (!content) return PDI_ERR_NULL_PTR;
     if (k != SYS_VALUE && k != SYS_MODE) return STORAGE_ERROR_READ_ONLY;
 
@@ -159,143 +250,93 @@ int SysFs::writeFile(const char* path, const char* content, uint32_t size, bool 
 #endif
 }
 
-int SysFs::readFile(const char* path, uint64_t size, pdiutil::function<bool(char*, uint32_t)> readbackfn, uint64_t offset, const char* readUntilMatchStr, bool* didmatchfound) {
-    if (!path || !readbackfn) return PDI_ERR_INVALID_ARG;
-    pdiutil::string content = generateContent(path);
-    if (content.empty()) return PDI_ERR_NOT_FOUND;
-    if (offset >= content.length()) return 0;
-
-    // `size` is the per-iteration chunk limit, not a total cap — loop the
-    // callback until the whole content is delivered or it returns false.
-    uint32_t total = content.length() - (uint32_t)offset;
-    uint32_t chunk = (size > 0 && size < total) ? (uint32_t)size : total;
-    uint32_t done = 0;
-    while (done < total) {
-        uint32_t n = total - done;
-        if (n > chunk) n = chunk;
-        if (!readbackfn((char*)content.c_str() + offset + done, n)) break;
-        done += n;
-    }
-    return (int)done;
-}
-
-int64_t SysFs::getFileSize(const char* path) {
-    pdiutil::string content = generateContent(path);
-    return content.empty() ? PDI_ERR_NOT_FOUND : (int64_t)content.length();
-}
-
-bool SysFs::isFileExist(const char* path) {
-    int16_t pin;
-    NodeKind k = classify(path, pin);
-    return (k == SYS_VALUE || k == SYS_MODE);
-}
-
-bool SysFs::isDirExist(const char* path) {
-    int16_t pin;
-    NodeKind k = classify(path, pin);
-    return (k == SYS_ROOT || k == SYS_CLASS || k == SYS_GPIODIR || k == SYS_PIN);
-}
-
-bool SysFs::isDirectory(const char* path) {
-    return isDirExist(path);
-}
-
-int SysFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern) {
-    int16_t pin;
-    NodeKind k = classify(path, pin);
-
-    auto addEntry = [&](const char* name, file_type_t type, uint16_t perms) {
-        file_info_t info;
-        memset(&info, 0, sizeof(info));
-        info.m_type = type;
-        info.m_perms = perms;
-        info.m_uid = 0;
-        info.m_gid = 0;
-        info.m_ctime = 0;
-        info.m_mtime = 0;
-        // Callers (ls) delete[] m_name — allocate a heap copy so the free path
-        // is safe.
-        uint32_t nlen = strlen(name);
-        info.m_name = pdiutil::safe_new_array<char>(nlen + 1);
-        if (nullptr == info.m_name) return;
-        memcpy(info.m_name, name, nlen);
-        info.m_name[nlen] = '\0';
-        items.push_back(info);
-    };
+int SysFs::listChildren(const char* path, pdiutil::vector<file_info_t>& items) {
+    int16_t index;
+    uint8_t leaf;
+    NodeKind k = classify(path, index, leaf);
 
     if (k == SYS_ROOT) {
-        addEntry("class", FILE_TYPE_DIR, 0555);
+        addEntry(items, "class", FILE_TYPE_DIR, 0555);
     } else if (k == SYS_CLASS) {
-        addEntry("gpio", FILE_TYPE_DIR, 0555);
+        addEntry(items, "gpio", FILE_TYPE_DIR, 0555);
+#ifdef ENABLE_NETWORK_SERVICE
+        addEntry(items, "net", FILE_TYPE_DIR, 0555);
+#endif
+#ifdef ENABLE_NETWORK_SERVICE
+    } else if (k == SYS_NETDIR) {
+        for (uint8_t i = 0; i < __netif_registry.count(); ++i) {
+            iNetifInterface* netif = __netif_registry.at(i);
+            if (nullptr == netif) continue;
+            addEntry(items, netif->name(), FILE_TYPE_DIR, 0555);
+        }
+    } else if (k == SYS_NETIF) {
+        for (uint8_t i = 0; i < netLeafCount((uint8_t)index); ++i) {
+            addEntry(items, s_sys_net_leaf_names[i], FILE_TYPE_REG, 0444);
+        }
+#endif
     } else if (k == SYS_GPIODIR) {
         char numbuf[6];
         for (uint8_t i = 0; i < MAX_GPIO_PINS; ++i) {
             if (!isValidPin(i)) continue;
             Uint32ToString(i, numbuf, sizeof(numbuf));
-            addEntry(numbuf, FILE_TYPE_DIR, 0555);
+            addEntry(items, numbuf, FILE_TYPE_DIR, 0555);
         }
     } else if (k == SYS_PIN) {
         for (uint8_t i = 0; i < s_sys_leaf_count; ++i) {
-            addEntry(s_sys_leaf_names[i], FILE_TYPE_REG, 0666);
+            addEntry(items, s_sys_leaf_names[i], FILE_TYPE_REG, 0666);
         }
     } else {
         return STORAGE_ERROR_NOT_A_DIRECTORY;
     }
+
     return (int)items.size();
 }
 
-int SysFs::getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t size) {
-    if (!buffer || size == 0) return PDI_ERR_INVALID_ARG;
-    int16_t pin;
-    NodeKind k = classify(path, pin);
-    if (k == SYS_INVALID) return PDI_ERR_NOT_FOUND;
+#ifdef ENABLE_NETWORK_SERVICE
+/**
+ * What one leaf of a registered network interface currently reads.
+ */
+pdiutil::string SysFs::renderNetAttr(uint8_t index, uint8_t leaf) {
+    iNetifInterface* netif = __netif_registry.at(index);
+    if (nullptr == netif) return pdiutil::string();
 
-    bool isdir = (k == SYS_ROOT || k == SYS_CLASS || k == SYS_GPIODIR || k == SYS_PIN);
+    netif_info_t info;
+    if (!netif->getInfo(info)) return pdiutil::string();
 
-    if (type == FILE_ATTR_PERMS && size >= sizeof(uint16_t)) {
-        *(uint16_t*)buffer = isdir ? 0555 : 0666;
-        return sizeof(uint16_t);
+    pdiutil::string out;
+
+    switch (leaf) {
+        case 0:
+            out = pdiutil::string(info.m_mac);
+            break;
+        case 1:
+            out = info.m_up ? CHARPTR_WRAP("up") : CHARPTR_WRAP("down");
+            break;
+        case 2:
+            out = pdiutil::string(info.m_ip);
+            break;
+        case 3:
+            out = pdiutil::string(info.m_netmask);
+            break;
+        case 4:
+            out = pdiutil::string(info.m_gateway);
+            break;
+        case 5:
+            out = info.m_ssid;
+            break;
+        default: {
+            char buf[12];
+            Int32ToString(info.m_rssi, buf, sizeof(buf), 0);
+            out = pdiutil::string(buf);
+            break;
+        }
     }
-    if (type == FILE_ATTR_UID && size >= sizeof(uint16_t)) {
-        *(uint16_t*)buffer = 0;
-        return sizeof(uint16_t);
-    }
-    if (type == FILE_ATTR_GID && size >= sizeof(uint16_t)) {
-        *(uint16_t*)buffer = 0;
-        return sizeof(uint16_t);
-    }
-    return STORAGE_ERROR_ATTR_NOT_FOUND;
+
+    // a leaf that has nothing to say still reads as a line, so a reader can
+    // tell an empty value from a node that is not there
+    out += "\n";
+    return out;
 }
-
-pdi_err_t SysFs::getFileMeta(const char* path, file_info_t& out) {
-    int16_t pin;
-    NodeKind k = classify(path, pin);
-    // Per iFileSystemInterface contract, m_name is left untouched — some callers
-    // assume m_name (when set) is heap-owned and will delete[] it.
-
-    if (k == SYS_ROOT || k == SYS_CLASS || k == SYS_GPIODIR || k == SYS_PIN) {
-        out.m_type  = FILE_TYPE_DIR;
-        out.m_size  = 0;
-        out.m_perms = 0555;
-        out.m_uid   = 0;
-        out.m_gid   = 0;
-        out.m_ctime = 0;
-        out.m_mtime = 0;
-        return 0;
-    }
-
-    if (k == SYS_VALUE || k == SYS_MODE) {
-        out.m_type  = FILE_TYPE_REG;
-        out.m_size  = getFileSize(path);
-        out.m_perms = 0666;
-        out.m_uid   = 0;
-        out.m_gid   = 0;
-        out.m_ctime = 0;
-        out.m_mtime = 0;
-        return 0;
-    }
-
-    return PDI_ERR_NOT_FOUND;
-}
+#endif
 
 #endif

@@ -113,11 +113,11 @@ web_session_t *WebSessionManager::create(const char *username, uint16_t uid, uin
   slot->m_sid = (uint8_t)(slot - m_sessions) + 1;
   slot->m_state = SESSION_STATE_INTERACTIVE;
   slot->m_terminal = nullptr;
-  slot->m_username = username;
   slot->m_loginAt = (uint32_t)__i_dvc_ctrl.millis_now();
   slot->m_lastActivityAt = slot->m_loginAt;
   slot->m_cookieIssuedAt = slot->m_loginAt;
 #ifdef ENABLE_AUTH_SERVICE
+  slot->m_username = username;
   slot->m_isAuthorized = true;
   slot->m_uid = uid;
   slot->m_gid = gid;
@@ -218,6 +218,7 @@ void WebSessionManager::destroyByUsername(const char *username)
     return;
   }
 
+#ifdef ENABLE_AUTH_SERVICE
   for (uint8_t i = 0; i < WEB_MAX_SESSIONS; i++)
   {
     if (SESSION_STATE_FREE != m_sessions[i].m_state &&
@@ -226,6 +227,7 @@ void WebSessionManager::destroyByUsername(const char *username)
       destroy(&m_sessions[i]);
     }
   }
+#endif
 }
 
 void WebSessionManager::collectExpired()

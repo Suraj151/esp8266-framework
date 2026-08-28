@@ -41,9 +41,15 @@ public:
     void stop();
 
     /**
-     * @brief close current client.
+     * @brief close the client held in one pool slot.
+     * @param slot Pool slot to close.
      */
-    void closeClient();
+    void closeClient(uint8_t slot);
+
+    /**
+     * @brief close every client the pool holds.
+     */
+    void closeAllClients();
 
     /**
      * @brief Handle incoming Telnet clients and data.
@@ -51,9 +57,16 @@ public:
     void handle();
 
 private:
+    /**
+     * @brief Run the idle check and the input pass for one pool slot.
+     * @param slot Pool slot to service.
+     */
+    void serviceClient(uint8_t slot);
+
     iTcpServerInterface* m_server;
-    iClientInterface* m_client;
-    uint64_t m_last_activity;
+    iClientInterface* m_clients[TELNET_MAX_SESSIONS];
+    uint64_t m_last_activity[TELNET_MAX_SESSIONS];
+    uint32_t m_poolfullsince;
 };
 
 extern TelnetServiceProvider __telnet_service;

@@ -69,31 +69,44 @@ pdiutil::string DevFs::basename(const char* path) {
     return pdiutil::string(last);
 }
 
-int DevFs::streamFill(bool random, uint64_t size, pdiutil::function<bool(char*, uint32_t)> readbackfn, uint64_t offset) {
+int DevFs::streamFill(bool random, uint64_t size, pdiutil::function<bool(char*, uint32_t)> readbackfn, uint64_t offset, const char* readUntilMatchStr, bool* didmatchfound) {
     // Unbounded nodes are capped so `cat` terminates on an MCU.
     uint32_t cap = DEVFS_STREAM_READ_MAX;
     if (offset >= cap) return 0;
 
+    // the whole capped stream is produced before it is delivered, so a match is
+    // seen even where it falls across what would otherwise be two chunks
+    char stream[DEVFS_STREAM_READ_MAX];
     uint32_t total = cap - (uint32_t)offset;
+
+    if (random) {
+        uint32_t i = 0;
+        while (i < total) {
+            uint32_t r = __i_dvc_ctrl.random_now();
+            uint32_t take = (total - i) < 4 ? (total - i) : 4;
+            memcpy(stream + i, &r, take);
+            i += take;
+        }
+    } else {
+        memset(stream, 0, total);
+    }
+
+    if (nullptr != readUntilMatchStr && '\0' != readUntilMatchStr[0]) {
+        int32_t at = __strstr(stream, total, readUntilMatchStr,
+                              (uint32_t)strlen(readUntilMatchStr), 0);
+        if (at >= 0) {
+            total = (uint32_t)at;
+            if (nullptr != didmatchfound) *didmatchfound = true;
+            if (0 == total) return 0;
+        }
+    }
+
     uint32_t chunk = (size > 0 && size < total) ? (uint32_t)size : total;
-    char buf[32];
     uint32_t done = 0;
     while (done < total) {
         uint32_t n = total - done;
         if (n > chunk) n = chunk;
-        if (n > sizeof(buf)) n = sizeof(buf);
-        if (random) {
-            uint32_t i = 0;
-            while (i < n) {
-                uint32_t r = __i_dvc_ctrl.random_now();
-                uint32_t take = (n - i) < 4 ? (n - i) : 4;
-                memcpy(buf + i, &r, take);
-                i += take;
-            }
-        } else {
-            memset(buf, 0, n);
-        }
-        if (!readbackfn(buf, n)) break;
+        if (!readbackfn(stream + done, n)) break;
         done += n;
     }
     return (int)done;
@@ -103,9 +116,9 @@ int DevFs::readFile(const char* path, uint64_t size, pdiutil::function<bool(char
     if (!path || !readbackfn) return PDI_ERR_INVALID_ARG;
     switch (classify(path)) {
         case DEV_NULL:    return 0; // EOF, deliver nothing
-        case DEV_ZERO:    return streamFill(false, size, readbackfn, offset);
+        case DEV_ZERO:    return streamFill(false, size, readbackfn, offset, readUntilMatchStr, didmatchfound);
         case DEV_RANDOM:
-        case DEV_URANDOM: return streamFill(true, size, readbackfn, offset);
+        case DEV_URANDOM: return streamFill(true, size, readbackfn, offset, readUntilMatchStr, didmatchfound);
         default:          return PDI_ERR_NOT_FOUND;
     }
 }

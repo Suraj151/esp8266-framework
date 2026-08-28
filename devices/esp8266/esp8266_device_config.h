@@ -38,6 +38,13 @@ created Date    : 1st Jan 2026
 #define SERIAL_BOOT_RX_QUIET_MS       (MILLISECOND_DURATION_1000/20)
 
 /**
+ * session table and the transport pools that draw from it
+ */
+#define PDI_MAX_SESSIONS              5
+#define SSH_MAX_SESSIONS              2
+#define TELNET_MAX_SESSIONS           2
+
+/**
  * gpio pin counts
  */
 #define MAX_DIGITAL_GPIO_PINS         9

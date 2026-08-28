@@ -131,17 +131,17 @@ namespace pdistd
     /// function comparison with nullptr
     template <typename Res, typename... Args>
     inline bool
-    operator!=(const function<Res, Args...> &__a, nullptr_t) noexcept
+    operator!=(const function<Res(Args...)> &__a, nullptr_t) noexcept
     {
-        return __a != nullptr;
+        return __a.functorHolderPtr != nullptr;
     }
 
     /// function comparison with nullptr
     template <typename Res, typename... Args>
     inline bool
-    operator!=(nullptr_t, const function<Res, Args...> &__a) noexcept
+    operator!=(nullptr_t, const function<Res(Args...)> &__a) noexcept
     {
-        return __a != nullptr;
+        return __a.functorHolderPtr != nullptr;
     }
 
 } // namespace pdistd

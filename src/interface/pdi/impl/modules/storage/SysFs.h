@@ -4,10 +4,9 @@ This file is part of the PDI Stack.
 This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
-SysFS is a synthetic filesystem mounted at /sys exposing device peripherals as
-files. GPIO pins are laid out as /sys/class/gpio/<pin>/{value,mode}, where value
-is the current reading/write value and mode is the GPIO_MODE (0=OFF 1=DW 2=DR
-3=BLINK 4=AW 5=AR). Both nodes are read/write; writes drive the gpio service.
+SysFS is a synthetic filesystem mounted at /sys. It exposes the device surfaces
+as a tree of small nodes, and unlike the rest of the synthetic filesystems some
+of its leaves are writable.
 
 Author          : Suraj I.
 Created Date    : 23rd July 2026
@@ -20,98 +19,22 @@ Created Date    : 23rd July 2026
 
 #ifdef ENABLE_SYSFS
 
-#include <interface/pdi/modules/storage/iFileSystemInterface.h>
-#include <interface/pdi/modules/storage/iStorageInterface.h>
+#include "SynthFs.h"
 
-class SysFs : public iFileSystemInterface {
+class SysFs : public SynthFs {
 public:
   SysFs();
   virtual ~SysFs() {}
 
-  pdi_err_t init() override { return 0; }
-
-  int createFile(const char *path, const char *content,
-                 int64_t size = -1) override {
-    return PDI_ERR_NOT_SUPPORTED;
-  }
-  int editFile(const char *path, uint64_t offset, const char *content,
-               uint32_t size) override {
-    return PDI_ERR_NOT_SUPPORTED;
-  }
   int writeFile(const char *path, const char *content, uint32_t size,
                 bool append = false) override;
-  int readFile(const char *path, uint64_t size,
-               pdiutil::function<bool(char *, uint32_t)> readbackfn,
-               uint64_t offset = 0, const char *readUntilMatchStr = nullptr,
-               bool *didmatchfound = nullptr) override;
-
-  int64_t getOffsetFromLineNumber(const char *path, int linenumber,
-                                  CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
-  int64_t getLineNumberFromOffset(const char *path, int64_t offset,
-                                  CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
-  int findInFile(const char *path, const char *findStr,
-                 pdiutil::vector<uint32_t> *findindices, int maxindices = -1,
-                 int everynthindice = 1, int64_t offset = 0,
-                 CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
-  int getLineNumbersInFile(const char *path,
-                           pdiutil::vector<uint32_t> &linenumberindices,
-                           int maxlinenumbers = -1, int linenumberoffset = 0,
-                           CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
-  int readLineInFile(const char *path, int32_t linenumber,
-                     pdiutil::string &linedata, const char *pattern = nullptr,
-                     CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
-
-  pdi_err_t createDirectory(const char *path) override { return PDI_ERR_NOT_SUPPORTED; }
-  pdi_err_t deleteDirectory(const char *path) override { return PDI_ERR_NOT_SUPPORTED; }
-  pdi_err_t rename(const char *oldPath, const char *newPath) override { return PDI_ERR_NOT_SUPPORTED; }
-  pdi_err_t copyFile(const char *sourcePath, const char *destPath) override {
-    return PDI_ERR_NOT_SUPPORTED;
-  }
-  pdi_err_t moveFile(const char *oldPath, const char *newPath) override { return PDI_ERR_NOT_SUPPORTED; }
-  pdi_err_t deleteFile(const char *path) override { return PDI_ERR_NOT_SUPPORTED; }
-
-  int64_t getFileSize(const char *path) override;
-  int getDirFileList(const char *path, pdiutil::vector<file_info_t> &items,
-                     const char *pattern = nullptr) override;
-  bool isFileExist(const char *path) override;
-  bool isDirExist(const char *path) override;
-  bool isDirectory(const char *path) override;
-
-  uint64_t getTotalSize() override { return 0; }
-  uint64_t getUsedSize() override { return 0; }
-  uint64_t getFreeSize() override { return 0; }
-
-  pdiutil::string getPWD() const override { return pdiutil::string("/sys"); }
-  bool setPWD(const char *path) override { return false; }
-  pdiutil::string getLastPWD() const override { return pdiutil::string("/sys"); }
-
-  void appendFileSeparator(char *path) override {}
-  void appendFileSeparator(pdiutil::string &path) override {}
-  bool updatePathNotations(const char *path, pdiutil::string &updatedpath) override { return false; }
-  bool changeDirectory(const char *path) override { return false; }
-  const char *getRootDirectory() const override { return "/sys"; }
-  const char *getHomeDirectory() const override { return "/sys"; }
-  const char *getTempDirectory() const override { return "/sys"; }
-  bool setHomeDirectory(pdiutil::string &homedir) override { return false; }
-
-  mimetype_t getFileMimeType(const pdiutil::string &path) override { return MIME_TYPE_TEXT_PLAIN; }
-  pdiutil::string basename(const char *path) override;
-  void applyFileSizeLimit(pdiutil::string &name, uint32_t sizelimit = FILE_NAME_MAX_SIZE) override {}
-
-  int setFileAttr(const char *path, uint8_t type, const void *buffer,
-                  uint32_t size) override {
-    return PDI_ERR_NOT_SUPPORTED;
-  }
-  int getFileAttr(const char *path, uint8_t type, void *buffer,
-                  uint32_t size) override;
-  pdi_err_t removeFileAttr(const char *path, uint8_t type) override { return PDI_ERR_NOT_SUPPORTED; }
-  pdi_err_t getFileMeta(const char *path, file_info_t &out) override;
-  int setFilePermissions(const char *path, uint16_t perms) override { return PDI_ERR_NOT_SUPPORTED; }
-  int setFileOwner(const char *path, uint16_t uid, uint16_t gid) override { return PDI_ERR_NOT_SUPPORTED; }
-  pdi_err_t touch(const char *path) override { return PDI_ERR_NOT_SUPPORTED; }
 
 protected:
-  uint32_t nowEpoch() override { return 0; }
+  synth_node_t resolve(const char *path) override;
+  pdiutil::string render(const char *path) override;
+  int listChildren(const char *path,
+                   pdiutil::vector<file_info_t> &items) override;
+  uint16_t permsFor(const char *path, synth_node_t kind) override;
 
 private:
   enum NodeKind : uint8_t {
@@ -121,13 +44,28 @@ private:
     SYS_GPIODIR,
     SYS_PIN,
     SYS_VALUE,
-    SYS_MODE
+    SYS_MODE,
+    SYS_NETDIR,
+    SYS_NETIF,
+    SYS_NETATTR
   };
 
-  NodeKind classify(const char *path, int16_t &pin_out) const;
+  /**
+   * Which node the path names, plus the pin or interface index behind it and
+   * which of that node's leaves it is.
+   */
+  NodeKind classify(const char *path, int16_t &index_out,
+                    uint8_t &leaf_out) const;
+
+  /**
+   * Whether the pin exists on this board and is safe to drive.
+   */
   bool isValidPin(uint8_t pin) const;
-  pdiutil::string generateContent(const char *path);
-  const char *normalizePath(const char *path) const;
+
+  /**
+   * What one leaf of a registered network interface currently reads.
+   */
+  pdiutil::string renderNetAttr(uint8_t index, uint8_t leaf);
 };
 
 extern SysFs __i_sysfs;

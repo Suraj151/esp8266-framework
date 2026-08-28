@@ -31,18 +31,34 @@ created Date    : 20th July 2026
 #define ENABLE_PROCFS
 #endif
 
+#ifndef PROC_MOUNT_PREFIX
+#define PROC_MOUNT_PREFIX "/proc"
+#endif
+
 #ifndef ENABLE_SYSFS
 #define ENABLE_SYSFS
+#endif
+
+#ifndef SYS_MOUNT_PREFIX
+#define SYS_MOUNT_PREFIX "/sys"
 #endif
 
 #ifndef ENABLE_DEVFS
 #define ENABLE_DEVFS
 #endif
 
+#ifndef DEV_MOUNT_PREFIX
+#define DEV_MOUNT_PREFIX "/dev"
+#endif
+
 // RAM-backed scratch filesystem. Holds real file content in the heap, so keep
 // it off (undef in DeviceConfig.h) on tight-RAM ports like Arduino UNO.
 #ifndef ENABLE_TMPFS
 #define ENABLE_TMPFS
+#endif
+
+#ifndef TMP_MOUNT_PREFIX
+#define TMP_MOUNT_PREFIX "/tmp"
 #endif
 
 // Byte count an unbounded devfs node (/dev/zero, /dev/random, /dev/urandom)

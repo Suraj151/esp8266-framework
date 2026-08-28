@@ -53,12 +53,12 @@ static pdiutil::string slurp(FileSystemInterface *fs, const char *path)
 
 TEST(storage, reports_its_size)
 {
-    ASSERT_EQ(__i_storage.size(), (uint64_t)MOCKDEVICE_STORAGE_SIZE);
+    ASSERT_EQ(__i_storage.size(), (uint64_t)PDI_POSIX_STORAGE_SIZE);
 }
 
 TEST(storage, an_erased_block_reads_as_all_ones)
 {
-    __i_storage.erase(0, MOCKDEVICE_STORAGE_BLOCK_SIZE);
+    __i_storage.erase(0, PDI_POSIX_STORAGE_BLOCK_SIZE);
 
     uint8_t buf[16];
     ASSERT_EQ(__i_storage.read(0, buf, sizeof(buf)), (int64_t)sizeof(buf));
@@ -73,7 +73,7 @@ TEST(storage, a_program_after_erase_stores_the_bytes)
     const uint8_t payload[4] = {0x01, 0x02, 0x03, 0x04};
     uint8_t readback[4] = {0};
 
-    __i_storage.erase(0, MOCKDEVICE_STORAGE_BLOCK_SIZE);
+    __i_storage.erase(0, PDI_POSIX_STORAGE_BLOCK_SIZE);
     ASSERT_EQ(__i_storage.write(0, payload, sizeof(payload)), (int64_t)sizeof(payload));
     ASSERT_EQ(__i_storage.read(0, readback, sizeof(readback)), (int64_t)sizeof(readback));
     ASSERT_MEMEQ(readback, payload, sizeof(payload));
@@ -89,7 +89,7 @@ TEST(storage, a_program_without_erase_only_clears_bits)
     const uint8_t second[1] = {0x0F};
     uint8_t readback[1] = {0};
 
-    __i_storage.erase(0, MOCKDEVICE_STORAGE_BLOCK_SIZE);
+    __i_storage.erase(0, PDI_POSIX_STORAGE_BLOCK_SIZE);
     __i_storage.write(0, first, 1);
     __i_storage.write(0, second, 1);
     __i_storage.read(0, readback, 1);
@@ -99,16 +99,16 @@ TEST(storage, a_program_without_erase_only_clears_bits)
 
 TEST(storage, erase_rejects_an_unaligned_range)
 {
-    ASSERT_FALSE(__i_storage.erase(1, MOCKDEVICE_STORAGE_BLOCK_SIZE));
+    ASSERT_FALSE(__i_storage.erase(1, PDI_POSIX_STORAGE_BLOCK_SIZE));
     ASSERT_FALSE(__i_storage.erase(0, 100));
 }
 
 TEST(storage, access_past_the_end_is_refused)
 {
     uint8_t buf[8];
-    ASSERT_EQ(__i_storage.read(MOCKDEVICE_STORAGE_SIZE, buf, sizeof(buf)), (int64_t)-1);
-    ASSERT_EQ(__i_storage.write(MOCKDEVICE_STORAGE_SIZE, buf, sizeof(buf)), (int64_t)-1);
-    ASSERT_FALSE(__i_storage.erase(MOCKDEVICE_STORAGE_SIZE, MOCKDEVICE_STORAGE_BLOCK_SIZE));
+    ASSERT_EQ(__i_storage.read(PDI_POSIX_STORAGE_SIZE, buf, sizeof(buf)), (int64_t)-1);
+    ASSERT_EQ(__i_storage.write(PDI_POSIX_STORAGE_SIZE, buf, sizeof(buf)), (int64_t)-1);
+    ASSERT_FALSE(__i_storage.erase(PDI_POSIX_STORAGE_SIZE, PDI_POSIX_STORAGE_BLOCK_SIZE));
 }
 
 TEST(filesystem, mounts)

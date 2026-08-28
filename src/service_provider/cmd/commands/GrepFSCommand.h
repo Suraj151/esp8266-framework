@@ -112,6 +112,61 @@ struct GrepFSCommand : public CommandBase {
 		items.clear();
 	}
 
+	/**
+	 * Matches the pattern against each line arriving on the input descriptor,
+	 * which is where a pipeline stage finds its input.
+	 */
+	void grepStream(const char *pattern){
+
+		pdiutil::string linedata;
+		int32_t lineNo = 0;
+		char block[64];
+
+		while(m_terminal->available() > 0){
+
+			int32_t got = m_terminal->read((uint8_t*)block, sizeof(block));
+			if(got <= 0) break;
+
+			for(int32_t i = 0; i < got; i++){
+
+				if('\n' != block[i]){
+					linedata += block[i];
+					continue;
+				}
+
+				if(!linedata.empty() && linedata.back() == '\r'){
+					linedata.pop_back();
+				}
+
+				int matchPos = regex_match(pattern, linedata.c_str(), (int)linedata.size());
+				if(matchPos >= 0){
+					m_terminal->write((int32_t)(lineNo + 1));
+					m_terminal->write(':');
+					m_terminal->write((int32_t)matchPos);
+					m_terminal->write(':');
+					m_terminal->write(linedata.c_str());
+					m_terminal->putln();
+				}
+
+				linedata.clear();
+				lineNo++;
+			}
+			__i_dvc_ctrl.yield();
+		}
+
+		if(!linedata.empty()){
+			int matchPos = regex_match(pattern, linedata.c_str(), (int)linedata.size());
+			if(matchPos >= 0){
+				m_terminal->write((int32_t)(lineNo + 1));
+				m_terminal->write(':');
+				m_terminal->write((int32_t)matchPos);
+				m_terminal->write(':');
+				m_terminal->write(linedata.c_str());
+				m_terminal->putln();
+			}
+		}
+	}
+
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -129,12 +184,12 @@ struct GrepFSCommand : public CommandBase {
 			bool isPatternProvided = (nullptr != patternoptn && nullptr != patternoptn->optionval && patternoptn->optionvalsize > 0);
 			bool isFileProvided = (nullptr != fileoptn && nullptr != fileoptn->optionval && fileoptn->optionvalsize > 0);
 
-			if(isPatternProvided && isFileProvided){
+			if(isPatternProvided && (isFileProvided || isInputRedirected())){
 
 				char *pattern = pdiutil::safe_new_array<char>(patternoptn->optionvalsize + 1);
-				pdiutil::string filepath = resolveArgPath(fileoptn);
+				pdiutil::string filepath = isFileProvided ? resolveArgPath(fileoptn) : pdiutil::string();
 
-				if(nullptr != pattern && !filepath.empty()){
+				if(nullptr != pattern && (!filepath.empty() || !isFileProvided)){
 					memcpy(pattern, patternoptn->optionval, patternoptn->optionvalsize);
 
 					const char* path = filepath.c_str();
@@ -142,7 +197,9 @@ struct GrepFSCommand : public CommandBase {
 
 					m_terminal->putln();
 
-					if(__i_fs.isDirectory(path)){
+					if(filepath.empty()){
+						grepStream(pattern);
+					}else if(__i_fs.isDirectory(path)){
 						grepDir(path, path_len, pattern);
 					}else if(__i_fs.isFileExist(path)){
 						grepFile(path, path_len, pattern);

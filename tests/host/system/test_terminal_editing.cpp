@@ -439,3 +439,56 @@ TEST(termedit, two_of_the_same_ending_stay_two_enters)
     ASSERT_TRUE(saw(out, "/"));
     ASSERT_EQ(promptsIn(out), 2u);
 }
+
+/* ------------------------------------------------------------- stray bytes */
+
+TEST(termedit, a_stray_ff_byte_is_not_a_typed_character)
+{
+    pditest::Shell shell;
+
+    shell.type("\xFF");
+    ASSERT_EQ(shell.lineBuffer().length(), 0u);
+
+    shell.type("pwd");
+    ASSERT_STREQ(shell.lineBuffer().c_str(), "pwd");
+}
+
+TEST(termedit, a_stray_byte_before_a_command_leaves_the_command_alone)
+{
+    pditest::Shell shell;
+
+    std::string out = shell.type("\xFF" "pwd" KEY_ENTER);
+
+    ASSERT_TRUE(saw(out, "/"));
+    ASSERT_EQ(shell.lineBuffer().length(), 0u);
+}
+
+TEST(termedit, an_unhandled_control_byte_is_dropped)
+{
+    pditest::Shell shell;
+
+    shell.type("a\x01\x02" "b");
+    ASSERT_STREQ(shell.lineBuffer().c_str(), "ab");
+}
+
+TEST(termedit, a_carriage_return_nul_pair_is_one_enter)
+{
+    pditest::Shell shell;
+
+    static const uint8_t keys[] = { 'p', 'w', 'd', '\r', 0x00 };
+    std::string out = shell.type(keys, sizeof(keys));
+
+    ASSERT_TRUE(saw(out, "/"));
+    ASSERT_EQ(promptsIn(out), 1u);
+    ASSERT_EQ(shell.lineBuffer().length(), 0u);
+}
+
+TEST(termedit, the_nul_after_a_carriage_return_starts_no_line)
+{
+    pditest::Shell shell;
+
+    static const uint8_t keys[] = { '\r', 0x00, 'p', 'w', 'd' };
+    shell.type(keys, sizeof(keys));
+
+    ASSERT_STREQ(shell.lineBuffer().c_str(), "pwd");
+}

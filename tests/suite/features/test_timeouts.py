@@ -19,7 +19,7 @@ run cannot continue. _keepalive touches it on a period well inside its window.
 import socket
 import time
 
-from .registry import test, expect_in, Skip
+from .registry import test, expect_in, Skip, ssh_port
 from ..driver.shell import ShellError
 
 
@@ -54,7 +54,7 @@ def ssh_handshake_idle_timeout(t):
     """A tcp client that opens the ssh port and never sends its version banner
     must be closed on SSH_HANDSHAKE_IDLE_MS, not held open."""
     try:
-        sock = socket.create_connection((t.address(), 22), timeout=15)
+        sock = socket.create_connection((t.address(), ssh_port(t)), timeout=15)
     except OSError as err:
         raise Skip("no ssh server reachable: %s" % err)
 

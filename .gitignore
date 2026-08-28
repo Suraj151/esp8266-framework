@@ -4,4 +4,5 @@
 /devices/DeviceSetup.h
 __pycache__/
 /tests/.build/
+/tests/.build-fuzz/
 .vscode/

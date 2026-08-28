@@ -16,6 +16,8 @@ created Date    : 1st Jan 2024
 #include "../../devices/esp8266/esp8266_pdi.cpp"
 #elif defined(DEVICE_ARDUINOUNO)
 #include "../../devices/arduinouno/arduinouno_pdi.cpp"
+#elif defined(DEVICE_POSIX)
+#include "../../devices/posix/posix_pdi.cpp"
 #else
-#include "../../devices/mockdevice/mockdevice_pdi.cpp"
+#include "../../devices/posix/posix_pdi.cpp"
 #endif

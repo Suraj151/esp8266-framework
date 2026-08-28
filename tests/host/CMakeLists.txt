@@ -12,6 +12,7 @@ endif()
 get_filename_component(PDI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
 option(PDI_TEST_SANITIZE "Build the host tests with address and UB sanitizers" ON)
+option(PDI_BUILD_FUZZ "Also build the libFuzzer harnesses for the pre-auth parsers" OFF)
 
 # the framework picks the mock device from this gate, leaving the generated
 # DeviceSetup.h that selects the user's real board untouched
@@ -43,6 +44,7 @@ file(GLOB PDI_IMPL_SOURCES
   ${PDI_ROOT}/src/interface/pdi/impl/log/*.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/middlewares/*.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/modules/database/*.cpp
+  ${PDI_ROOT}/src/interface/pdi/impl/modules/netif/*.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/modules/storage/*.cpp
 )
 
@@ -136,3 +138,9 @@ target_include_directories(pdi_host_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/fr
 # sketch uses
 add_executable(pdid ${CMAKE_CURRENT_SOURCE_DIR}/pdid_main.cpp)
 target_link_libraries(pdid PRIVATE pdi_framework)
+
+# the fuzz harnesses share every source list above, so they are added last and
+# only when asked for -- they need a clang configured build directory of their own
+if(PDI_BUILD_FUZZ)
+  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../fuzz ${CMAKE_CURRENT_BINARY_DIR}/fuzz)
+endif()

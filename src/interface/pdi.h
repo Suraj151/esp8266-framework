@@ -19,8 +19,10 @@ created Date    : 1st Jan 2024
 #include "../../devices/esp8266/esp8266_pdi.h"
 #elif defined(DEVICE_ARDUINOUNO)
 #include "../../devices/arduinouno/arduinouno_pdi.h"
+#elif defined(DEVICE_POSIX)
+#include "../../devices/posix/posix_pdi.h"
 #else
-#include "../../devices/mockdevice/mockdevice_pdi.h"
+#include "../../devices/posix/posix_pdi.h"
 #endif
 
 #include <interface/pdi/iDeviceIotInterface.h>

@@ -52,7 +52,29 @@ struct HeadFSCommand : public CommandBase {
 			CommandOption *fileoptn = &m_options[0];
 			CommandOption *countoptn = &m_options[1];
 
-			if(nullptr != fileoptn && nullptr != fileoptn->optionval && fileoptn->optionvalsize > 0){
+			// a piped stage has no file to name, so its lone positional is the
+			// count rather than a path
+			if( isInputRedirected() ){
+
+				CommandOption *streamcountoptn = ( nullptr != fileoptn && nullptr != fileoptn->optionval &&
+												   fileoptn->optionvalsize > 0 ) ? fileoptn : countoptn;
+
+				uint32_t count = 10;
+				if(nullptr != streamcountoptn && nullptr != streamcountoptn->optionval && streamcountoptn->optionvalsize > 0){
+					uint32_t parsed = StringToUint32(streamcountoptn->optionval, streamcountoptn->optionvalsize);
+					if(parsed > 0) count = parsed;
+				}
+
+				uint32_t printed = 0;
+				m_terminal->putln();
+
+				readCommandLines(pdiutil::string(), m_terminal, [&](const pdiutil::string &line)->bool{
+					m_terminal->write(line.c_str());
+					m_terminal->putln();
+					printed++;
+					return printed < count;
+				});
+			}else if(nullptr != fileoptn && nullptr != fileoptn->optionval && fileoptn->optionvalsize > 0){
 
 				uint32_t count = 10;
 				if(nullptr != countoptn && nullptr != countoptn->optionval && countoptn->optionvalsize > 0){

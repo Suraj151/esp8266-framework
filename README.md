@@ -12,9 +12,13 @@ What comes out of the box is closer to a small system than to a sketch template:
 
 **Portability is the whole point.** Services depend on abstract interfaces, not on vendor SDKs. Supporting a new board means writing an adapter for the interfaces that board can actually offer; the services, the portal and the shell come along unchanged. Anything a board can't do is switched off at compile time rather than stubbed at runtime.
 
+**It runs on your laptop too.** One of those adapters targets plain POSIX, so the same firmware builds as a host process you can ssh into, copy files to and open the portal on. That is how the test suite exercises the framework before a board is involved — see [§17](#17-test-suite).
+
 **Services.** WiFi with captive portal, HTTP/HTTPS web portal, MQTT client, OTA updates, SSH server, Telnet server, SFTP subsystem, SMTP client, GPIO control (locally and over MQTT/HTTP), an NVM-backed configuration database, TLS via BearSSL or mbedTLS, ESPNOW mesh, authentication, and a device-IoT hook for your own cloud. Each one is a `ServiceProvider` with the same lifecycle, and `srvc list / status / start / stop / restart` drives them at runtime the way systemd drives units.
 
-**A real shell.** The same forty-plus commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `net`, `host`, `ping`, `date`, `useradd`, `passwd`, `watch` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
+**A real shell.** The same fifty-odd commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `net`, `host`, `ping`, `date`, `useradd`, `passwd`, `watch` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
+
+**Commands join up.** Output pipes from one command into the next and redirects to and from files, so `ps | grep ssh`, `cat /proc/meminfo > /tmp/mem.txt` and `wc < /home/notes.txt` all mean what they mean on a desktop — see [§7.7](#77-pipes-and-redirection).
 
 **A filesystem with users.** Several backends mount into one tree and are routed by longest prefix: LittleFS at the root, a read-only `/proc` of live system nodes, a writable `/sys` where GPIO pins are files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with `null`/`zero`/`random`, and a RAM-backed `/tmp`. Permissions, ownership and per-session umask are enforced in the VFS layer, so `/etc/passwd` and `/etc/shadow` mean what they say and two logged-in users genuinely see different access.
 
@@ -62,7 +66,7 @@ Full inventory in [§15 Utility Library](#15-utility-library).
 **Storage** — one VFS tree over LittleFS, `/proc`, `/sys`, `/dev` and `/tmp`, with POSIX permissions and multi-user access control.
 Details in [§6.2.11 Storage](#6211-storage-interface-init-no-provider).
 
-**CLI** — 40+ built-in commands, listed in [§7.7 Built-in command inventory](#77-built-in-command-inventory).
+**CLI** — 50+ built-in commands, listed in [§7.8 Built-in command inventory](#78-built-in-command-inventory).
 
 **Extras** — captive portal, GPIO events over MQTT/HTTP/email, NAT on the ESP8266 lwIP port ([§2.4.1](#241-nat-and-mesh)), mesh over ESPNOW.
 
@@ -114,7 +118,7 @@ The **[Detailed Documentation](#detailed-documentation)** below is the in-tree r
 - **[14. Device Layer & Porting Guide](#14-device-layer--porting-guide)** — how to add a new board.
 - **[15. Utility Library](#15-utility-library)** — event bus, string ops, embedded STL, crypto.
 - **[16. Extending the Framework](#16-extending-the-framework)** — adding services, commands, pages.
-- **[17. Test Suite](#17-test-suite)** — the three tiers, running them, adding a test.
+- **[17. Test Suite](#17-test-suite)** — the four tiers, running them, adding a test.
 - **[18. Troubleshooting & FAQ](#18-troubleshooting--faq)** — common issues and fixes.
 
 # Detailed Documentation
@@ -160,7 +164,7 @@ The stack is layered, and the layering is enforced by what each layer is allowed
                                                 │ implemented by
                                                 ▼
                        ┌──────────────────────────────────────────────────┐
-   Devices             │  esp32 · esp8266 · arduinouno · mockdevice       │
+   Devices             │  esp32 · esp8266 · arduinouno · posix            │
    (the "adapters")    │  concrete implementations + one aggregator each  │
                        └──────────────────────────────────────────────────┘
 ```
@@ -575,7 +579,14 @@ The struct carries no size constant of its own. A table declares `sizeof(Table)`
 | DeviceIotConfig | `device_iot_config_table` | config and OTP URLs, channel keys, sampling bounds |
 | SerialConfig | — | mode, baud, interface selection |
 | StorageConfig | — | mount point, path limits |
-| SshConfig | — | key algorithms, RSA key bits, session count, auth policy, host-key and config paths |
+| SshConfig | — | key algorithms, RSA key bits, session pool size and pool-full grace, auth policy, host-key and config paths |
+| TelnetConfig | — | port, idle timeout, session pool size and pool-full grace |
+| SessionConfig | — | session table size, pipe capacity, file-stream buffer, tail hold-back |
+| VfsConfig | — | mount slots, prefix and name limits, per-backend enable flags, mount prefixes, devfs read cap |
+| TmpFsConfig | — | the RAM filesystem's byte, node and path budgets |
+| UserStoreConfig | — | `/etc/passwd` and `/etc/shadow` paths, field and record limits |
+| SyslogConfig | — | syslog directory and the four level files, rotation size |
+| MdnsConfig | — | advertised service types, TTLs, multicast group |
 | NetworkConfig | — | network-wide timeouts |
 | EventConfig | — | the event enum and channel registry |
 
@@ -668,7 +679,7 @@ A task is a POD stored by value in a vector reserved to `MAX_SCHEDULABLE_TASKS`,
 
 | Group | Fields | Why |
 |---|---|---|
-| identity | id, name, owner | pid, a read-only name pointer (often in flash), and the owning session — 0 means kernel |
+| identity | id, name, owner | pid, a read-only name pointer (often in flash), and the owning session — 0 means kernel. Ids count up and start again at `MAX_TASK_ID`, stepping over any still in use, so a caller holding the id of a task that has ended cannot reach whatever registered next |
 | callback | the function | what actually runs |
 | schedule | duration, last run, remaining attempts, priority, nice, policy, mode | everything scoring needs |
 | lifecycle | state, pending signal | ready / running / sleeping / stopped / zombie, plus a queued signal |
@@ -705,7 +716,6 @@ Every registration call takes a trailing name and owner. Fill them in — that i
 | change nice, -20..19 | `setTaskNice(id, nice)`, then rebase for an immediate re-sort |
 | queue a signal on one task | `sendSignal(id, sig)` |
 | signal every task with a name | `sendSignalByName(name, sig, requester, is_root)` — this is what `pkill` and `srvc stop` use |
-| print the `ps` view | `printPsToTerminal(terminal, filter_owner)` |
 | promote a task to a lane | `scheduleUnderExecSched(sched, id, mode, stack)` |
 
 ### 4.5 What happens on a tick
@@ -800,6 +810,8 @@ Across lanes: `sleep(ms)` and `yield()` are called from inside a cooperative tas
 ### 4.9 Watching and steering it from the shell
 
 `ps` prints every registered task — pid, owner, state (`R` running, `S` sleeping, `T` stopped, `Z` zombie), priority, nice, policy, rolling %CPU, run count, interval and name — and `ps <sid>` filters by owner. `top` re-renders the same view on a scheduler tick and stops on Ctrl+C. `watch` wraps any other command on an interval.
+
+Both read `/proc` rather than reaching into the scheduler, so what a command prints and what a file says cannot drift apart. A build with no filesystem keeps `ps` and `top` by falling back to the scheduler directly, through the same renderer.
 
 Signals mirror POSIX: `HUP=1`, `KILL=9`, `TERM=15`, `CONT=18`, `STOP=19`. They are queued on the task and consumed at the top of the next scheduler pass.
 
@@ -1143,14 +1155,24 @@ Storage has no service class. The filesystem is used directly by SSH and SFTP, t
 
 Mounting happens during `initialize()`, and the table is five slots by default — exactly what those five backends need. `mount` shows the table at runtime and `df` reports usage per mount. On a RAM-tight port, `/tmp` is the first thing to drop, since it holds file content in the heap.
 
-**procfs** nodes are all `0444` and root-owned; writes fail. `/proc/uptime` gives seconds since boot in the Linux two-number layout, `/proc/version` gives the release and config version. Everything that reads files works on them — `cat`, `head`, `wc`, `grep`, `hexdump`.
+Each prefix is named once, in [src/config/VfsConfig.h](src/config/VfsConfig.h): `PROC_MOUNT_PREFIX`, `SYS_MOUNT_PREFIX`, `DEV_MOUNT_PREFIX` and `TMP_MOUNT_PREFIX` beside the `ENABLE_` flag for the backend that answers there, with the root at `FILE_SEPARATOR`. Code that reaches a synthetic node writes `PROC_MOUNT_PREFIX "/mounts"` rather than the path in full, so moving a mount is one edit.
 
-**sysfs** is where GPIO lives:
+**procfs** nodes are all `0444` and root-owned; writes fail, and a redirect into one says `cannot write <path>` rather than appearing to succeed. `/proc/uptime` gives seconds since boot in the Linux two-number layout, `/proc/version` gives the release and config version, `/proc/meminfo` the free heap and the largest block it can still hand out, `/proc/mounts` a line per mount, and `/proc/stat` the scheduler's cumulative counters. Every running task has a directory of its own — `/proc/<pid>/{stat,cmdline,status}` — and `/proc/net/{route,dev}` describes the registered interfaces. Everything that reads files works on them — `cat`, `head`, `wc`, `grep`, `hexdump`.
+
+`ps`, `top`, `mount` and `df` read through these nodes rather than reaching into the scheduler or the mount table, so what a command shows and what a file says cannot disagree. `df` takes its list of mounts from `/proc/mounts` and asks the backend behind each prefix for its sizes.
+
+**sysfs** carries GPIO and the network interfaces:
 
 | Node | Mode | Content |
 |---|---|---|
 | `/sys/class/gpio/<pin>/value` | `0666` | current reading, or the value to drive |
 | `/sys/class/gpio/<pin>/mode` | `0666` | `0` off · `1` digital write · `2` digital read · `3` blink · `4` analog write · `5` analog read |
+| `/sys/class/net/<iface>/address` | `0444` | the interface's hardware address |
+| `/sys/class/net/<iface>/operstate` | `0444` | `up` or `down` |
+| `/sys/class/net/<iface>/{ip,netmask,gateway}` | `0444` | its current addressing |
+| `/sys/class/net/<iface>/{ssid,rssi}` | `0444` | the association, on a station only |
+
+The radio presents itself as `wlan0` and `ap0`. A link type registers into a table the same way a filesystem registers into the mount table, so Ethernet or PPP appears here by registering rather than by anything under `/sys` changing.
 
 Reads return what the GPIO service last sampled; writes update its config copy, persist it and re-apply the modes. Set mode first, then value — `echo 3 > /sys/class/gpio/4/mode` followed by `echo 500 > /sys/class/gpio/4/value` blinks pin 4 at half-second intervals. Use `echo` with redirection for these; the `fedit` editor works through a temp file and so belongs to real files only.
 
@@ -1188,7 +1210,7 @@ Started with the HTTP server interface and ticked from every pass of `serve()`. 
 
 #### 6.2.13 `TelnetServiceProvider` — `__telnet_service`
 
-Binds port 23, accepts a client, and hands its stream to the CLI as a terminal. Everything after that is the shell.
+Binds port 23, accepts clients into a pool of `TELNET_MAX_SESSIONS` slots, and hands each stream to the CLI as a terminal. Everything after that is the shell. A slot whose client has gone is reclaimed before the next accept, an idle session is closed after `TELNET_SHELL_IDLE_MS` while one running a command is left alone, and a client arriving when every slot is taken is told so and closed after `TELNET_POOL_FULL_GRACE_MS` rather than left waiting on a prompt that will not come. The sizes live in [src/config/TelnetConfig.h](src/config/TelnetConfig.h).
 
 #### 6.2.14 `SSHServer` — `__sshserver_service`
 
@@ -1214,7 +1236,7 @@ The most expensive service in the framework, and the most capable: a full SSH se
 
 Host keys live in `/etc/ssh` alongside `sshconfig`, leaving `~/.ssh` to the user's own client keys. The Ed25519 host key is created on service start if it is missing, which takes milliseconds. RSA is generated only when asked for with `sshkgen t=2,f=b`, because 2048-bit keygen on these parts is measured in minutes.
 
-Both authentication methods are on by default and each can be switched off in `/etc/ssh/sshconfig`, which is created with defaults on first boot. When an attempt fails the server advertises exactly the methods still permitted. [§7.9.1](#791-ssh-authentication) has the operational detail.
+Both authentication methods are on by default and each can be switched off in `/etc/ssh/sshconfig`, which is created with defaults on first boot. When an attempt fails the server advertises exactly the methods still permitted. [§7.10.1](#7101-ssh-authentication) has the operational detail.
 
 Two sessions are served concurrently by default, which is what graphical SFTP clients need — they hold a browse connection open and open a second one to move a file. The SFTP subsystem covers path resolution, stat, directory listing, open/read/write, mkdir, rmdir, remove and rename, which is enough for interactive `sftp`, for editing a remote file in FileZilla or WinSCP, and for `scp -s`.
 
@@ -1222,7 +1244,7 @@ Two sessions are served concurrently by default, which is what graphical SFTP cl
 
 Registers every command and owns the binding between terminals and sessions. Attaching a terminal creates or finds its session and draws the login prompt; each input tick looks the session up from the terminal and makes it current before dispatching. Every in-flight command remembers which session owns it, so one session's half-finished prompt is never handed to another.
 
-Up to three sessions run at once across serial, telnet and SSH, each with its own line buffer, cursor, history position, working directory, umask and identity. [§7](#7-command-line--terminal) is the full CLI reference.
+Up to `PDI_MAX_SESSIONS` sessions run at once across serial, telnet and SSH, each with its own line buffer, cursor, history position, working directory, umask and identity — and telnet and SSH each hold a pool of their own, so several remote shells of the same kind can be open together. The table is sized from those pools: `PDI_MAX_SESSIONS` defaults to one console plus `TELNET_MAX_SESSIONS` plus `SSH_MAX_SESSIONS`, and a board that names a smaller number in its device config fails the build rather than leaving one transport unable to claim the slots its own pool promises. [§7](#7-command-line--terminal) is the full CLI reference.
 
 #### 6.2.16 TLS (no provider; transport hookup + cert provisioning)
 
@@ -1343,7 +1365,7 @@ Two habits keep services well-behaved. Do the real work in `initService`, not in
 ---
 ## 7. Command Line / Terminal
 
-The shell is the universal control plane. The same commands are reachable over serial, over telnet on port 23, and over SSH on port 22, with login, history, tab completion, in-place editing and file transfer. One implementation covers all three channels because every source presents itself as an `iTerminalInterface`, and the CLI binds one per session.
+The shell is the universal control plane. The same commands are reachable over serial, over telnet on port 23, and over SSH on port 22, with login, history, tab completion, pipes and redirection, in-place editing and file transfer. One implementation covers every channel because each source presents itself as an `iTerminalInterface`, and the CLI binds one session per terminal.
 
 Start reading at [src/service_provider/cmd/](src/service_provider/cmd/); the parser lives in `src/utility/CommandBase.h`.
 
@@ -1392,7 +1414,9 @@ Line editing happens in-process, so the CLI recognises control sequences byte by
 | Esc | cancel the line; inside `fedit`, open the save/cancel/delete menu |
 | Ctrl+C, Ctrl+Z | abort the running command |
 
-Clients disagree about what Enter is: a raw serial terminal sends `\n`, telnet sends CR LF. Both endings are accepted, and a pair is taken as the single key press it represents rather than as a key press followed by an empty line — the two halves may arrive in separate reads, so which ending was taken is remembered on the session.
+Clients disagree about what Enter is: a raw serial terminal sends `\n`, telnet sends CR LF or CR NUL. Every ending is accepted, and a pair is taken as the single key press it represents rather than as a key press followed by an empty line — the two halves may arrive in separate reads, so which ending was taken is remembered on the session.
+
+Only real characters reach the line. Control bytes the editor has no meaning for, and the stray `0xff` a board can emit as it comes out of reset, are dropped rather than typed — so a line that starts arriving mid-reset is still the line you meant.
 
 A long-running command receives these mid-execution by overriding `executeTermInputAction`.
 
@@ -1460,7 +1484,45 @@ The service owns the list of in-flight commands and the history file path. Every
 
 History is persisted only when storage is available, in a file capped at 25 lines. Completion walks the command registry for names matching the typed prefix and cycles on repeated Tab, and works with or without storage because the registry is in RAM.
 
-### 7.7 Built-in command inventory
+### 7.7 Pipes and redirection
+
+A command does not know where its output is going, and a command reading input does not know where it came from. That is the whole trick: the shell puts a stream in front of each end, and the command writes and reads as it always did.
+
+```
+   ps | grep ssh > /tmp/found.txt
+
+   ┌──────────┐   stdout     ┌──────────┐   stdout     ┌───────────────┐
+   │   ps     │ ───────────▶ │  grep    │ ───────────▶ │ /tmp/found.txt│
+   └──────────┘   a pipe     └──────────┘   a file     └───────────────┘
+                             ▲   stdin
+                             └── the pipe the stage before it filled
+```
+
+Each session carries a small descriptor table — `stdin`, `stdout`, `stderr` — that normally points at the terminal. The shell repoints an entry for the length of one line and puts it back afterwards, so nothing leaks into the next command:
+
+```
+                        fd 0 · stdin        fd 1 · stdout
+
+   plain command        the terminal        the terminal
+
+   cat /etc/passwd  ┬─  cat: the terminal   cat: the pipe
+             | wc   ┴─  wc : the pipe       wc : the terminal
+```
+
+| Operator | Meaning |
+|---|---|
+| `>` | send output to a file, replacing it |
+| `>>` | send output to a file, appending |
+| `\|` | send output to the next command |
+| `<` | read input from a file |
+
+`cat`, `head`, `tail`, `wc` and `grep` read the input descriptor when no filename is given, which is what makes them useful on the right of a pipe. Everything else keeps writing to `stdout` without a line of its own changing.
+
+Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` bytes (1024 by default), the way a real one is; a stage that outruns it marks the pipe overflowed instead of growing until the heap is gone. And a write the filesystem refuses — a redirect into read-only `/proc`, or a full disk — is reported as `cannot write <path>` rather than passing silently, because the answer only arrives when the last block is committed.
+
+Not implemented yet: `;`, `&&` and `||`. They need a per-command exit status, which the shell does not carry today.
+
+### 7.8 Built-in command inventory
 
 | Command | Options | Brief |
 |---|---|---|
@@ -1471,19 +1533,19 @@ History is persisted only when storage is available, in a file capped at 25 line
 | cp \<src> \<dst> | | Copy a file, across mounts if needed. e.g. **cp /home/a.txt /home/b.txt** |
 | pwd | | Print the working directory. |
 | rm \<path> | | Remove a file or directory; needs write permission. e.g. **rm /home/notes.txt** |
-| cat \<file> | | Print a file; needs read permission. e.g. **cat /proc/uptime** |
-| echo \<text> [>\|>> \<file>] | | Print text, or send it to a file: `>` replaces in a single write, so it works on synthetic nodes too, and `>>` appends, which is how a multi-line file is built from the shell. e.g. **echo 1 > /sys/class/gpio/5/value**, **echo second line >> /home/notes.txt** |
+| cat [\<file>] | | Print a file, or the piped input when no file is named; needs read permission. e.g. **cat /proc/uptime** |
+| echo \<text> | | Print text. Like every command it can be redirected or piped ([§7.7](#77-pipes-and-redirection)), which is how a file is written from the shell. e.g. **echo 1 > /sys/class/gpio/5/value**, **echo second line >> /home/notes.txt** |
 | fedit \<file> | | Scrolling in-place line editor. A status bar shows the path; ←/→/Home/End/Backspace edit the active line, ↑/↓ move through the file, Enter splits at the cursor. Esc opens the menu: **!w** save, **!c** cancel, **!d** delete line. Edits stream to a temp copy and commit on save. e.g. **fedit /home/notes.txt** |
-| head \<file> [N] | | First N lines, default 10, in constant memory. |
-| tail \<file> [N] | | Last N lines, default 10, in constant memory. |
-| wc \<file> | | Lines, words, bytes. |
-| df | | One row per mount: total, used, free. |
+| head [\<file>] [N] | | First N lines, default 10, in constant memory. Reads the piped input when no file is named. |
+| tail [\<file>] [N] | | Last N lines, default 10, in constant memory. Reads the piped input when no file is named. |
+| wc [\<file>] | | Lines, words, bytes, of a file or of the piped input. |
+| df | | One row per mount: total, used, free. The mount list comes from `/proc/mounts` and the sizes from the backend behind each prefix. |
 | mount | | The mount table: prefix, type, backend. |
 | chmod \<octal> \<path> | | Set permission bits; owner or root. e.g. **chmod 0644 /etc/passwd** |
 | chown \<uid>[:\<gid>] \<path> | | Change owner, root only; gid defaults to uid. e.g. **chown 1001 /home/alice** |
 | umask [\<octal>] | | Show or set this session's umask, default `0022`. |
 | hexdump \<file> | | Offset, sixteen hex bytes, ASCII. |
-| grep \<pattern> \<path> | | Search a file or directory tree, printing `path:line:col:content`. Regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` and escapes. e.g. **grep ^ERROR /home/log.txt** |
+| grep \<pattern> [\<path>] | | Search a file or directory tree, or the piped input, printing `path:line:col:content`. Regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` and escapes. e.g. **grep ^ERROR /home/log.txt**, **ps \| grep ssh** |
 | cls | | Clear the screen. |
 | cd \<dir> | | Change directory; `~` and `-` work. |
 | login | u=, p= | Interactive login, or inline with both options. |
@@ -1497,7 +1559,7 @@ History is persisted only when storage is available, in a file capped at 25 line
 | useradd u=\<user> p=\<pass> | u, p | Root only. Next free uid, gid equal to uid, home `/`. Writes both user files. |
 | userdel u=\<user> | u | Root only. Removes from both files; refuses root and self. |
 | srvc list \| status \| start \| stop \| restart | positional | Service supervisor. `list` shows state per service, `status <name>` adds tracked pids and that service's own detail, and start/stop/restart signal every task it owns. Root for the last three. e.g. **srvc status MDNS** |
-| ps [\<sid>] | | Scheduler tasks with owner, state, %CPU, run count, interval and name; optional owner filter. |
+| ps [\<sid>] | | Tasks with owner, state, %CPU, run count, interval and name, read from `/proc`; optional owner filter. |
 | top | i=, n=, u= | The `ps` view on a repeating tick — interval, iteration bound, owner filter. Ctrl+C stops it. |
 | kill [\<sig>] \<pid> | | Signal a task: 9 KILL, 15 TERM, 18 CONT, 19 STOP. One argument is a pid, two are signal then pid. |
 | pkill [\<sig>] \<name> | | Same, matched by name across every task carrying it. |
@@ -1511,30 +1573,32 @@ History is persisted only when storage is available, in a file capped at 25 line
 | tdctl | | Clock status: local and universal time, zone, sync state, server. |
 | reboot | | Reboot. |
 | watch | c=, i=, n= | Run a command repeatedly. Options are separated by `;` so the inner command may contain commas. e.g. **watch c=net ip; i=3000; n=10** |
+| db status \| list \| verify \| save \| restore | positional | Inspect the config record store: which medium is live and how full it is, one line per record, a checksum pass over all of them, and saving or restoring the defaults tier. Never prints a record's contents. See [§5.10](#510-from-the-terminal). |
 | iot \<option> | setid, getid, sethost, gethost | Device unique id and IoT host. |
 | help | | Every registered command with its usage line. Works before login. |
 | uptime | | `up Xd Yh Zm Ws`. |
 | tls q=1,t=,l=,n=,i= | | On-device certificate generation, ESP32 with cert generation enabled. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
-| elfload \<path> | | ESP32 only. Load an ELF from the filesystem and run it as a background task, returning its pid. See [§7.12](#712-dynamic-app-loading-esp32). |
+| elfload \<path> | | ESP32 only. Load an ELF from the filesystem and run it as a background task, returning its pid. See [§7.13](#713-dynamic-app-loading-esp32). |
 
 Path arguments behave the POSIX way everywhere: a leading `/` is absolute, anything else resolves against the session's working directory, and `cd` also takes `~` and `-`.
 
 On argument style: commands with at most two arguments take them positionally, which is both shorter to type and what muscle memory expects — `chmod 0644 /etc/passwd`, `renice -5 10`. Where a leading argument is optional, the count disambiguates: one argument is the target, two are signal then target. Named `x=y` options are kept for commands with many optional slots, for anything that takes a password, and for patterns where the optional argument sits in the middle.
 
-### 7.8 Multi-terminal session lifecycle
+### 7.9 Multi-terminal session lifecycle
 
-Three sessions can run at once, one per channel, with fully independent state. There is a single dispatcher and an array of session slots; each slot holds its own line buffer, cursor, history and completion position, working directory, umask, and identity.
+Several sessions run at once with fully independent state. There is a single dispatcher and an array of session slots; each slot holds its own line buffer, cursor, history and completion position, working directory, umask, identity and descriptor table. The serial console holds one slot from boot, and telnet and SSH each keep a pool of their own, so two people over telnet and four over SSH are all just slots in the same table.
 
 ```
   boot ──▶ filesystem up
         ──▶ user store bootstraps /etc/passwd and /etc/shadow if absent
         ──▶ serial terminal attached, login prompt drawn
 
-  telnet connect ──▶ accept ──▶ useTerminal(client)
-                                  ├─ session attached to the next free slot
-                                  └─ login prompt on that client only
+  telnet connect ──▶ free pool slot? ──▶ accept ──▶ useTerminal(client)
+                  │                                  ├─ session attached to the next free slot
+                  │                                  └─ login prompt on that client only
+                  │  pool full ──▶ short grace, then "no telnet session available"
                   ──▶ each tick: find session by terminal, make current, dispatch
-                  ──▶ disconnect: session detached, slot freed
+                  ──▶ disconnect: session detached, both slots freed
 
   ssh connect    ──▶ user auth succeeds ──▶ session attached and marked authorised
                   ──▶ channel opens     ──▶ useTerminal, prompt
@@ -1542,11 +1606,13 @@ Three sessions can run at once, one per channel, with fully independent state. T
                   ──▶ close: session detached
 ```
 
+The table and the pools are sized together — see the note in [§6.2.15](#6215-commandlineserviceprovider--__cmd_service). A pool larger than the table it draws from would leave one transport unable to claim the slots it promises, so a device config that names too few sessions fails the build rather than finding out at runtime.
+
 Two invariants carry the whole design. First, the current session is switched once per tick, at the top of input handling, and the static terminal pointer moves with it — so prompt drawing, new command instances and the auth delegators all see the right session without anyone passing it around. Second, every in-flight command records which session created it, and the lookups that find waiting commands filter on that. A telnet login prompt waiting for a username cannot be fed by SSH keystrokes.
 
 Long-running commands capture their terminal and owner when they start, so their output keeps flowing to the right session no matter what the other sessions are doing.
 
-### 7.9 SFTP and SCP file transfer
+### 7.10 SFTP and SCP file transfer
 
 The SSH service opens an SFTP subsystem on demand, and the same handlers serve `scp -s` for single files, interactive `sftp`, and graphical clients like FileZilla and WinSCP — including editing a remote file in place, which works because the session pool serves the second connection those clients open.
 
@@ -1570,7 +1636,7 @@ Data records arrive small — the SSH crypto window caps them at 256 bytes — a
 
 Directory listings are read once when the directory opens and paginated across responses, released when it closes. One handle is tracked per session, which is what an interactive client uses. Idle SFTP sessions are reaped after a minute so a suspended client cannot hold a pool slot; interactive shell sessions are never idle-reaped, because a person may sit at a prompt for as long as they like.
 
-#### 7.9.1 SSH authentication
+#### 7.10.1 SSH authentication
 
 Password and public key are both accepted, and `/etc/ssh/sshconfig` decides which are offered:
 
@@ -1594,7 +1660,7 @@ ssh -i ~/.ssh/id_ed25519 pdiStack@<device-ip>
 
 The device's own host keys are separate, in `/etc/ssh`. Ed25519 lives in `/etc/ssh/ed25519` with its `.pub` and `.seed`, and is created automatically the first time the SSH service starts. RSA lives in `/etc/ssh/rsa` and is generated only when you ask for it with `sshkgen t=2,f=b`, since 2048-bit keygen costs about a minute on ESP32 and six on ESP8266. Either way the key goes onto the wire in standard SSH format during the handshake. `authorized_keys` is one file under the device home directory, shared by all users.
 
-### 7.10 Background commands and Ctrl+C
+### 7.11 Background commands and Ctrl+C
 
 `watch` and `top` run as scheduler tasks behind a shell session, and they are the template for any long-running command:
 
@@ -1607,7 +1673,7 @@ The device's own host keys are separate, in `/etc/ssh`. Ed25519 lives in `/etc/s
 
 Ctrl+C handling is generic: the dispatcher walks its command list and calls `stopRunningInBackground()` on every backgrounded command owned by the current session. A new background command inherits that behaviour with no wiring in the shell. `ps` shows what is currently running, under the command's own name.
 
-### 7.11 Adding a command
+### 7.12 Adding a command
 
 Say you want `temp`.
 
@@ -1639,7 +1705,7 @@ That is the whole job. Tab completion, history, help, argument-error usage print
 
 A few limits shape command design. Names are capped at eight characters and options at three, each name up to three characters, so a verb that wants more either splits into sub-commands or takes positional arguments. Option values cannot contain the separator, an `=`, or spaces, since there is no quoting — pick a separator that doesn't collide with your payload, which is why `watch` separates on `;`. And `needauth()` is the only permission gate, so put it on anything that changes state.
 
-### 7.12 Dynamic app loading (esp32)
+### 7.13 Dynamic app loading (esp32)
 
 With `ENABLE_PROGRAM_EXEC`, `elfload` reads a relocatable ELF off the filesystem, resolves its external symbols against the running firmware, and launches its `main()` as a background preemptive task:
 
@@ -2030,7 +2096,7 @@ A transport speaks a wire protocol on a byte stream. It sits between the `iClien
    iClientInterface  plaintext TCP or TLS — the transport can't tell
 ```
 
-That split buys three things. The same HTTP parsing serves both the client and the portal. A port that ships an SDK-native MQTT client can present it as an `iClientInterface` and the framework's own client falls away without any service noticing. And because a transport is plain C++ over a stream, it can be exercised against a memory-backed mock with no radio involved.
+That split buys three things. The same HTTP parsing serves both the client and the portal. A port that ships an SDK-native MQTT client can present it as an `iClientInterface` and the framework's own client falls away without any service noticing. And because a transport is plain C++ over a stream, it can be exercised on a host with no radio involved.
 
 Live in [src/transports/](src/transports/). There are no globals — each consumer creates an instance.
 
@@ -2347,6 +2413,8 @@ Every byte of that comes back when the client disconnects — the worker exits, 
 
 **The containers allocate.** `pdiutil::string` and `pdiutil::vector` hide the heap but still use it, and repeated growth fragments. Reserve up front wherever the size is known, the way the scheduler reserves its task table.
 
+**Sessions and their pools.** Every session slot is a fixed record in the table, so `PDI_MAX_SESSIONS` is a straight multiplier on static RAM — and because the table is sized from the telnet and SSH pools, growing a pool grows the table with it. A live session then costs a little heap on top for its line buffer and paths. On a tight port, shrink the pools rather than the table.
+
 ### 12.4 Heap discipline
 
 The framework is built to run for weeks or months between reboots, which shapes a few habits.
@@ -2396,7 +2464,7 @@ Use explicit-width integer types in config structs. `sizeof(int)` differs betwee
 
 Stay away from the `printf` family; the framework's own conversions save four to eight kilobytes by never linking libc's formatter.
 
-Move firmware over OTA rather than SFTP — file transfer runs at 0.2 to 1 KB/s by design ([§7.9](#79-sftp-and-scp-file-transfer)).
+Move firmware over OTA rather than SFTP — file transfer runs at 0.2 to 1 KB/s by design ([§7.10](#710-sftp-and-scp-file-transfer)).
 
 ### 12.8 Looking at a running device
 
@@ -2497,6 +2565,7 @@ Composites are built by multiple inheritance rather than by aggregation, which i
 | `iStorageInterface` | the filesystem, LittleFS | byte-addressable read, write, erase, size |
 | `iFileSystemInterface` | SSH, SFTP, every file command | file and directory CRUD, traversal, line and offset lookup, search, custom attributes |
 | `iWiFiInterface` | WiFi service, `net` | station and AP, sync and async scan, NAPT, mode |
+| `iNetifInterface` | `/sys/class/net`, `/proc/net` | one network link describing itself: name, kind, hardware address, addressing, link state |
 
 #### 13.3.5 Optional
 
@@ -2531,11 +2600,11 @@ A port that wants preemption wires its tick ISR to exactly that.
 
 ### 13.4 Shared default implementations
 
-Not every interface is worth rewriting per device. Two portable defaults ship under `impl/`, and both are what a new port should reach for first.
+Not every interface is worth rewriting per device. The portable defaults ship under `impl/`, and they are what a new port should reach for first.
 
-The HTTP server implementation is a protocol-correct HTTP/1.1 server built on nothing but the TCP server and client interfaces — and with TLS enabled, the same file serves HTTPS by wrapping accepted connections. The filesystem implementation is LittleFS on top of any storage interface.
+The HTTP server implementation is a protocol-correct HTTP/1.1 server built on nothing but the TCP server and client interfaces — and with TLS enabled, the same file serves HTTPS by wrapping accepted connections. The filesystem side is larger: LittleFS on top of any storage interface, the dispatcher that routes one tree across several backends, and the generated filesystems behind `/proc`, `/sys`, `/dev` and `/tmp`. None of them are per-board.
 
-So a new device needs to supply raw TCP and raw storage, and inherits the HTTP server, the HTTPS server and the whole filesystem for free. The TLS classes are deliberately not here, because BearSSL and mbedTLS are different enough that each port supplies its own pair.
+So a new device needs to supply raw TCP and raw storage, and inherits the HTTP server, the HTTPS server, the whole filesystem and every synthetic mount for free. The TLS classes are deliberately not here, because BearSSL and mbedTLS are different enough that each port supplies its own pair.
 
 ### 13.5 What an implementation must promise
 
@@ -2552,7 +2621,7 @@ The bar is whether at least two devices could implement it differently. If they 
 1. Pick the group — drivers for silicon, middlewares for network and device operations, modules for orthogonal features, threading for execution, top level for cross-cutting concerns.
 2. Forward-declare the concrete class and declare the `extern` singleton at the bottom.
 3. Guard it with the same flag that gates the service consuming it, so no existing port has to provide anything until it opts in.
-4. Add a stub to the mock device so the off-device build still links.
+4. Add an implementation to the posix port so the off-device build still links.
 5. Write it up here.
 
 An interface with exactly one implementation is usually a sign the abstraction is premature — keep it in device-specific code until a second port needs it.
@@ -2593,7 +2662,7 @@ The device layer is the only place vendor SDK and Arduino-core symbols are allow
     threading/                  optional: the cooperative and preemptive lanes
 ```
 
-The two ends of the spectrum are worth looking at. The mock device is header-only stubs, used when no board is selected so the framework still compiles for analysis or off-device tests. The Arduino UNO port has no network, storage-beyond-EEPROM, or web server at all — device control, database, serial, storage, filesystem and the instance factory, and nothing more.
+The two ends of the spectrum are worth looking at. The **posix** port targets the machine you develop on: real BSD sockets, real files, real ICMP for `ping`, and a restart that re-execs the process. It is what the test suite runs the whole framework against, so a shell, an ssh channel and the portal can all be driven without a board. The **Arduino UNO** port has no network, no storage beyond EEPROM and no web server at all — device control, database, serial, storage, filesystem and the instance factory, and nothing more.
 
 For threading, ESP32 builds on FreeRTOS primitives while ESP8266 ships bare-metal Xtensa context switching driven by a hardware timer. Both satisfy the same interfaces.
 
@@ -2709,7 +2778,7 @@ Say the board is `myboard`.
 
 ### 14.9 Before you call it done
 
-- The mock device still compiles — proof that nothing under `src/` picked up a vendor header.
+- The posix port still compiles — proof that nothing under `src/` picked up a vendor header.
 - The bundled example builds with every flag the board can support.
 - Every `__i_*` symbol the flag set implies is defined exactly once.
 - Microsecond time is monotonic across the platform's counter wrap, and `ps` shows non-zero CPU share for tasks with sub-millisecond callbacks after a few ticks.
@@ -2819,7 +2888,7 @@ Every section above has its own "how do I add one of these" part. This one is th
 | speak a new wire protocol | a transport | [§10.5](#105-adding-a-transport) |
 | persist new configuration | a database table | [§5.11](#511-adding-a-table) |
 | add a screen to the portal | a controller and a page | [§8.10](#810-adding-a-page) |
-| add a terminal command | a command class | [§7.11](#711-adding-a-command) |
+| add a terminal command | a command class | [§7.12](#712-adding-a-command) |
 | persist something only your sketch cares about | the database escape hatch | [§11.3](#113-addingdatabasetable) |
 | react to another service without coupling to it | the event bus | [§6.4](#64-the-event-bus) |
 | run periodic or long work | the scheduler | [§4](#4-task-scheduler) |
@@ -2835,7 +2904,7 @@ Create the folder with its SDK umbrella header, its platform-macro header and th
 
 ### 16.3 A new interface
 
-Pick the group, write the header with pure virtuals plus a forward-declared concrete class and its `extern` singleton, guard it behind the flag that gates its consumers, and add a mock stub so off-device builds still link. If more than one port would end up writing the same logic, put a default implementation under `impl/` instead.
+Pick the group, write the header with pure virtuals plus a forward-declared concrete class and its `extern` singleton, guard it behind the flag that gates its consumers, and add a posix implementation so off-device builds still link. If more than one port would end up writing the same logic, put a default implementation under `impl/` instead.
 
 The bar is that two ports would genuinely implement it differently. One implementation means it belongs in the device folder for now.
 
@@ -2876,7 +2945,7 @@ A sketch can add a controller the same way without touching the framework; [§11
 
 ### 16.8 A new command
 
-Add the name constant, write the command struct with its options and `execute`, then include and register it in the CLI service. Completion, history and Ctrl+C come for free. Keep the name within eight characters and the options within three ([§7.11](#711-adding-a-command)).
+Add the name constant, write the command struct with its options and `execute`, then include and register it in the CLI service. Completion, history and Ctrl+C come for free. Keep the name within eight characters and the options within three ([§7.12](#712-adding-a-command)).
 
 ### 16.9 Calling a service from a sketch
 
@@ -2940,38 +3009,52 @@ python3 tests/run_tests.py
 Exit status is zero only when every selected test passed. `tests/README.md` is the full reference;
 this section is the shape of it.
 
-### 17.1 Three tiers
+### 17.1 Four tiers
 
 | Tier | What it is | Needs |
 |---|---|---|
-| `unit` | Native host binary linking the framework against the mock device | a compiler |
+| `unit` | Native host binary linking the framework against the posix port | a compiler |
 | `system` | The whole stack as a host process (`pdid`) you can ssh, sftp and curl | a compiler |
 | `device` | The same feature suites over serial, telnet or ssh | a board |
+| `fuzz` | libFuzzer harnesses over the parsers that face the network before login | clang |
 
 ```
 python3 tests/run_tests.py --tier unit
 python3 tests/run_tests.py --tier system --features
 python3 tests/run_tests.py --device ssh:pdiStack@<ip> --password <pw>
+python3 tests/run_tests.py --tier fuzz --fuzz-seconds 60
 ```
 
 The unit tier asserts on functions and runs under Address and UB sanitizers, so an out-of-bounds
-read fails the run rather than passing quietly. The other two drive the framework the way a user
-does — a shell, an ssh channel, the web portal, an MQTT broker.
+read fails the run rather than passing quietly. The middle two drive the framework the way a user
+does — a shell, an ssh channel, the web portal, an MQTT broker. The fuzz tier feeds the ssh wire,
+sftp, http, shell, database-record and config parsers whatever a stranger could send before they
+have authenticated.
+
+With several `--device` targets, `--mode interleave` opens all of them at once and gives each test
+the next transport in rotation. It is roughly three times faster than running the suite per
+transport, and it is the only mode where the transports contend for the board, which is where
+session and pool defects show up.
 
 ### 17.2 How the host build works
 
 `src/` contains no Arduino or vendor SDK includes; every SDK dependency lives under `devices/`. The
-test build compiles the real framework sources against the mock adapter in `devices/mockdevice/`
-with `MOCK_DEVICE_TEST` defined on the command line. That gate is the only thing selecting the mock
-device — `devices/DeviceSetup.h`, which records the board you build firmware for, is never read or
+test build compiles the real framework sources against the posix port in `devices/posix/` with
+`MOCK_DEVICE_TEST` defined on the command line. That gate is the only thing selecting the posix
+port — `devices/DeviceSetup.h`, which records the board you build firmware for, is never read or
 written by a test run, so testing never disturbs your build.
+
+`scripts/SyntaxSweep.py` compiles every translation unit on its own, across the C++ standards the
+boards use and across feature-flag profiles with services switched off. It is what catches a file
+that only ever compiled because something else happened to include a header first, and a guard that
+was never exercised because no board turns that combination on.
 
 ### 17.3 Feature suites
 
-`tests/suite/features/` holds one file per area: terminal, filesystem, users, sessions, processes,
-networking, name resolution, portal, ssh, sftp, mDNS, MQTT. Each is written against a `Target`
-rather than a transport, so one source runs against the host process and against a board over any
-of the three transports.
+`tests/suite/features/` holds one file per area: terminal, shell grammar, filesystem, generated
+filesystems, users, sessions, processes, networking, name resolution, portal, ssh, sftp, scp,
+timeouts, mDNS and MQTT. Each is written against a `Target` rather than a transport, so one source
+runs against the host process and against a board over any of the three transports.
 
 Two rules keep the results honest. A capability difference is found by **attempting** the thing and
 skipping with the reason, never by branching on the transport's name. And a test that needs a peer
@@ -3106,13 +3189,19 @@ sshkgen t=1,f=b
 `t=1` is Ed25519 and is instant; `f=b` is the `/etc/ssh` host-key directory.
 
 **`scp -s` is slow.**
-Transfers stream in small chunks and pay flash-write cost on overwrite, which lands around 0.2 to 1 KB/s. Firmware belongs on OTA ([§7.9](#79-sftp-and-scp-file-transfer)).
+Transfers stream in small chunks and pay flash-write cost on overwrite, which lands around 0.2 to 1 KB/s. Firmware belongs on OTA ([§7.10](#710-sftp-and-scp-file-transfer)).
 
 **`fedit` will not exit.**
 Press Esc for the menu, then `!w` to save and leave or `!c` to discard.
 
 **Tab completion works but the arrow keys don't recall history.**
 History is a file, so it needs storage; completion reads the in-RAM registry and works either way ([§7.6](#76-the-dispatcher)).
+
+**A second telnet client just hangs.**
+It won't any more: telnet keeps a pool, and a client arriving when every slot is taken is told `no telnet session available, try again later` and closed. If you see that message, either a session is idle and about to be reaped, or the pool is genuinely smaller than the number of people trying to log in — raise `TELNET_MAX_SESSIONS`, and the session table grows with it ([§7.9](#79-multi-terminal-session-lifecycle)).
+
+**`echo something > /proc/uptime` prints `cannot write`.**
+That is correct — `/proc` is generated and read-only. The message appears when the last block is written, so a redirect that fails halfway still tells you ([§7.7](#77-pipes-and-redirection)).
 
 ### 18.5 Questions that come up
 
@@ -3143,10 +3232,10 @@ On ESP32, `tls q=1,t=0,l=256,n=device.local,i=192.168.1.50` writes a self-signed
 For a development box on ESP32 none of that is needed: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` the mDNS service mints one covering the address and `<hostname>.local` as soon as the station has an IP, and reissues it if either changes.
 
 **Is there a simulator?**
-The mock device lets the framework compile off-device for analysis; it does not simulate behaviour. Interactive testing means real hardware.
+The posix port runs the whole framework as a host process, so most behaviour can be exercised without a board — the feature suites drive it over a shell, ssh and the portal. What it cannot stand in for is timing, radio and flash wear, so anything that depends on those still needs real hardware.
 
 **How do I unit-test framework code?**
-`python3 tests/run_tests.py` — see [§17](#17-test-suite). The framework compiles against the mock device on host x86, so a unit test links the real source with no board attached.
+`python3 tests/run_tests.py` — see [§17](#17-test-suite). The framework compiles against the posix port on host x86, so a unit test links the real source with no board attached.
 
 **Where do I report issues?**
 GitHub: <https://github.com/Suraj151/pdi-framework>.

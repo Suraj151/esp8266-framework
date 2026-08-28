@@ -217,7 +217,9 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
     }, MQTT_INITIALIZE_DURATION, __i_dvc_ctrl.millis_now() );
   }else if( MQTT_PUBSUB_CONFIG == _mqtt_config_type ){
 
-    for ( uint16_t i = 0; i < this->m_mqtt_client.m_mqttClient.subscribed_topics.size(); i++) {
+    // UnSubscribe removes the topic from the list being walked, so step down
+    // through it or the entry shifted into this slot is never examined
+    for ( int32_t i = (int32_t)this->m_mqtt_client.m_mqttClient.subscribed_topics.size() - 1; i >= 0; i--) {
 
       bool _found = false;
       for (uint8_t j = 0; j < MQTT_MAX_SUBSCRIBE_TOPIC; j++) {

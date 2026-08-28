@@ -17,8 +17,12 @@ created Date    : 16th Aug 2026
 #include <interface/pdi/impl/modules/storage/ProcFs.h>
 #include <interface/pdi/impl/modules/storage/SysFs.h>
 #include <interface/pdi/impl/modules/storage/TmpFs.h>
+#include <helpers/ConfigHelper.h>
 #include <service_provider/session/SessionManager.h>
 #include <MountedStack.h>
+#include <ShellHarness.h>
+#include <utility/TaskScheduler.h>
+#include <interface/pdi/impl/modules/netif/NetifRegistry.h>
 #include <pditest.h>
 
 static VfsDispatcher *mountedVfs()
@@ -305,6 +309,400 @@ TEST(procfs, the_directory_lists_its_nodes)
     ASSERT_TRUE(sawversion);
 }
 
+TEST(procfs, meminfo_reports_free_heap_and_the_largest_block)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pdiutil::string meminfo = slurp(fs, "/proc/meminfo");
+
+    ASSERT_TRUE(meminfo.find("MemFree:") != pdiutil::string::npos);
+    ASSERT_TRUE(meminfo.find("MemMaxBlock:") != pdiutil::string::npos);
+    ASSERT_TRUE(meminfo.find(" B") != pdiutil::string::npos);
+}
+
+TEST(procfs, mounts_names_every_mounted_filesystem)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pdiutil::string mounts = slurp(fs, "/proc/mounts");
+
+    for (uint8_t i = 0; i < fs->getMountCount(); i++)
+    {
+        const vfs_mount_t *mount = fs->getMount(i);
+        ASSERT_TRUE(nullptr != mount);
+        ASSERT_TRUE(mounts.find(mount->m_prefix) != pdiutil::string::npos);
+        ASSERT_TRUE(mounts.find(mount->m_name) != pdiutil::string::npos);
+    }
+}
+
+TEST(procfs, mounts_gives_each_line_the_type_the_mount_carries)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pdiutil::string mounts = slurp(fs, "/proc/mounts");
+
+    ASSERT_TRUE(mounts.find("procfs /proc procfs rw 0 0") != pdiutil::string::npos);
+}
+
+TEST(procfs, a_read_stops_at_the_string_it_was_told_to_stop_at)
+{
+    VfsDispatcher *fs = mountedVfs();
+
+    pdiutil::string first;
+    bool matched = false;
+    int bytes = fs->readFile("/proc/mounts", 64, [&first](char *chunk, uint32_t len) {
+        for (uint32_t i = 0; i < len; i++)
+        {
+            first += chunk[i];
+        }
+        return true;
+    }, 0, "\n", &matched);
+
+    ASSERT_TRUE(matched);
+    ASSERT_TRUE(bytes > 0);
+    ASSERT_EQ((uint32_t)bytes, (uint32_t)first.length());
+    ASSERT_TRUE(first.find('\n') == pdiutil::string::npos);
+}
+
+TEST(procfs, stepping_by_the_match_walks_every_line_once)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pdiutil::string whole = slurp(fs, "/proc/mounts");
+
+    uint16_t lines = 0;
+    pdiutil::string rebuilt;
+    uint64_t offset = 0;
+
+    while (offset < (uint64_t)whole.length() && lines < 32)
+    {
+        pdiutil::string line;
+        int bytes = fs->readFile("/proc/mounts", 64, [&line](char *chunk, uint32_t len) {
+            for (uint32_t i = 0; i < len; i++)
+            {
+                line += chunk[i];
+            }
+            return true;
+        }, offset, "\n");
+
+        if (bytes < 0) break;
+        offset += (uint64_t)bytes + 1;
+
+        rebuilt += line;
+        rebuilt += "\n";
+        lines++;
+    }
+
+    ASSERT_EQ((uint32_t)lines, (uint32_t)fs->getMountCount());
+    ASSERT_STREQ(rebuilt.c_str(), whole.c_str());
+}
+
+TEST(procfs, a_read_with_no_match_in_it_delivers_the_rest)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pdiutil::string whole = slurp(fs, "/proc/version");
+
+    pdiutil::string out;
+    bool matched = false;
+    fs->readFile("/proc/version", 64, [&out](char *chunk, uint32_t len) {
+        for (uint32_t i = 0; i < len; i++)
+        {
+            out += chunk[i];
+        }
+        return true;
+    }, 0, "@@nosuchmatch@@", &matched);
+
+    ASSERT_FALSE(matched);
+    ASSERT_STREQ(out.c_str(), whole.c_str());
+}
+
+TEST(procfs, stat_counts_the_tasks_the_scheduler_holds)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyScheduler();
+
+    pdiutil::task_id_t id = __task_scheduler.register_task([]() {}, 1000, DEFAULT_TASK_PRIORITY, 0, -1, "fsprobe");
+    ASSERT_TRUE(id >= 0);
+
+    pdiutil::string stat = slurp(fs, "/proc/stat");
+
+    char line[32];
+    __snprintf(line, sizeof(line), "processes %d", (int)__task_scheduler.getTaskCount());
+
+    __task_scheduler.remove_task(id);
+
+    ASSERT_TRUE(stat.find("cpu 0 0 ") == 0);
+    ASSERT_TRUE(stat.find(line) != pdiutil::string::npos);
+    ASSERT_TRUE(stat.find("ctxt ") != pdiutil::string::npos);
+    ASSERT_TRUE(stat.find("procs_running ") != pdiutil::string::npos);
+}
+
+TEST(procfs, stat_busy_and_idle_add_up_to_the_uptime)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pdiutil::string stat = slurp(fs, "/proc/stat");
+
+    // "cpu 0 0 <busy> <idle>" - the pair is a partition of the elapsed time,
+    // which is what makes a ratio taken from it meaningful
+    pdiutil::string::size_type at = stat.find("cpu 0 0 ");
+    ASSERT_TRUE(at == 0);
+
+    pdiutil::string rest = stat.substr(8);
+    pdiutil::string::size_type gap = rest.find(' ');
+    ASSERT_TRUE(gap != pdiutil::string::npos);
+
+    uint64_t busy = StringToUint64(rest.substr(0, gap).c_str());
+    uint64_t idle = StringToUint64(rest.substr(gap + 1).c_str());
+
+    ASSERT_TRUE((busy + idle) > 0);
+}
+
+TEST(procfs, a_task_gets_a_directory_of_its_own)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyScheduler();
+
+    pdiutil::task_id_t id = __task_scheduler.register_task([]() {}, 1000, DEFAULT_TASK_PRIORITY, 0, -1, "fsprobe");
+    ASSERT_TRUE(id >= 0);
+
+    char dir[32];
+    __snprintf(dir, sizeof(dir), "/proc/%d", (int)id);
+
+    ASSERT_TRUE(fs->isDirExist(dir));
+    ASSERT_TRUE(fs->isDirectory(dir));
+    ASSERT_FALSE(fs->isFileExist(dir));
+
+    __task_scheduler.remove_task(id);
+}
+
+TEST(procfs, a_task_directory_holds_stat_cmdline_and_status)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyScheduler();
+
+    pdiutil::task_id_t id = __task_scheduler.register_task([]() {}, 1000, DEFAULT_TASK_PRIORITY, 0, -1, "fsprobe");
+    ASSERT_TRUE(id >= 0);
+
+    char dir[32];
+    __snprintf(dir, sizeof(dir), "/proc/%d", (int)id);
+
+    pdiutil::vector<file_info_t> items;
+    ASSERT_TRUE(fs->getDirFileList(dir, items) >= 0);
+
+    bool sawstat = false;
+    bool sawcmdline = false;
+    bool sawstatus = false;
+    for (file_info_t &item : items)
+    {
+        if (nullptr == item.m_name) continue;
+        if (0 == strcmp(item.m_name, "stat")) sawstat = true;
+        if (0 == strcmp(item.m_name, "cmdline")) sawcmdline = true;
+        if (0 == strcmp(item.m_name, "status")) sawstatus = true;
+    }
+    for (file_info_t &item : items)
+    {
+        pdiutil::safe_delete_array(item.m_name);
+    }
+
+    __task_scheduler.remove_task(id);
+
+    ASSERT_TRUE(sawstat);
+    ASSERT_TRUE(sawcmdline);
+    ASSERT_TRUE(sawstatus);
+}
+
+TEST(procfs, stat_leads_with_the_pid_name_and_state)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyScheduler();
+
+    pdiutil::task_id_t id = __task_scheduler.register_task([]() {}, 1000, DEFAULT_TASK_PRIORITY, 0, -1, "fsprobe");
+    ASSERT_TRUE(id >= 0);
+
+    char path[40];
+    __snprintf(path, sizeof(path), "/proc/%d/stat", (int)id);
+    pdiutil::string stat = slurp(fs, path);
+
+    char lead[24];
+    __snprintf(lead, sizeof(lead), "%d (fsprobe)", (int)id);
+
+    __task_scheduler.remove_task(id);
+
+    ASSERT_TRUE(stat.find(lead) == 0);
+}
+
+TEST(procfs, cmdline_names_the_task)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyScheduler();
+
+    pdiutil::task_id_t id = __task_scheduler.register_task([]() {}, 1000, DEFAULT_TASK_PRIORITY, 0, -1, "fsprobe");
+    ASSERT_TRUE(id >= 0);
+
+    char path[40];
+    __snprintf(path, sizeof(path), "/proc/%d/cmdline", (int)id);
+    pdiutil::string cmdline = slurp(fs, path);
+
+    __task_scheduler.remove_task(id);
+
+    ASSERT_TRUE(cmdline.find("fsprobe") != pdiutil::string::npos);
+}
+
+TEST(procfs, status_reports_the_same_pid_as_the_directory)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyScheduler();
+
+    pdiutil::task_id_t id = __task_scheduler.register_task([]() {}, 1000, DEFAULT_TASK_PRIORITY, 0, -1, "fsprobe");
+    ASSERT_TRUE(id >= 0);
+
+    char path[40];
+    __snprintf(path, sizeof(path), "/proc/%d/status", (int)id);
+    pdiutil::string status = slurp(fs, path);
+
+    char pidline[24];
+    __snprintf(pidline, sizeof(pidline), "Pid:\t%d", (int)id);
+
+    __task_scheduler.remove_task(id);
+
+    ASSERT_TRUE(status.find("Name:\tfsprobe") != pdiutil::string::npos);
+    ASSERT_TRUE(status.find(pidline) != pdiutil::string::npos);
+}
+
+TEST(procfs, the_root_lists_a_directory_per_running_task)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyScheduler();
+
+    pdiutil::task_id_t id = __task_scheduler.register_task([]() {}, 1000, DEFAULT_TASK_PRIORITY, 0, -1, "fsprobe");
+    ASSERT_TRUE(id >= 0);
+
+    char name[16];
+    __snprintf(name, sizeof(name), "%d", (int)id);
+
+    pdiutil::vector<file_info_t> items;
+    ASSERT_TRUE(fs->getDirFileList("/proc", items) >= 0);
+
+    bool sawtask = false;
+    for (file_info_t &item : items)
+    {
+        if (nullptr != item.m_name && 0 == strcmp(item.m_name, name))
+        {
+            sawtask = (item.m_type == FILE_TYPE_DIR);
+        }
+    }
+    for (file_info_t &item : items)
+    {
+        pdiutil::safe_delete_array(item.m_name);
+    }
+
+    __task_scheduler.remove_task(id);
+
+    ASSERT_TRUE(sawtask);
+}
+
+TEST(procfs, a_removed_task_keeps_its_directory_until_it_is_reaped)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyScheduler();
+
+    pdiutil::task_id_t id = __task_scheduler.register_task([]() {}, 1000, DEFAULT_TASK_PRIORITY, 0, -1, "fsprobe");
+    ASSERT_TRUE(id >= 0);
+
+    char dir[32];
+    char statpath[40];
+    __snprintf(dir, sizeof(dir), "/proc/%d", (int)id);
+    __snprintf(statpath, sizeof(statpath), "/proc/%d/stat", (int)id);
+    ASSERT_TRUE(fs->isDirExist(dir));
+
+    // removing marks the task a zombie rather than freeing its slot, and a
+    // zombie is still something ps and /proc can be asked about
+    __task_scheduler.remove_task(id);
+
+    ASSERT_TRUE(fs->isDirExist(dir));
+    pdiutil::string stat = slurp(fs, statpath);
+    ASSERT_TRUE(stat.find(") Z ") != pdiutil::string::npos);
+
+    __task_scheduler.remove_expired_tasks();
+
+    ASSERT_FALSE(fs->isDirExist(dir));
+    ASSERT_FALSE(fs->isFileExist(statpath));
+}
+
+TEST(procfs, an_unknown_leaf_under_a_task_is_absent)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyScheduler();
+
+    pdiutil::task_id_t id = __task_scheduler.register_task([]() {}, 1000, DEFAULT_TASK_PRIORITY, 0, -1, "fsprobe");
+    ASSERT_TRUE(id >= 0);
+
+    char path[40];
+    __snprintf(path, sizeof(path), "/proc/%d/bogus", (int)id);
+
+    bool exists = fs->isFileExist(path);
+    __task_scheduler.remove_task(id);
+
+    ASSERT_FALSE(exists);
+}
+
+TEST(procfs, a_pid_that_never_ran_is_absent)
+{
+    VfsDispatcher *fs = mountedVfs();
+
+    ASSERT_FALSE(fs->isDirExist("/proc/60000"));
+    ASSERT_FALSE(fs->isFileExist("/proc/60000/stat"));
+    ASSERT_EQ(fs->getFileSize("/proc/60000/stat"), (int64_t)PDI_ERR_NOT_FOUND);
+}
+
+TEST(procfs, the_net_directory_holds_route_and_dev)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+
+    ASSERT_TRUE(fs->isDirExist("/proc/net"));
+    ASSERT_TRUE(fs->isFileExist("/proc/net/route"));
+    ASSERT_TRUE(fs->isFileExist("/proc/net/dev"));
+    ASSERT_FALSE(fs->isFileExist("/proc/net/bogus"));
+}
+
+TEST(procfs, route_names_every_interface_that_is_up)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+    pdiutil::string route = slurp(fs, "/proc/net/route");
+
+    ASSERT_TRUE(route.find("Iface") == 0);
+
+    for (uint8_t i = 0; i < __netif_registry.count(); i++)
+    {
+        iNetifInterface *netif = __netif_registry.at(i);
+        ASSERT_TRUE(nullptr != netif);
+
+        netif_info_t info;
+        if (!netif->getInfo(info) || !info.m_up) continue;
+
+        ASSERT_TRUE(route.find(netif->name()) != pdiutil::string::npos);
+    }
+}
+
+TEST(procfs, dev_lists_only_interfaces_that_can_count)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+    pdiutil::string dev = slurp(fs, "/proc/net/dev");
+
+    ASSERT_TRUE(dev.find("Iface") == 0);
+
+    // an interface with no counters is left out rather than reported as idle
+    for (uint8_t i = 0; i < __netif_registry.count(); i++)
+    {
+        iNetifInterface *netif = __netif_registry.at(i);
+        ASSERT_TRUE(nullptr != netif);
+
+        netif_counters_t counters;
+        if (netif->getCounters(counters)) continue;
+
+        ASSERT_TRUE(dev.find(netif->name()) == pdiutil::string::npos);
+    }
+}
+
 /* ------------------------------------------------------------------- sysfs */
 
 TEST(sysfs, a_pin_value_node_exists)
@@ -482,6 +880,60 @@ TEST(devfs, random_does_not_repeat_itself)
     ASSERT_STRNE(first.c_str(), second.c_str());
 }
 
+TEST(devfs, a_stream_delivers_all_of_itself_when_the_match_cannot_occur)
+{
+    VfsDispatcher *fs = mountedVfs();
+
+    uint32_t seen = 0;
+    bool matched = false;
+    int bytes = fs->readFile("/dev/zero", 16, [&seen](char *chunk, uint32_t len) {
+        seen += len;
+        return true;
+    }, 0, "\n", &matched);
+
+    ASSERT_FALSE(matched);
+    ASSERT_EQ(seen, (uint32_t)DEVFS_STREAM_READ_MAX);
+    ASSERT_EQ((uint32_t)bytes, seen);
+}
+
+TEST(devfs, a_stream_stops_at_the_string_it_was_told_to_stop_at)
+{
+    VfsDispatcher *fs = mountedVfs();
+
+    uint16_t matches = 0;
+    for (uint16_t attempt = 0; attempt < 64; attempt++)
+    {
+        pdiutil::string out;
+        bool matched = false;
+        int bytes = fs->readFile("/dev/random", 16, [&out](char *chunk, uint32_t len) {
+            for (uint32_t i = 0; i < len; i++)
+            {
+                out += chunk[i];
+            }
+            return true;
+        }, 0, "\n", &matched);
+
+        ASSERT_TRUE(bytes >= 0);
+        ASSERT_EQ((uint32_t)bytes, (uint32_t)out.length());
+
+        if (matched)
+        {
+            matches++;
+            ASSERT_TRUE(out.length() < (uint32_t)DEVFS_STREAM_READ_MAX);
+            for (uint32_t i = 0; i < out.length(); i++)
+            {
+                ASSERT_TRUE(out[i] != '\n');
+            }
+        }
+        else
+        {
+            ASSERT_EQ(out.length(), (uint32_t)DEVFS_STREAM_READ_MAX);
+        }
+    }
+
+    ASSERT_TRUE(matches > 0);
+}
+
 TEST(devfs, the_directory_lists_its_nodes)
 {
     VfsDispatcher *fs = mountedVfs();
@@ -581,6 +1033,105 @@ TEST(tmpfs, filling_it_leaves_the_root_filesystem_alone)
     ASSERT_EQ(fs->getFreeSize(), rootfree);
 
     fs->deleteFile("/tmp/bulk.txt");
+}
+
+TEST(tmpfs, a_read_stops_at_the_string_it_was_told_to_stop_at)
+{
+    VfsDispatcher *fs = mountedVfs();
+    removeIfPresent(fs, "/tmp/lines.txt");
+    ASSERT_GE(fs->createFile("/tmp/lines.txt", "first\nsecond\nthird\n"), 0);
+
+    pdiutil::string first;
+    bool matched = false;
+    int bytes = fs->readFile("/tmp/lines.txt", 64, [&first](char *chunk, uint32_t len) {
+        for (uint32_t i = 0; i < len; i++)
+        {
+            first += chunk[i];
+        }
+        return true;
+    }, 0, "\n", &matched);
+
+    ASSERT_TRUE(matched);
+    ASSERT_EQ((uint32_t)bytes, (uint32_t)first.length());
+    ASSERT_STREQ(first.c_str(), "first");
+
+    fs->deleteFile("/tmp/lines.txt");
+}
+
+TEST(tmpfs, stepping_by_the_match_walks_every_line_once)
+{
+    VfsDispatcher *fs = mountedVfs();
+    removeIfPresent(fs, "/tmp/lines.txt");
+    ASSERT_GE(fs->createFile("/tmp/lines.txt", "first\nsecond\nthird\n"), 0);
+
+    int64_t size = fs->getFileSize("/tmp/lines.txt");
+    uint16_t lines = 0;
+    pdiutil::string rebuilt;
+    uint64_t offset = 0;
+
+    while (offset < (uint64_t)size && lines < 16)
+    {
+        pdiutil::string line;
+        int bytes = fs->readFile("/tmp/lines.txt", 64, [&line](char *chunk, uint32_t len) {
+            for (uint32_t i = 0; i < len; i++)
+            {
+                line += chunk[i];
+            }
+            return true;
+        }, offset, "\n");
+
+        if (bytes < 0) break;
+        offset += (uint64_t)bytes + 1;
+
+        rebuilt += line;
+        rebuilt += "\n";
+        lines++;
+    }
+
+    ASSERT_EQ(lines, 3);
+    ASSERT_STREQ(rebuilt.c_str(), "first\nsecond\nthird\n");
+
+    fs->deleteFile("/tmp/lines.txt");
+}
+
+TEST(tmpfs, a_read_with_no_match_in_it_delivers_the_rest)
+{
+    VfsDispatcher *fs = mountedVfs();
+    removeIfPresent(fs, "/tmp/lines.txt");
+    ASSERT_GE(fs->createFile("/tmp/lines.txt", "first\nsecond\nthird\n"), 0);
+
+    pdiutil::string out;
+    bool matched = false;
+    fs->readFile("/tmp/lines.txt", 64, [&out](char *chunk, uint32_t len) {
+        for (uint32_t i = 0; i < len; i++)
+        {
+            out += chunk[i];
+        }
+        return true;
+    }, 0, "@@nosuchmatch@@", &matched);
+
+    ASSERT_FALSE(matched);
+    ASSERT_STREQ(out.c_str(), "first\nsecond\nthird\n");
+
+    fs->deleteFile("/tmp/lines.txt");
+}
+
+TEST(tmpfs, a_config_file_in_memory_parses_a_line_at_a_time)
+{
+    VfsDispatcher *fs = mountedVfs();
+    removeIfPresent(fs, "/tmp/probe.conf");
+    ASSERT_GE(fs->createFile("/tmp/probe.conf", "# a comment\nport 2222\nname in memory\n"), 0);
+
+    pdiutil::vector<config_kv_t> pairs;
+    ASSERT_TRUE(loadConfigFile("/tmp/probe.conf", pairs));
+
+    ASSERT_EQ((uint32_t)pairs.size(), 2u);
+    ASSERT_STREQ(pairs[0].m_key.c_str(), "port");
+    ASSERT_STREQ(pairs[0].m_value.c_str(), "2222");
+    ASSERT_STREQ(pairs[1].m_key.c_str(), "name");
+    ASSERT_STREQ(pairs[1].m_value.c_str(), "in memory");
+
+    fs->deleteFile("/tmp/probe.conf");
 }
 
 /* ------------------------------------------------------------- cross mount */
@@ -852,4 +1403,166 @@ TEST(vfsperm, ending_a_scope_that_never_began_does_not_underflow)
 
     fs->endPrivileged();
     ASSERT_FALSE(fs->isPrivileged());
+}
+
+
+/* ------------------------------------------------------------------- netif */
+
+TEST(netif, the_registry_holds_the_wifi_interfaces)
+{
+    pditest::readyNetifs();
+
+    ASSERT_TRUE(__netif_registry.count() >= 2);
+    ASSERT_TRUE(nullptr != __netif_registry.find("wlan0"));
+    ASSERT_TRUE(nullptr != __netif_registry.find("ap0"));
+    ASSERT_TRUE(nullptr == __netif_registry.find("eth0"));
+}
+
+TEST(netif, a_name_already_taken_is_refused)
+{
+    pditest::readyNetifs();
+
+    iNetifInterface *existing = __netif_registry.find("wlan0");
+    ASSERT_TRUE(nullptr != existing);
+
+    ASSERT_EQ(__netif_registry.registerNetif(existing), (int8_t)PDI_ERR_EXISTS);
+}
+
+TEST(netif, registering_nothing_is_refused)
+{
+    ASSERT_EQ(__netif_registry.registerNetif(nullptr), (int8_t)PDI_ERR_NULL_PTR);
+}
+
+TEST(netif, an_interface_answers_with_its_addresses)
+{
+    pditest::readyNetifs();
+
+    iNetifInterface *wlan = __netif_registry.find("wlan0");
+    ASSERT_TRUE(nullptr != wlan);
+
+    netif_info_t info;
+    ASSERT_TRUE(wlan->getInfo(info));
+    ASSERT_EQ(info.m_kind, NETIF_KIND_WIFI_STA);
+    ASSERT_TRUE(strlen(info.m_mac) > 0);
+}
+
+TEST(netif, an_interface_without_counters_says_so)
+{
+    pditest::readyNetifs();
+
+    iNetifInterface *wlan = __netif_registry.find("wlan0");
+    ASSERT_TRUE(nullptr != wlan);
+
+    netif_counters_t counters;
+    ASSERT_FALSE(wlan->getCounters(counters));
+}
+
+/* --------------------------------------------------------------- sysfs net */
+
+TEST(sysfs, the_class_directory_lists_net_beside_gpio)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+    pdiutil::vector<file_info_t> items;
+
+    ASSERT_TRUE(fs->getDirFileList("/sys/class", items) >= 0);
+
+    bool sawgpio = false;
+    bool sawnet = false;
+    for (file_info_t &item : items)
+    {
+        if (nullptr == item.m_name) continue;
+        if (0 == strcmp(item.m_name, "gpio")) sawgpio = true;
+        if (0 == strcmp(item.m_name, "net")) sawnet = true;
+    }
+    for (file_info_t &item : items)
+    {
+        pdiutil::safe_delete_array(item.m_name);
+    }
+
+    ASSERT_TRUE(sawgpio);
+    ASSERT_TRUE(sawnet);
+}
+
+TEST(sysfs, the_net_directory_lists_every_registered_interface)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+    pdiutil::vector<file_info_t> items;
+
+    ASSERT_TRUE(fs->getDirFileList("/sys/class/net", items) >= 0);
+    ASSERT_EQ((uint8_t)items.size(), __netif_registry.count());
+
+    for (file_info_t &item : items)
+    {
+        pdiutil::safe_delete_array(item.m_name);
+    }
+}
+
+TEST(sysfs, a_station_reports_its_association_and_an_access_point_does_not)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+
+    ASSERT_TRUE(fs->isFileExist("/sys/class/net/wlan0/ssid"));
+    ASSERT_TRUE(fs->isFileExist("/sys/class/net/wlan0/rssi"));
+
+    // an access point has no association to describe, so those leaves are
+    // absent rather than present and empty
+    ASSERT_FALSE(fs->isFileExist("/sys/class/net/ap0/ssid"));
+    ASSERT_FALSE(fs->isFileExist("/sys/class/net/ap0/rssi"));
+    ASSERT_TRUE(fs->isFileExist("/sys/class/net/ap0/ip"));
+}
+
+TEST(sysfs, an_interface_that_is_not_registered_has_no_directory)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+
+    ASSERT_FALSE(fs->isDirExist("/sys/class/net/eth0"));
+    ASSERT_FALSE(fs->isFileExist("/sys/class/net/eth0/ip"));
+}
+
+TEST(sysfs, operstate_reads_up_or_down)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+    pdiutil::string state = slurp(fs, "/sys/class/net/wlan0/operstate");
+
+    ASSERT_TRUE(state == pdiutil::string("up\n") || state == pdiutil::string("down\n"));
+}
+
+TEST(sysfs, the_address_leaf_reads_the_interface_mac)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+    pdiutil::string address = slurp(fs, "/sys/class/net/wlan0/address");
+
+    netif_info_t info;
+    ASSERT_TRUE(__netif_registry.find("wlan0")->getInfo(info));
+    ASSERT_TRUE(address.find(info.m_mac) == 0);
+}
+
+TEST(sysfs, a_net_leaf_is_read_only)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+
+    ASSERT_EQ(fs->writeFile("/sys/class/net/wlan0/ip", "1.2.3.4", 7),
+              (int)STORAGE_ERROR_READ_ONLY);
+
+    uint16_t perms = 0;
+    ASSERT_TRUE(fs->getFileAttr("/sys/class/net/wlan0/ip", FILE_ATTR_PERMS,
+                                &perms, sizeof(perms)) > 0);
+    ASSERT_EQ(perms, (uint16_t)0444);
+}
+
+TEST(sysfs, a_gpio_leaf_is_still_writable)
+{
+    VfsDispatcher *fs = mountedVfs();
+
+    uint16_t perms = 0;
+    ASSERT_TRUE(fs->getFileAttr("/sys/class/gpio/2/value", FILE_ATTR_PERMS,
+                                &perms, sizeof(perms)) > 0);
+    ASSERT_EQ(perms, (uint16_t)0666);
 }

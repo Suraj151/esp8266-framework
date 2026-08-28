@@ -42,5 +42,12 @@ created Date    : 1st June 2019
 #endif
 #define MAX_FACTORY_RESET_CALLBACKS	MAX_SCHEDULABLE_TASKS
 
+/**
+ * highest task id handed out before ids start again from one
+ */
+#ifndef MAX_TASK_ID
+#define MAX_TASK_ID	32000
+#endif
+
 
 #endif

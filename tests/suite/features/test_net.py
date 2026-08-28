@@ -215,6 +215,12 @@ def date_utc(t):
 @test("net scansta scans and reports the wifi networks in range", needs=("net",), slow=True)
 def net_scansta(t):
     import re
+
+    # a target that is not itself on wifi has no radio to scan with, and a
+    # count of zero from one of those says nothing about the scan
+    if "netstatus - 1" not in t.run("net ip"):
+        raise Skip("this target has no wifi station to scan from")
+
     out = t.run("net scansta", timeout=30)
     expect_in("Found networks", out, "the scan reports its result")
 
@@ -228,6 +234,7 @@ def net_scansta(t):
 @test("date prints a custom strftime format", needs=("date",))
 def date_custom_format(t):
     import re
+    a_synced_clock(t)
     out = t.run("date +%Y")
     if not re.search(r"20\d\d", out):
         raise AssertionError("date +%%Y did not print a year: %r" % out)

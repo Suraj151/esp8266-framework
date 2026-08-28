@@ -101,6 +101,89 @@ created Date    : 1st June 2019
 
 #ifdef ENABLE_STORAGE_SERVICE
 /**
+ * Whether something has claimed the session input descriptor, meaning a
+ * command given no file still has somewhere to read from.
+ */
+static inline bool isInputRedirected(){
+	session_t *s = SessionManager::current();
+	return ( nullptr != s && nullptr != s->m_fdtable &&
+			 nullptr != s->m_fdtable->m_fds[PDI_FD_STDIN] );
+}
+
+/**
+ * Feeds a command its input in blocks, from the named file when one was given
+ * and from the input descriptor otherwise.
+ */
+static inline int readCommandInput(const pdiutil::string &path, iTerminalInterface *term,
+								   pdiutil::function<bool(char*, uint32_t)> sink,
+								   uint16_t blocksize = 250){
+
+	if( !path.empty() ){
+		return __i_fs.readFile(path.c_str(), blocksize, sink);
+	}
+
+	if( nullptr == term ){
+		return -1;
+	}
+
+	char block[64];
+	int total = 0;
+
+	while( term->available() > 0 ){
+
+		int32_t got = term->read((uint8_t*)block, sizeof(block));
+		if( got <= 0 ){
+			break;
+		}
+
+		total += (int)got;
+		if( !sink(block, (uint32_t)got) ){
+			break;
+		}
+	}
+
+	return total;
+}
+
+/**
+ * Feeds a command its input one line at a time, from the named file when one
+ * was given and from the input descriptor otherwise.
+ */
+static inline int readCommandLines(const pdiutil::string &path, iTerminalInterface *term,
+								   pdiutil::function<bool(const pdiutil::string&)> online){
+
+	pdiutil::string line;
+	bool wanted = true;
+
+	int total = readCommandInput(path, term, [&](char *data, uint32_t size)->bool{
+
+		for( uint32_t i = 0; i < size && wanted; i++ ){
+
+			if( '\n' != data[i] ){
+				line += data[i];
+				continue;
+			}
+
+			if( !line.empty() && '\r' == line.back() ){
+				line.pop_back();
+			}
+
+			wanted = online(line);
+			line.clear();
+		}
+
+		return wanted;
+	});
+
+	// a stream that ended without a terminator still holds one whole line
+	if( total >= 0 && wanted && !line.empty() ){
+		online(line);
+	}
+
+	return total;
+}
+
+/**
  * Resolve a raw path argument against the session PWD. Absolute args
  * (leading '/') are taken as-is; relative args are joined with PWD.
  */

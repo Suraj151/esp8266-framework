@@ -17,7 +17,7 @@ missing. The refusal test needs neither and runs wherever paramiko does.
 import os
 import time
 
-from .registry import test, expect_in, Skip
+from .registry import test, expect_in, Skip, ssh_port
 
 
 def ssh_client(t, attempts=3):
@@ -34,7 +34,7 @@ def ssh_client(t, attempts=3):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            client.connect(t.address(), port=22, username=t.username,
+            client.connect(t.address(), port=ssh_port(t), username=t.username,
                            password=t.password, timeout=45, banner_timeout=45,
                            auth_timeout=45, allow_agent=False, look_for_keys=False)
             return client

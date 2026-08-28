@@ -14,6 +14,8 @@ created Date    : 16th Aug 2026
 #include <ShellHarness.h>
 #include <utility/TaskScheduler.h>
 #include <pditest.h>
+#include <vector>
+#include <cctype>
 
 using pditest::saw;
 
@@ -105,6 +107,66 @@ TEST(cmdproc, a_cleared_task_leaves_the_listing)
     ASSERT_FALSE(saw(shell.run("ps"), "transient"));
 }
 
+/**
+ * @brief The whitespace separated columns of a ps row.
+ */
+static std::vector<std::string> psColumns(const std::string &row)
+{
+    std::vector<std::string> columns;
+    size_t at = 0;
+
+    while (at < row.length())
+    {
+        while (at < row.length() && isspace((unsigned char)row[at])) at++;
+        if (at >= row.length()) break;
+
+        size_t stop = at;
+        while (stop < row.length() && !isspace((unsigned char)row[stop])) stop++;
+
+        columns.push_back(row.substr(at, stop - at));
+        at = stop;
+    }
+
+    return columns;
+}
+
+TEST(cmdproc, a_ps_row_carries_each_value_in_its_own_column)
+{
+    pditest::Shell shell;
+    pdiutil::task_id_t id = parkTask("columned", 5);
+
+    std::vector<std::string> columns = psColumns(psRow(shell, "columned"));
+
+    // PID OWN ST PRI NI POL %CPU RUNS INTVL NAME — a field read at the wrong
+    // index in the stat line lands here as a value under the wrong heading
+    ASSERT_EQ((int)columns.size(), 10);
+    ASSERT_STREQ(columns[1].c_str(), "5");
+    ASSERT_STREQ(columns[4].c_str(), "0");
+    ASSERT_STREQ(columns[9].c_str(), "columned");
+    ASSERT_TRUE(columns[6].find('.') != std::string::npos);
+
+    release(id);
+    reap();
+}
+
+TEST(cmdproc, a_ps_row_names_the_pid_its_proc_directory_carries)
+{
+    pditest::Shell shell;
+    pdiutil::task_id_t id = parkTask("pidmatch");
+
+    std::vector<std::string> columns = psColumns(psRow(shell, "pidmatch"));
+    ASSERT_TRUE(columns.size() >= 1);
+
+    pdiutil::string path("/proc/");
+    path += columns[0].c_str();
+    path += "/cmdline";
+
+    ASSERT_TRUE(saw(shell.run((pdiutil::string("cat ") + path).c_str()), "pidmatch"));
+
+    release(id);
+    reap();
+}
+
 TEST(cmdproc, ps_can_be_filtered_by_owner)
 {
     pditest::Shell shell;
@@ -114,6 +176,38 @@ TEST(cmdproc, ps_can_be_filtered_by_owner)
     std::string out = shell.run("ps 1");
     ASSERT_TRUE(saw(out, "ownedbyone"));
     ASSERT_FALSE(saw(out, "ownedbytwo"));
+
+    release(mine);
+    release(theirs);
+    reap();
+}
+
+TEST(cmdproc, a_filtered_listing_counts_only_what_it_shows)
+{
+    pditest::Shell shell;
+    pdiutil::task_id_t mine = parkTask("countedone", 1);
+    pdiutil::task_id_t theirs = parkTask("countedtwo", 2);
+
+    std::string out = shell.run("ps 1");
+
+    // the summary line counts tasks; filtered, it must not report the whole
+    // table while listing one row of it
+    size_t at = out.find(" tasks,");
+    ASSERT_TRUE(at != std::string::npos);
+
+    size_t begin = out.rfind(' ', at - 1);
+    ASSERT_TRUE(begin != std::string::npos);
+    std::string counted = out.substr(begin + 1, at - begin - 1);
+
+    size_t rows = 0;
+    for (size_t seek = out.find("countedone"); seek != std::string::npos;
+         seek = out.find("countedone", seek + 1))
+    {
+        rows++;
+    }
+
+    ASSERT_STREQ(counted.c_str(), "1");
+    ASSERT_EQ((int)rows, 1);
 
     release(mine);
     release(theirs);

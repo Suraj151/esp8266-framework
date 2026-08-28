@@ -63,6 +63,7 @@ created Date    : 1st June 2019
 #include "commands/HeadFSCommand.h"
 #include "commands/TailFSCommand.h"
 #include "commands/GrepFSCommand.h"
+#include "ShellParser.h"
 
 
 #ifdef ENABLE_STORAGE_SERVICE
@@ -121,6 +122,25 @@ private:
 
 	int16_t getCommandWaitingForUserInput();
 	cmd_t* getCommandToExecute(const char *cmdname);
+#ifdef ENABLE_STORAGE_SERVICE
+	/**
+	 * Points the session output descriptor at the redirect target, resolved
+	 * against the working directory. False when the file will not open.
+	 */
+	bool openRedirect(const pdiutil::string &target, bool append);
+
+	/**
+	 * Points the session input descriptor at the named file, resolved against
+	 * the working directory. False when the file will not open.
+	 */
+	bool openSource(const pdiutil::string &source);
+
+	/**
+	 * Runs every stage in turn, carrying each one's output into the next
+	 * through a pipe and sending the last one to the target or the terminal.
+	 */
+	cmd_result_t runPipeline(const char *line, const ShellParser::Line &parsed);
+#endif
 	cmd_t* getActiveCommandByName(const char* _cmd);
 };
 

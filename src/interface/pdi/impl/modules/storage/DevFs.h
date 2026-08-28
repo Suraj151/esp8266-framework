@@ -81,17 +81,17 @@ public:
   uint64_t getUsedSize() override { return 0; }
   uint64_t getFreeSize() override { return 0; }
 
-  pdiutil::string getPWD() const override { return pdiutil::string("/dev"); }
+  pdiutil::string getPWD() const override { return pdiutil::string(DEV_MOUNT_PREFIX); }
   bool setPWD(const char *path) override { return false; }
-  pdiutil::string getLastPWD() const override { return pdiutil::string("/dev"); }
+  pdiutil::string getLastPWD() const override { return pdiutil::string(DEV_MOUNT_PREFIX); }
 
   void appendFileSeparator(char *path) override {}
   void appendFileSeparator(pdiutil::string &path) override {}
   bool updatePathNotations(const char *path, pdiutil::string &updatedpath) override { return false; }
   bool changeDirectory(const char *path) override { return false; }
-  const char *getRootDirectory() const override { return "/dev"; }
-  const char *getHomeDirectory() const override { return "/dev"; }
-  const char *getTempDirectory() const override { return "/dev"; }
+  const char *getRootDirectory() const override { return DEV_MOUNT_PREFIX; }
+  const char *getHomeDirectory() const override { return DEV_MOUNT_PREFIX; }
+  const char *getTempDirectory() const override { return DEV_MOUNT_PREFIX; }
   bool setHomeDirectory(pdiutil::string &homedir) override { return false; }
 
   mimetype_t getFileMimeType(const pdiutil::string &path) override { return MIME_TYPE_TEXT_PLAIN; }
@@ -127,7 +127,8 @@ private:
   const char *normalizePath(const char *path) const;
   int streamFill(bool random, uint64_t size,
                  pdiutil::function<bool(char *, uint32_t)> readbackfn,
-                 uint64_t offset);
+                 uint64_t offset, const char *readUntilMatchStr = nullptr,
+                 bool *didmatchfound = nullptr);
 };
 
 extern DevFs __i_devfs;

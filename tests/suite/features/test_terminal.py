@@ -272,11 +272,6 @@ def interrupt_waiting_command(t):
 
     t.shell.answer("su", "user: ", t.timeout)
 
-    # the target discards pending input shortly after printing a prompt, so an
-    # interrupt sent immediately is thrown away rather than delivered; see the
-    # destructive flush noted in the plan
-    t.shell.drain(0.8, 5.0)
-
     t.shell.send_raw(CTRL_C)
     out = t.shell.drain(0.6, 8.0)
 
@@ -306,3 +301,24 @@ def cls_clears_screen(t):
     settle(t)
     t.run("cls")
     expect_in("/", t.run("pwd"), "the shell is usable after cls")
+
+
+@test("a line typed while a command runs is not discarded", needs=("ps", "echo"))
+def type_ahead_survives_a_command(t):
+    """
+    Both lines leave in one write, so the second arrives while the first is
+    still running. A target that discards unread input on its way back to the
+    prompt loses it, and the operator's next line vanishes with no sign.
+    """
+    settle(t)
+
+    t.shell.send_raw("ps\n" "echo aheadmark\n")
+    seen = t.shell.drain(1.0, max(t.timeout, 20.0))
+
+    expect_in("aheadmark", seen, "the line typed while ps ran")
+
+    # once as the echo of what was typed, once as what echo printed
+    if seen.count("aheadmark") < 2:
+        raise AssertionError("the second line was read but never ran")
+
+    settle(t)

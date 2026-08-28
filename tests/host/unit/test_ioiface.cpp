@@ -12,7 +12,7 @@ created Date    : 16th Aug 2026
 ******************************************************************************/
 
 #include <StringTerminal.h>
-#include <devices/mockdevice/SerialInterface.h>
+#include <devices/posix/SerialInterface.h>
 #include <pditest.h>
 
 #include <unistd.h>

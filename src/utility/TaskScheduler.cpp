@@ -22,7 +22,8 @@ Created Date    : 1st June 2019
  */
 TaskScheduler::TaskScheduler() : m_util(nullptr),
                                  m_max_tasks(MAX_SCHEDULABLE_TASKS),
-                                 m_rebase_start_priotask(false)
+                                 m_rebase_start_priotask(false),
+                                 m_next_task_id(1)
 {
     // the table is sized once and never grown or compacted after this, so a
     // slot never moves and a running task keeps the callable it is executing.
@@ -687,8 +688,14 @@ bool TaskScheduler::remove_task(pdiutil::task_id_t _id)
  */
 pdiutil::task_id_t TaskScheduler::get_unique_task_id()
 {
-    for (pdiutil::task_id_t _id = 1; _id < this->m_max_tasks; _id++)
+    // ids advance instead of refilling the lowest gap, so the id of a task that
+    // has gone is not handed straight to the next one registered, and a caller
+    // still holding it updates nothing rather than another task
+    for (uint16_t _attempt = 0; _attempt <= (uint16_t)this->m_max_tasks; _attempt++)
     {
+        pdiutil::task_id_t _id = this->m_next_task_id;
+        this->m_next_task_id = (_id >= MAX_TASK_ID) ? 1 : (pdiutil::task_id_t)(_id + 1);
+
         bool _id_used = false;
         for (uint16_t i = 0; i < this->m_tasks.size(); i++)
         {
@@ -755,115 +762,6 @@ void TaskScheduler::setUtilityInterface(iUtilityInterface *util)
 void TaskScheduler::rebaseAndRestartPrioTasks()
 {
     m_rebase_start_priotask = true;
-}
-
-/**
- * @brief Prints all registered tasks to the terminal.
- *
- * @param terminal Pointer to the terminal interface.
- */
-void TaskScheduler::printPsToTerminal(iTerminalInterface *terminal, uint8_t filter_owner)
-{
-    if (nullptr == terminal || nullptr == m_util) return;
-
-    uint64_t now = m_util->millis_now();
-    uint16_t shown = 0;
-    for (uint16_t i = 0; i < this->m_tasks.size(); i++)
-    {
-        if (this->m_tasks[i].m_task_id < 0) continue; // free slot
-        if (filter_owner != 0xFF && this->m_tasks[i].m_owner != filter_owner) continue;
-        shown++;
-    }
-
-    char content[24];
-
-    terminal->writeln();
-    terminal->write_ro(RODT_ATTR("top - up "));
-    Int64ToString((int64_t)(now / 1000), content, 24, 0);
-    terminal->write(content);
-    terminal->write_ro(RODT_ATTR("s, "));
-    Int32ToString((int32_t)shown, content, 24, 0);
-    terminal->write(content);
-    terminal->write_ro(RODT_ATTR(" tasks, "));
-    Int32ToString((int32_t)m_util->get_free_heap(), content, 24, 0);
-    terminal->write(content);
-    terminal->writeln_ro(RODT_ATTR(" bytes free heap"));
-
-    terminal->write_ro(RODT_ATTR("PID  "));
-    terminal->write_ro(RODT_ATTR("OWN  "));
-    terminal->write_ro(RODT_ATTR("ST  "));
-    terminal->write_ro(RODT_ATTR("PRI  "));
-    terminal->write_ro(RODT_ATTR("NI   "));
-    terminal->write_ro(RODT_ATTR("POL  "));
-    terminal->write_ro(RODT_ATTR("%CPU   "));
-    terminal->write_ro(RODT_ATTR("RUNS      "));
-    terminal->write_ro(RODT_ATTR("INTVL     "));
-    terminal->writeln_ro(RODT_ATTR("NAME"));
-
-    static const char _state_letters[]  = "rSTZ"; // READY(r), RUNNING(R via override below), SLEEPING(S), STOPPED(T), ZOMBIE(Z)
-    static const char _policy_letters[] = "FRDS"; // FIFO, ROUNDROBIN, DEADLINE, FAIRSHARE
-
-    for (uint16_t i = 0; i < this->m_tasks.size(); i++)
-    {
-        task_t &t = this->m_tasks[i];
-        if (t.m_task_id < 0) continue; // free slot
-        if (filter_owner != 0xFF && t.m_owner != filter_owner) continue;
-
-        Int32ToString(t.m_task_id, content, 24, 5);
-        terminal->write(content);
-
-        Int32ToString(t.m_owner, content, 24, 5);
-        terminal->write(content);
-
-        char stletter;
-        switch (t.m_state) {
-            case TASK_STATE_RUNNING:  stletter = 'R'; break;
-            case TASK_STATE_SLEEPING: stletter = 'S'; break;
-            case TASK_STATE_STOPPED:  stletter = 'T'; break;
-            case TASK_STATE_ZOMBIE:   stletter = 'Z'; break;
-            default:                  stletter = 'r'; break;
-        }
-        content[0] = stletter; content[1] = ' '; content[2] = ' '; content[3] = ' '; content[4] = '\0';
-        terminal->write(content);
-
-        Int32ToString(t.m_task_priority, content, 24, 5);
-        terminal->write(content);
-
-        Int32ToString(t.m_nice, content, 24, 5);
-        terminal->write(content);
-
-        char polletter = (t.m_task_policy < 4) ? _policy_letters[t.m_task_policy] : '?';
-        content[0] = polletter; content[1] = ' '; content[2] = ' '; content[3] = ' '; content[4] = ' '; content[5] = '\0';
-        terminal->write(content);
-
-        uint64_t elapsed_ms = (now > t.m_created_ms) ? (now - t.m_created_ms) : 1;
-        uint64_t cpu_x100 = (t.m_total_exec_us * 10ULL) / elapsed_ms;
-        if (cpu_x100 > 99999ULL) cpu_x100 = 99999ULL;
-        uint32_t whole = (uint32_t)(cpu_x100 / 100);
-        uint32_t frac  = (uint32_t)(cpu_x100 % 100);
-        uint8_t wd = (whole >= 100) ? 3 : (whole >= 10) ? 2 : 1;
-        Int32ToString((int32_t)whole, content, 24, 0);
-        content[wd]     = '.';
-        content[wd + 1] = '0' + (char)(frac / 10);
-        content[wd + 2] = '0' + (char)(frac % 10);
-        uint8_t total = wd + 3;
-        while (total < 7) content[total++] = ' ';
-        content[total] = '\0';
-        terminal->write(content);
-
-        Int32ToString((int32_t)t.m_run_count, content, 24, 10);
-        terminal->write(content);
-
-        Int64ToString(t.m_duration, content, 24, 10);
-        terminal->write(content);
-
-        if (nullptr != t.m_name) {
-            terminal->write_ro(t.m_name);
-        } else {
-            terminal->write_ro(RODT_ATTR("-"));
-        }
-        terminal->writeln();
-    }
 }
 
 /**

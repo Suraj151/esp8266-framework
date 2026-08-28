@@ -12,6 +12,7 @@ created Date    : 19th July 2026
 #define _PS_COMMAND_H_
 
 #include "CommandCommon.h"
+#include <helpers/ProcHelper.h>
 
 /**
  * ps command — snapshot of scheduler tasks.
@@ -61,7 +62,7 @@ struct PsCommand : public CommandBase {
 			filter_owner = (uint8_t)StringToUint16(ucmdoptn->optionval, ucmdoptn->optionvalsize);
 		}
 
-		__task_scheduler.printPsToTerminal(m_terminal, filter_owner);
+		printProcessTable(m_terminal, filter_owner);
 		return CMD_RESULT_OK;
 	}
 };

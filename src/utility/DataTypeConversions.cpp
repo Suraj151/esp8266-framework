@@ -780,3 +780,23 @@ int32_t MapRange(int32_t value, int32_t fromlow, int32_t fromhigh, int32_t tolow
     int64_t span = (int64_t)(value - fromlow) * (int64_t)(tohigh - tolow);
     return (int32_t)(span / (int64_t)(fromhigh - fromlow)) + tolow;
 }
+
+/**
+ * @brief Names a mounted filesystem's type.
+ * @param type The type recorded on the mount.
+ * @return A read-only label, "unknown" for a type with no name.
+ */
+const char *VfsTypeToString(vfs_type_t type)
+{
+    switch (type)
+    {
+    case VFS_TYPE_LITTLEFS: return RODT_ATTR("littlefs");
+    case VFS_TYPE_SPIFFS:   return RODT_ATTR("spiffs");
+    case VFS_TYPE_SD:       return RODT_ATTR("sd");
+    case VFS_TYPE_TMPFS:    return RODT_ATTR("tmpfs");
+    case VFS_TYPE_PROCFS:   return RODT_ATTR("procfs");
+    case VFS_TYPE_SYSFS:    return RODT_ATTR("sysfs");
+    case VFS_TYPE_DEVFS:    return RODT_ATTR("devfs");
+    default:                return RODT_ATTR("unknown");
+    }
+}

@@ -14,6 +14,12 @@ created Date    : 1st June 2019
 
 #include "CommandLineServiceProvider.h"
 #include <service_provider/session/SessionManager.h>
+#ifdef ENABLE_STORAGE_SERVICE
+#include <service_provider/session/FileWriteStream.h>
+#include <service_provider/session/FileReadStream.h>
+#include <service_provider/session/PipeStream.h>
+#include <utility/SafeAlloc.h>
+#endif
 
 
 /**
@@ -413,7 +419,7 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
             // }
           }
         }
-      }else{
+      }else if( (uint8_t)c >= 0x20 && 0xFF != (uint8_t)c ){
 
         //terminal->write(c);  // echo
 
@@ -698,12 +704,34 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
       res = m_cmdlist[waitingCmdIndex]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
     }else{
 
+      #if defined(ENABLE_STORAGE_SERVICE)
+      ShellParser::Line parsed = ShellParser::parse(cmd->c_str(), cmd->size());
+
+      if( parsed.m_malformed ){
+
+        m_terminal->writeln();
+        m_terminal->writeln_ro(RODT_ATTR("syntax error"));
+        res = CMD_RESULT_ARGS_ERROR;
+      }else if( parsed.isPlain() ){
+
+        cmd_t* cmd_to_exec = getCommandToExecute(cmd->c_str());
+
+        if(nullptr != cmd_to_exec){
+
+          res = cmd_to_exec->executeCommand((char*)cmd->c_str(), cmd->size());
+        }
+      }else{
+
+        res = runPipeline(cmd->c_str(), parsed);
+      }
+      #else
       cmd_t* cmd_to_exec = getCommandToExecute(cmd->c_str());
 
       if(nullptr != cmd_to_exec){
 
         res = cmd_to_exec->executeCommand((char*)cmd->c_str(), cmd->size());
       }
+      #endif
     }
 
     // for (int16_t i = 0; !is_executing_lastcommand && i < m_cmdlist.size(); i++){
@@ -1038,6 +1066,160 @@ int16_t CommandLineServiceProvider::getCommandWaitingForUserInput(){
   return PDI_ERR_FAILURE;
 }
 
+#ifdef ENABLE_STORAGE_SERVICE
+/**
+ * Points the session output descriptor at the redirect target, resolved
+ * against the working directory. False when the file will not open.
+ */
+bool CommandLineServiceProvider::openRedirect(const pdiutil::string &target, bool append){
+
+  pdiutil::string path = resolveArgPathStr(target.c_str(), (int16_t)target.size());
+
+  if( path.size() == 0 ){
+    return false;
+  }
+
+  FileWriteStream *sink = pdiutil::safe_new<FileWriteStream>(path.c_str(), append);
+
+  if( nullptr == sink || !sink->isValid() ){
+    pdiutil::safe_delete(sink);
+    return false;
+  }
+
+  if( !SessionManager::setFd(PDI_FD_STDOUT, sink, true) ){
+    pdiutil::safe_delete(sink);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Points the session input descriptor at the named file, resolved against the
+ * working directory. False when the file will not open.
+ */
+bool CommandLineServiceProvider::openSource(const pdiutil::string &source){
+
+  pdiutil::string path = resolveArgPathStr(source.c_str(), (int16_t)source.size());
+
+  if( path.size() == 0 ){
+    return false;
+  }
+
+  FileReadStream *src = pdiutil::safe_new<FileReadStream>(path.c_str());
+
+  if( nullptr == src || !src->isValid() ){
+    pdiutil::safe_delete(src);
+    return false;
+  }
+
+  if( !SessionManager::setFd(PDI_FD_STDIN, src, true) ){
+    pdiutil::safe_delete(src);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Runs every stage in turn, carrying each one's output into the next through
+ * a pipe and sending the last one to the target or the terminal.
+ */
+cmd_result_t CommandLineServiceProvider::runPipeline(const char *line, const ShellParser::Line &parsed){
+
+  cmd_result_t res = CMD_RESULT_MAX;
+  PipeStream *carry = nullptr;
+  bool redirected = false;
+  uint16_t last = (uint16_t)(parsed.m_stages.size() - 1);
+
+  for( uint16_t i = 0; i < parsed.m_stages.size(); i++ ){
+
+    SessionManager::closeFd(PDI_FD_STDIN);
+    SessionManager::closeFd(PDI_FD_STDOUT);
+
+    if( nullptr != carry ){
+      SessionManager::setFd(PDI_FD_STDIN, carry, false);
+    }else if( 0 == i && parsed.m_sourced && !openSource(parsed.m_inpath) ){
+
+      m_terminal->writeln();
+      m_terminal->write_ro(RODT_ATTR("cannot open "));
+      m_terminal->writeln(parsed.m_inpath.c_str());
+      SessionManager::resetStdio();
+      return CMD_RESULT_ARGS_ERROR;
+    }
+
+    PipeStream *outpipe = nullptr;
+
+    if( i < last ){
+
+      outpipe = pdiutil::safe_new<PipeStream>();
+
+      if( nullptr == outpipe || !outpipe->isValid() ){
+        pdiutil::safe_delete(outpipe);
+        pdiutil::safe_delete(carry);
+        m_terminal->writeln();
+        m_terminal->writeln_ro(RODT_ATTR("cannot open pipe"));
+        SessionManager::resetStdio();
+        return CMD_RESULT_FAILED;
+      }
+
+      SessionManager::setFd(PDI_FD_STDOUT, outpipe, false);
+    }else if( parsed.m_redirected ){
+
+      if( !openRedirect(parsed.m_outpath, parsed.m_append) ){
+
+        pdiutil::safe_delete(carry);
+        m_terminal->writeln();
+        m_terminal->write_ro(RODT_ATTR("cannot open "));
+        m_terminal->writeln(parsed.m_outpath.c_str());
+        SessionManager::resetStdio();
+        return CMD_RESULT_ARGS_ERROR;
+      }
+
+      redirected = true;
+    }
+
+    const char *stage = line + parsed.m_stages[i].m_start;
+    cmd_t* cmd_to_exec = getCommandToExecute(stage);
+
+    res = CMD_RESULT_MAX;
+    if( nullptr != cmd_to_exec ){
+      res = cmd_to_exec->executeCommand((char*)stage, parsed.m_stages[i].m_len);
+    }
+
+    pdiutil::safe_delete(carry);
+    carry = outpipe;
+
+    // a stage that stopped early leaves the rest of the pipeline nothing
+    // worth running
+    if( CMD_RESULT_INCOMPLETE == res ){
+      break;
+    }
+  }
+
+  pdiutil::safe_delete(carry);
+
+  // storage says whether it took the write only when the last block is
+  // committed, so the target is closed here rather than left to the reset,
+  // which has nowhere to report a refusal
+  if( redirected ){
+
+    iTerminalInterface *sink = SessionManager::getFd(PDI_FD_STDOUT);
+
+    if( nullptr != sink && sink->disconnect() < 0 ){
+
+      m_terminal->writeln();
+      m_terminal->write_ro(RODT_ATTR("cannot write "));
+      m_terminal->writeln(parsed.m_outpath.c_str());
+      res = CMD_RESULT_FAILED;
+    }
+  }
+
+  SessionManager::resetStdio();
+  return res;
+}
+#endif
+
 /**
  * @brief Mark command to be execute and add it in cmdlist for further operations
  */
@@ -1047,8 +1229,11 @@ cmd_t* CommandLineServiceProvider::getCommandToExecute(const char *cmdname){
 
   if(nullptr != cmd_to_exec){
 
-    cmd_to_exec->SetTerminal(m_terminal);
-    cmd_to_exec->m_owner = SessionManager::current();
+    session_t *owner = SessionManager::current();
+    SessionStdio *io = SessionManager::stdioFor(owner);
+
+    cmd_to_exec->SetTerminal(nullptr != io ? (iTerminalInterface *)io : m_terminal);
+    cmd_to_exec->m_owner = owner;
     m_cmdlist.push_back(cmd_to_exec);
   }
 

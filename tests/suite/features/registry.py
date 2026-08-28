@@ -51,6 +51,21 @@ def expect_any(needles, haystack, what):
         raise AssertionError("%s: expected one of %r in:\n%s" % (what, needles, haystack))
 
 
+def ssh_port(t):
+    """
+    The port the target's ssh server is really on.
+
+    A board serves 22. A host process cannot bind a privileged port and moves
+    to a shadow, so asking 22 there reaches the developer machine's own sshd
+    and tests it instead of the target.
+    """
+    probe = getattr(t.shell, "is_listening", None)
+    found = probe(22) if probe is not None else 22
+    if not found:
+        raise Skip("the target has no ssh listener to probe")
+    return found
+
+
 class Test(object):
 
     def __init__(self, feature, name, fn, needs, mounts, services, su, slow):

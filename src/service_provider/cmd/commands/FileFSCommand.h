@@ -64,14 +64,14 @@ struct FileReadCommand : public CommandBase {
 			// Get first option which must be the filename to read
 			CommandOption *cmdoptn = &m_options[0];
 			pdiutil::string filename = resolveArgPath(cmdoptn);
-			if( !filename.empty() ){
+			if( !filename.empty() || isInputRedirected() ){
 
 				m_terminal->putln();
-				int iStatus = __i_fs.readFile(filename.c_str(), 10, [&](char* data, uint32_t size)->bool{
+				int iStatus = readCommandInput(filename, m_terminal, [&](char* data, uint32_t size)->bool{
 					m_terminal->write(data, size);
 					// return true to continue reading
 					return true;
-				});
+				}, 10);
 
 				if (iStatus < 0) {
 					result = CMD_RESULT_FAILED;

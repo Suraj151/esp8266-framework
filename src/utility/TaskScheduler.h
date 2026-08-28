@@ -280,18 +280,6 @@ public:
     void rebaseAndRestartPrioTasks();
 
     /**
-     * @brief Prints a POSIX-style ps view of registered tasks to the terminal.
-     *
-     * State letters: R=running, S=sleeping, T=stopped, Z=zombie.
-     * Policy letters: F=fifo, R=roundrobin, D=deadline, S=fairshare.
-     * %CPU is a lifetime average of total exec time over elapsed since registration.
-     *
-     * @param terminal Pointer to the terminal interface.
-     * @param filter_owner Session id to filter by (0xFF = show all).
-     */
-    void printPsToTerminal(iTerminalInterface *terminal, uint8_t filter_owner = 0xFF);
-
-    /**
      * @brief Base class api to yield the running task.
      * Currently handling device specific yield not switching context as this is under cooperative schedule context.
      */
@@ -362,6 +350,12 @@ private:
      * @brief Break the task execution, sort with priorities and restart the task queue.
      */
     bool m_rebase_start_priotask;
+
+    /**
+     * @var pdiutil::task_id_t m_next_task_id
+     * @brief Id to hand to the next task registered, advancing rather than refilling gaps.
+     */
+    pdiutil::task_id_t m_next_task_id;
 };
 
 /**

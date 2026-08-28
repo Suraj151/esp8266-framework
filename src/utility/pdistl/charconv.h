@@ -31,7 +31,7 @@ namespace __detail
     __to_chars_len(_Tp __value, int __base = 10) noexcept
     {
       static_assert(__is_integer<_Tp>::value, "implementation bug");
-      static_assert(__is_unsigned<_Tp>::value, "implementation bug");
+      static_assert(__is_unsigned_type<_Tp>::value, "implementation bug");
 
       unsigned __n = 1;
       const unsigned __b2 = __base  * __base;
@@ -56,7 +56,7 @@ namespace __detail
     __to_chars_10_impl(char* __first, unsigned __len, _Tp __val) noexcept
     {
       static_assert(__is_integer<_Tp>::value, "implementation bug");
-      static_assert(__is_unsigned<_Tp>::value, "implementation bug");
+      static_assert(__is_unsigned_type<_Tp>::value, "implementation bug");
 
       static constexpr char __digits[201] =
 	"0001020304050607080910111213141516171819"

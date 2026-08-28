@@ -21,6 +21,9 @@ created Date    : 16th Aug 2026
 #include <service_provider/cmd/CommandLineServiceProvider.h>
 #include <service_provider/session/SessionManager.h>
 #include <service_provider/user/UserStoreService.h>
+#if defined(ENABLE_NETWORK_SERVICE) && defined(ENABLE_WIFI_SERVICE)
+#include <interface/pdi/impl/modules/netif/WiFiNetif.h>
+#endif
 #include <string>
 
 namespace pditest
@@ -86,6 +89,27 @@ namespace pditest
 
         __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
         __task_scheduler.setMaxTasksLimit(MAX_SCHEDULABLE_TASKS);
+    }
+
+    /**
+     * @brief Put the wifi interfaces in the netif registry, the way boot does.
+     *
+     * PdiStack::initialize registers them right after the wifi service starts.
+     * Without it the registry is empty, so /sys/class/net has no interfaces to
+     * list and /proc/net/route has nothing to route.
+     */
+    inline void readyNetifs()
+    {
+#if defined(ENABLE_NETWORK_SERVICE) && defined(ENABLE_WIFI_SERVICE)
+        static bool done = false;
+        if (done)
+        {
+            return;
+        }
+        done = true;
+
+        registerWiFiNetifs();
+#endif
     }
 
     class Shell
@@ -169,6 +193,24 @@ namespace pditest
             ServiceProvider::setTerminal(&m_terminal);
             m_terminal.forget();
             m_terminal.feed(keys);
+
+            while (m_terminal.available() > 0)
+            {
+                m_result = __cmd_service.processTerminalInput(&m_terminal);
+            }
+
+            return m_terminal.captured();
+        }
+
+        /**
+         * @brief Type raw bytes, for input a terminated string cannot carry.
+         */
+        std::string type(const uint8_t *bytes, size_t len)
+        {
+            SessionManager::setCurrent(m_session);
+            ServiceProvider::setTerminal(&m_terminal);
+            m_terminal.forget();
+            m_terminal.feed(bytes, len);
 
             while (m_terminal.available() > 0)
             {

@@ -187,6 +187,19 @@ int TmpFs::readFile(const char* path, uint64_t size, pdiutil::function<bool(char
 
     // `size` is the per-iteration chunk limit — loop until content is drained.
     uint32_t total = (uint32_t)data.length() - (uint32_t)offset;
+
+    // the count returned stops short of the match, so a caller stepping line by
+    // line adds the length of what it matched on to reach the next one
+    if (nullptr != readUntilMatchStr && '\0' != readUntilMatchStr[0]) {
+        int32_t at = __strstr(data.c_str() + offset, total, readUntilMatchStr,
+                              (uint32_t)strlen(readUntilMatchStr), 0);
+        if (at >= 0) {
+            total = (uint32_t)at;
+            if (nullptr != didmatchfound) *didmatchfound = true;
+            if (0 == total) return 0;
+        }
+    }
+
     uint32_t chunk = (size > 0 && size < total) ? (uint32_t)size : total;
     uint32_t done = 0;
     while (done < total) {

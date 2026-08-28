@@ -1,0 +1,144 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # the unit and system tiers, built against the mock device. the cmake build
+  # turns address and ub sanitizers on by default, so this job is also what
+  # keeps them running -- do not pass --no-sanitize here.
+  host-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake g++ python3
+
+      - name: report versions
+        run: |
+          cmake --version
+          g++ --version
+          python3 --version
+
+      # ubsan recovers by default: it prints a diagnostic and lets the process
+      # carry on, so a finding would leave the exit status at zero and pass.
+      # halt_on_error is what turns a finding into a failed job.
+      - name: run unit and system tiers
+        env:
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=0
+        run: python3 tests/run_tests.py --verbose
+
+  # the feature suites against pdid, the whole stack running as a host process
+  # and driven through its own shell. this is the only host job that exercises
+  # the transports, the portal and the shell grammar end to end.
+  feature-tier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake g++ python3 python3-pip
+
+      # imported lazily by the drivers, so the unit and system tiers stay
+      # stdlib-only and this is the one job that needs them
+      - name: install driver dependencies
+        run: python3 -m pip install --user paramiko cryptography pexpect
+
+      # pdid cannot bind 22/23/80 unprivileged and moves each to a shadow port;
+      # the drivers already look there first, so no privilege is needed here.
+      - name: run the feature suites against pdid
+        env:
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=0
+        run: python3 tests/run_tests.py --tier system --features --verbose
+
+  # the parsers a peer reaches before any credential is checked. this is a
+  # bounded smoke run, not a soak: it re-runs the saved corpus and then mutates
+  # for a minute per harness, which is enough to catch a regression that breaks
+  # an input already known to matter. a real hunt is a local run with a much
+  # larger --fuzz-seconds.
+  fuzz-tier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # libfuzzer ships with the clang runtime and gcc has no equivalent, so
+      # this is the one job that does not build with g++. the runtime is only a
+      # recommend of the clang package, and recommends are off here, so
+      # libclang-rt is named explicitly or -fsanitize=fuzzer finds no library.
+      - name: install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake clang libclang-rt-dev python3
+
+      - name: run the fuzz harnesses
+        run: python3 tests/run_tests.py --tier fuzz --fuzz-seconds 60 --verbose
+
+      - name: keep whatever was found
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-findings
+          path: tests/fuzz/findings/
+
+  # the three ports disagree on the c++ standard: arduinouno gnu++11, esp8266
+  # gnu++17, esp32 gnu++2a. shared headers have to hold at the gnu++11 floor and
+  # nothing else in the build checks that.
+  syntax-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        std: [gnu++11, gnu++17, gnu++2a]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ python3
+
+      # both ports: the mock layer the host tests use, and the same posix port
+      # without its test scaffolding. posix is the only real port a sweep can
+      # reach -- the others need their vendor sdk headers -- so it is what keeps
+      # the device-layer contract honest in ci.
+      - name: sweep src/ at ${{ matrix.std }}
+        run: python3 scripts/SyntaxSweep.py --std ${{ matrix.std }} --port mock --port posix
+
+  # a path behind #ifdef ENABLE_X only compiles when X is on, and the stock mock
+  # device turns every root service on. one standard is enough here: this axis is
+  # about the guards, not the language level.
+  flag-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [no-network, no-storage, no-auth, no-cmd, no-seal, minimal]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ python3
+
+      - name: sweep src/ with ${{ matrix.profile }}
+        run: python3 scripts/SyntaxSweep.py --std gnu++17 --profile ${{ matrix.profile }}

@@ -138,6 +138,14 @@ void BytesToHexString(const uint8_t *bytes, uint8_t bytelen, char *out);
 void FilePermsToString(uint16_t perms, bool isdir, char *out);
 
 /**
+ * @brief Names a mounted filesystem's type.
+ *
+ * @param type The type recorded on the mount.
+ * @return A read-only label, "unknown" for a type with no name.
+ */
+const char *VfsTypeToString(vfs_type_t type);
+
+/**
  * @brief Parses a hex string into a byte array.
  * @param hex Source hex string (2*bytelen characters, upper or lower case).
  * @param bytelen Number of bytes to decode.

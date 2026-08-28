@@ -11,12 +11,19 @@ created Date    : 1st June 2019
 #define _DEVICES_COMMON_CONFIG_H_
 
 /**
- * MOCK_DEVICE_TEST is set on the compiler command line by the test build. it
- * selects the mock device and leaves the generated device setup untouched.
+ * MOCK_DEVICE_TEST is set on the compiler command line by the test build. It
+ * selects the posix port and leaves the generated device setup untouched, so
+ * the tests run against the same port a host build ships.
  */
 #ifdef MOCK_DEVICE_TEST
+#ifndef DEVICE_POSIX
+#define DEVICE_POSIX
+#endif
+#endif
 
-#include "mockdevice/mockdevice_device_config.h"
+#ifdef DEVICE_POSIX
+
+#include "posix/posix_device_config.h"
 
 #else
 
@@ -35,10 +42,20 @@ created Date    : 1st June 2019
 #include "esp32/esp32_device_config.h"
 #elif defined(DEVICE_ARDUINOUNO)
 #include "arduinouno/arduinouno_device_config.h"
+#elif defined(DEVICE_POSIX)
+#include "posix/posix_device_config.h"
 #else
 #include "esp32/esp32_device_config.h"
 #endif
 
+#endif
+
+/**
+ * the user store keeps its accounts in /etc/passwd and /etc/shadow, so auth is
+ * only meaningful on a device that has the storage service.
+ */
+#if defined(ENABLE_AUTH_SERVICE) && !defined(ENABLE_STORAGE_SERVICE)
+#undef ENABLE_AUTH_SERVICE
 #endif
 
 /**
@@ -116,7 +133,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable ssh
  */
-#if defined(ENABLE_STORAGE_SERVICE)
+#if defined(ENABLE_STORAGE_SERVICE) && defined(ENABLE_AUTH_SERVICE)
 #define ENABLE_SSH_SERVICE
 #endif
 

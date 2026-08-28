@@ -18,4 +18,12 @@ created Date    : 19th August 2026
 #define TELNET_SHELL_IDLE_MS 180000
 #endif
 
+#ifndef TELNET_MAX_SESSIONS
+#define TELNET_MAX_SESSIONS 2
+#endif
+
+#ifndef TELNET_POOL_FULL_GRACE_MS
+#define TELNET_POOL_FULL_GRACE_MS 5000
+#endif
+
 #endif

@@ -43,8 +43,8 @@ namespace pdiutil {
     using pdistd::to_string;
 
     // Function type alias
-    template<typename _Res, typename... _ArgTypes>
-    using function = pdistd::function<_Res, _ArgTypes...>;
+    template<typename _Signature>
+    using function = pdistd::function<_Signature>;
 
 } // namespace pdiutil
 
@@ -683,6 +683,26 @@ enum file_type_t : uint8_t {
     FILE_TYPE_MAX
 };
 
+enum mimetype : uint8_t {
+    MIME_TYPE_TEXT_PLAIN,
+    MIME_TYPE_TEXT_HTML,
+    MIME_TYPE_TEXT_CSS,
+    MIME_TYPE_TEXT_JAVASCRIPT,
+    MIME_TYPE_TEXT_CSV,
+    MIME_TYPE_APPLICATION_JSON,
+    MIME_TYPE_APPLICATION_XML,
+    MIME_TYPE_APPLICATION_OCTET_STREAM,
+    MIME_TYPE_APPLICATION_PDF,
+    MIME_TYPE_APPLICATION_ZIP,
+    MIME_TYPE_APPLICATION_GZIP,
+    MIME_TYPE_APPLICATION_X_WWW_FORM_URLENCODED,
+    MIME_TYPE_IMAGE_GIF,
+    MIME_TYPE_IMAGE_JPEG,
+    MIME_TYPE_IMAGE_PNG,
+    MIME_TYPE_MAX
+};
+typedef enum mimetype mimetype_t;
+
 // Reserved custom-attribute IDs for PDI file metadata. Values 0 and >=
 // FILE_ATTR_USER_BASE are free for callers of setFileAttr to define their own.
 enum file_attr_id_t : uint8_t {
@@ -769,6 +789,56 @@ struct vfs_mount_t {
     vfs_type_t m_type;
 };
 
+/**
+ * @enum netif_kind_t
+ * @brief What sort of link a network interface carries.
+ */
+enum netif_kind_t : uint8_t {
+    NETIF_KIND_UNKNOWN = 0,
+    NETIF_KIND_WIFI_STA,
+    NETIF_KIND_WIFI_AP,
+    NETIF_KIND_ETHERNET,
+    NETIF_KIND_PPP,
+    NETIF_KIND_LOOPBACK,
+    NETIF_KIND_MAX
+};
+
+/**
+ * @struct netif_info_t
+ * @brief What a network interface currently is, as any reader would ask it.
+ */
+struct netif_info_t {
+    netif_info_t() : m_kind(NETIF_KIND_UNKNOWN), m_up(false), m_rssi(0) {
+        m_mac[0] = '\0';
+    }
+
+    char m_mac[18];
+    ipaddress_t m_ip;
+    ipaddress_t m_netmask;
+    ipaddress_t m_gateway;
+    pdiutil::string m_ssid;
+    netif_kind_t m_kind;
+    bool m_up;
+    int32_t m_rssi;
+};
+
+/**
+ * @struct netif_counters_t
+ * @brief Traffic a network interface has carried, when it can count it.
+ */
+struct netif_counters_t {
+    netif_counters_t() : m_rx_bytes(0), m_tx_bytes(0),
+                         m_rx_packets(0), m_tx_packets(0),
+                         m_rx_errors(0), m_tx_errors(0) {}
+
+    uint64_t m_rx_bytes;
+    uint64_t m_tx_bytes;
+    uint32_t m_rx_packets;
+    uint32_t m_tx_packets;
+    uint32_t m_rx_errors;
+    uint32_t m_tx_errors;
+};
+
 #ifdef ENABLE_AUTH_SERVICE
 struct user_record_t {
     user_record_t() : m_uid(0), m_gid(0) {}
@@ -791,6 +861,47 @@ struct user_record_t {
 
 class iTerminalInterface;
 
+class SessionStdio;
+
+/**
+ * Slots 0, 1 and 2 are stdin, stdout and stderr; the rest are free for a
+ * redirect or a pipe to claim.
+ */
+#ifndef PDI_MAX_FDS
+#define PDI_MAX_FDS 6
+#endif
+
+#define PDI_FD_STDIN  0
+#define PDI_FD_STDOUT 1
+#define PDI_FD_STDERR 2
+
+/**
+ * A session with no redirect resolves every standard descriptor to its own
+ * terminal, so the table is allocated only once something claims a slot and is
+ * released again as soon as the last claim goes.
+ */
+#ifdef ENABLE_CMD_SERVICE
+struct fd_table_t {
+
+    fd_table_t() : m_stdio(nullptr), m_owned(0) {
+        for (uint8_t i = 0; i < PDI_MAX_FDS; i++) {
+            m_fds[i] = nullptr;
+        }
+    }
+
+    bool isIdle() const {
+        for (uint8_t i = 0; i < PDI_MAX_FDS; i++) {
+            if (nullptr != m_fds[i]) return false;
+        }
+        return true;
+    }
+
+    iTerminalInterface *m_fds[PDI_MAX_FDS];
+    SessionStdio *m_stdio;
+    uint8_t m_owned;
+};
+#endif
+
 enum session_state_t : uint8_t {
     SESSION_STATE_FREE = 0,
     SESSION_STATE_PRELOGIN,
@@ -809,7 +920,11 @@ struct session_t {
 #ifdef ENABLE_AUTH_SERVICE
                   m_uid(0), m_gid(0),
 #endif
-                  m_autoCompleteIdx(-1), m_prevCmdSize(0) {}
+                  m_autoCompleteIdx(-1), m_prevCmdSize(0)
+#ifdef ENABLE_CMD_SERVICE
+                  , m_fdtable(nullptr)
+#endif
+    {}
 
     virtual ~session_t() {}
 
@@ -839,6 +954,9 @@ struct session_t {
 #endif
         m_autoCompleteIdx = -1;
         m_prevCmdSize = 0;
+#ifdef ENABLE_CMD_SERVICE
+        m_fdtable = nullptr;
+#endif
     }
 
     uint8_t m_sid;
@@ -867,6 +985,9 @@ struct session_t {
 #endif
     int16_t m_autoCompleteIdx;
     int16_t m_prevCmdSize;
+#ifdef ENABLE_CMD_SERVICE
+    fd_table_t *m_fdtable;
+#endif
 };
 
 #endif

@@ -16,6 +16,7 @@ created Date    : 6th Apr 2025
 #include <utility/SafeAlloc.h>
 #include <utility/crypto/asymmetric/ed25519/ed25519.h>
 #include <service_provider/session/SessionManager.h>
+#include <service_provider/auth/AuthServiceProvider.h>
 #ifdef ENABLE_CMD_SERVICE
 #include <service_provider/cmd/CommandLineServiceProvider.h>
 #endif
@@ -196,8 +197,21 @@ void SSHServer::handle() {
     }
     m_handling = true;
 
-    // Accept new client connections into any free pool slot. Clients that
-    // arrive while the pool is full stay queued in the transport backlog.
+    // A session whose client has already gone keeps its slot until the service
+    // pass below, so reap those first or a new client is refused a slot that
+    // is free in all but name.
+    for (uint8_t i = 0; i < SSH_MAX_SESSIONS; i++) {
+        if (nullptr != m_sessions[i] && nullptr != m_sessions[i]->m_client &&
+            !m_sessions[i]->m_client->connected()) {
+            m_session = m_sessions[i];
+            closeSession();
+            m_sessions[i] = m_session;
+        }
+    }
+    m_session = nullptr;
+
+    // Accept new client connections into any free pool slot. A client that
+    // arrives while the pool is full is refused rather than left connected.
     while (m_server->hasClient()) {
 
         int8_t slot = -1;
@@ -205,8 +219,36 @@ void SSHServer::handle() {
             if (m_sessions[i] == nullptr) { slot = i; break; }
         }
         if (slot < 0) {
-            break; // pool full
+
+            // the transport has already completed the handshake, so a client
+            // left queued here waits on a banner that never comes. Give a slot
+            // a short while to free, then refuse rather than hold it forever.
+            uint32_t now = (uint32_t)__i_dvc_ctrl.millis_now();
+
+            if (0 == m_poolfullsince) {
+                m_poolfullsince = now;
+                break;
+            }
+
+            if ((now - m_poolfullsince) < SSH_POOL_FULL_GRACE_MS) {
+                break;
+            }
+
+            iClientInterface* refused = m_server->accept();
+            if (nullptr == refused) {
+                break;
+            }
+
+            refused->close();
+            pdiutil::safe_delete(refused);
+
+            // the next client waits its own grace rather than inheriting the
+            // remains of this one's
+            m_poolfullsince = (uint32_t)__i_dvc_ctrl.millis_now();
+            continue;
         }
+
+        m_poolfullsince = 0;
 
         iClientInterface* client = m_server->accept();
         m_sessions[slot] = pdiutil::safe_new<LWSSHSession>(client);
@@ -267,9 +309,12 @@ void SSHServer::serviceSession() {
 
             if (!is_sftp && nullptr != termsession) {
 
+                #ifdef ENABLE_CMD_SERVICE
                 if (__cmd_service.isSessionBusy(termsession)) {
                     termsession->m_lastActivityAt = (uint32_t)__i_dvc_ctrl.millis_now();
-                } else if (((uint32_t)__i_dvc_ctrl.millis_now() - termsession->m_lastActivityAt) > SSH_SHELL_IDLE_MS) {
+                } else
+                #endif
+                if (((uint32_t)__i_dvc_ctrl.millis_now() - termsession->m_lastActivityAt) > SSH_SHELL_IDLE_MS) {
                     m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_TIMEOUT;
                 }
             } else {
@@ -1116,10 +1161,16 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
             int32_t packetlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
             payloadoffset += 4;
 
-            if ( (payloadoffset + packetlen) > data.size() ){
+            // a packet shorter than it declares leaves the stream unframed, so
+            // there is nothing to resynchronise to and the session is given up
+            if ( (uint32_t)packetlen > (data.size() - payloadoffset) ){
 
                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
-            }else{
+            }
+            // a request carries a type byte and a request id, so anything
+            // shorter than five bytes cannot be one. Its frame is intact, so it
+            // is passed over rather than taken as a reason to drop the client.
+            else if ( packetlen >= 5 ){
 
                 uint8_t packettype = data[payloadoffset];
                 payloadoffset += 1;
@@ -1153,7 +1204,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
                         payloadoffset += 4;
 
-                        if (payloadoffset + pathlen > data.size()) {
+                        if (pathlen > (data.size() - payloadoffset)) {
                             errcode = SSH_FX_BAD_MESSAGE;
                         } else {
                             pdiutil::string reqpath(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
@@ -1236,13 +1287,11 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     }
                 }else if (packettype == SSH_FXP_STAT || packettype == SSH_FXP_LSTAT){ // treat both same until symlinks not supported by FS
 
-                    // Parse filename length
-                    uint32_t fnamelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                    payloadoffset += 4;
-
                     // Parse filename
-                    pdiutil::string filename(reinterpret_cast<const char*>(&data[payloadoffset]), fnamelen);
-                    payloadoffset += fnamelen;
+                    pdiutil::string filename;
+                    if (!read_ssh_string(data, filename, payloadoffset)) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    }
 
                     // (Optional: parse flags if present, for LSTAT usually not needed)
 
@@ -1319,13 +1368,11 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     }
                 }else if (packettype == SSH_FXP_OPEN){
 
-                    // Parse filename length
-                    uint32_t fnamelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                    payloadoffset += 4;
-
                     // Parse filename
-                    pdiutil::string filename(reinterpret_cast<const char*>(&data[payloadoffset]), fnamelen);
-                    payloadoffset += fnamelen;
+                    pdiutil::string filename;
+                    if (!read_ssh_string(data, filename, payloadoffset)) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    }
 
                     // Parse flags if present
                     uint32_t flags = 0;
@@ -1426,16 +1473,11 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                 }else if (packettype == SSH_FXP_OPENDIR){
 
-                    // Parse path length
-                    uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                    payloadoffset += 4;
-
-                    if (payloadoffset + pathlen > data.size()) {
+                    // Parse path
+                    pdiutil::string dirpath;
+                    if (!read_ssh_string(data, dirpath, payloadoffset)) {
                         errcode = SSH_FX_BAD_MESSAGE;
                     } else {
-                        // Parse path
-                        pdiutil::string dirpath(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
-                        payloadoffset += pathlen;
 
                         if (!__i_fs.isDirExist(dirpath.c_str())) {
                             errcode = SSH_FX_NO_SUCH_FILE;
@@ -1499,16 +1541,10 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                 }else if (packettype == SSH_FXP_READDIR){
 
-                    // Parse handle length
-                    uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                    payloadoffset += 4;
-
-                    if (handlelen == 0 || payloadoffset + handlelen > data.size()) {
+                    pdiutil::string handle;
+                    if (!read_ssh_string(data, handle, payloadoffset) || handle.empty()) {
                         errcode = SSH_FX_BAD_MESSAGE;
                     } else {
-                        pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
-                        payloadoffset += handlelen;
-
                         auto &sftp = m_session->current_channel.subsystem_req.sftp;
 
                         if (sftp.handle != handle || !sftp.is_dir) {
@@ -1661,7 +1697,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
                         payloadoffset += 4;
 
-                        if (payloadoffset + pathlen > data.size()) {
+                        if (pathlen > (data.size() - payloadoffset)) {
                             errcode = SSH_FX_BAD_MESSAGE;
                         } else {
                             pdiutil::string dirpath(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
@@ -1687,7 +1723,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
                         payloadoffset += 4;
 
-                        if (handlelen == 0 || payloadoffset + handlelen > data.size()) {
+                        if (handlelen == 0 || handlelen > (data.size() - payloadoffset)) {
                             errcode = SSH_FX_BAD_MESSAGE;
                         } else {
                             pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
@@ -1778,7 +1814,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
                         payloadoffset += 4;
 
-                        if (payloadoffset + pathlen > data.size()) {
+                        if (pathlen > (data.size() - payloadoffset)) {
                             errcode = SSH_FX_BAD_MESSAGE;
                         } else {
                             pdiutil::string path(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
@@ -1800,27 +1836,20 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                 }else if (packettype == SSH_FXP_RENAME){
 
                     // Parse oldpath
-                    if (payloadoffset + 4 > data.size()) {
+                    pdiutil::string oldpath;
+                    pdiutil::string newpath;
+                    if (!read_ssh_string(data, oldpath, payloadoffset)) {
                         errcode = SSH_FX_BAD_MESSAGE;
                     } else {
-                        uint32_t oldlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                        payloadoffset += 4;
 
-                        if (payloadoffset + oldlen + 4 > data.size()) {
+                        // Parse newpath
+                        if (!read_ssh_string(data, newpath, payloadoffset)) {
                             errcode = SSH_FX_BAD_MESSAGE;
                         } else {
-                            pdiutil::string oldpath(reinterpret_cast<const char*>(&data[payloadoffset]), oldlen);
-                            payloadoffset += oldlen;
 
-                            // Parse newpath
-                            uint32_t newlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                            payloadoffset += 4;
-
-                            if (payloadoffset + newlen > data.size()) {
+                            if (oldpath.empty() || newpath.empty()) {
                                 errcode = SSH_FX_BAD_MESSAGE;
                             } else {
-                                pdiutil::string newpath(reinterpret_cast<const char*>(&data[payloadoffset]), newlen);
-                                payloadoffset += newlen;
 
                                 if (!__i_fs.isFileExist(oldpath.c_str()) && !__i_fs.isDirExist(oldpath.c_str())) {
                                     errcode = SSH_FX_NO_SUCH_FILE;
@@ -1844,7 +1873,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
                         payloadoffset += 4;
 
-                        if (payloadoffset + pathlen > data.size()) {
+                        if (pathlen > (data.size() - payloadoffset)) {
                             errcode = SSH_FX_BAD_MESSAGE;
                         } else {
                             pdiutil::string filepath(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
@@ -1869,7 +1898,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
                         payloadoffset += 4;
 
-                        if (payloadoffset + pathlen > data.size()) {
+                        if (pathlen > (data.size() - payloadoffset)) {
                             errcode = SSH_FX_BAD_MESSAGE;
                         } else {
                             pdiutil::string dirpath(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
@@ -1888,14 +1917,9 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                 }else if (packettype == SSH_FXP_READ){
 
-                    // Parse handle length
-                    uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                    payloadoffset += 4;
-
                     // Parse handle
-                    if (handlelen > 0 && payloadoffset + handlelen <= data.size()) {
-                        pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
-                        payloadoffset += handlelen;
+                    pdiutil::string handle;
+                    if (read_ssh_string(data, handle, payloadoffset) && !handle.empty()) {
 
                         if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
                             // Parse offset
@@ -1996,14 +2020,9 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     }
                 }else if (packettype == SSH_FXP_WRITE){
 
-                    // Parse handle length
-                    uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                    payloadoffset += 4;
-
                     // Parse handle
-                    if (handlelen > 0 && payloadoffset + handlelen <= data.size()) {
-                        pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
-                        payloadoffset += handlelen;
+                    pdiutil::string handle;
+                    if (read_ssh_string(data, handle, payloadoffset) && !handle.empty()) {
 
                         if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
                             // Parse offset
@@ -2034,14 +2053,9 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     }
                 }else if (packettype == SSH_FXP_FSETSTAT){ 
 
-                    // Parse handle length
-                    uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                    payloadoffset += 4;
-
                     // Parse handle
-                    if (handlelen > 0 && payloadoffset + handlelen <= data.size()) {
-                        pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
-                        payloadoffset += handlelen;
+                    pdiutil::string handle;
+                    if (read_ssh_string(data, handle, payloadoffset) && !handle.empty()) {
 
                         if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
 
@@ -2058,14 +2072,9 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     }
                 }else if (packettype == SSH_FXP_CLOSE){ 
 
-                    // Parse handle length
-                    uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                    payloadoffset += 4;
-
                     // Parse handle
-                    if (handlelen > 0 && payloadoffset + handlelen <= data.size()) {
-                        pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
-                        payloadoffset += handlelen;
+                    pdiutil::string handle;
+                    if (read_ssh_string(data, handle, payloadoffset) && !handle.empty()) {
 
                         if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
                             // Successfully closed the file/dir, send success reply
@@ -2150,16 +2159,17 @@ bool LWSSH::SSHServer::handleChannelSftpBolusChunks(pdiutil::vector<uint8_t> &bo
 
         memset(sftpheader, 0, 28);
 
-        // a chunk shorter than the header carries no request to act on
-        if( boluschunk.size() < 28 ){
+        // a chunk too short to name a request type carries nothing to act on
+        if( boluschunk.size() < 5 ){
 
             m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr;
             boluschunk.clear();
             return false;
         }
 
-        // If the first chunk is not SSH_FXP_WRITE, handle it normally and stop further chunk receiving
-        if( boluschunk[4] != SSH_FXP_WRITE ){
+        // If the first chunk is not SSH_FXP_WRITE, handle it normally and stop further chunk receiving.
+        // A write too short to carry its own header is not one to reassemble either.
+        if( boluschunk[4] != SSH_FXP_WRITE || boluschunk.size() < 28 ){
 
             m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // reset the callback
             handleChannelSubsystemSftpRequest(boluschunk);

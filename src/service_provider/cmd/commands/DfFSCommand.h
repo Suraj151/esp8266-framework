@@ -12,6 +12,7 @@ created Date    : 28th May 2026
 #define _DF_FS_COMMAND_H_
 
 #include "CommandCommon.h"
+#include <helpers/ProcHelper.h>
 
 #ifdef ENABLE_STORAGE_SERVICE
 
@@ -58,24 +59,44 @@ struct DfFSCommand : public CommandBase {
 		m_terminal->write_pad_ro(RODT_ATTR("USED"),  4, NUM_W);
 		m_terminal->writeln_ro(RODT_ATTR("FREE"));
 
-		char buf[24];
+#ifdef ENABLE_PROCFS
+		pdiutil::string name, prefix;
+
+		readProcLines(PROC_MOUNT_PREFIX "/mounts", [&](pdiutil::string &line) -> bool {
+			if( !procLineField(line, 0, name) || !procLineField(line, 1, prefix) ) return true;
+			writeUsage(prefix.c_str(), name.c_str(), __i_fs.findMountForPath(prefix.c_str()));
+			return true;
+		});
+#else
 		for( uint8_t i = 0; i < __i_fs.getMountCount(); i++ ){
 			const vfs_mount_t *m = __i_fs.getMount(i);
-			if( nullptr == m || nullptr == m->m_backend ) continue;
-			m_terminal->write_pad(m->m_prefix, MOUNT_W);
-			m_terminal->write_pad(m->m_name,   NAME_W);
-			Int64ToString((int64_t)m->m_backend->getTotalSize(), buf, sizeof(buf), 0);
-			m_terminal->write_pad(buf, NUM_W);
-			Int64ToString((int64_t)m->m_backend->getUsedSize(),  buf, sizeof(buf), 0);
-			m_terminal->write_pad(buf, NUM_W);
-			m_terminal->write((int64_t)m->m_backend->getFreeSize());
-			m_terminal->putln();
+			if( nullptr == m ) continue;
+			writeUsage(m->m_prefix, m->m_name, m);
 		}
+#endif
 
 		return CMD_RESULT_OK;
 	}
 
 private:
+
+	/**
+	 * Writes one row, asking the backend behind the mount what it holds.
+	 */
+	void writeUsage(const char *prefix, const char *name, const vfs_mount_t *mount){
+
+		if( nullptr == mount || nullptr == mount->m_backend ) return;
+
+		char buf[24];
+		m_terminal->write_pad(prefix, MOUNT_W);
+		m_terminal->write_pad(name, NAME_W);
+		Int64ToString((int64_t)mount->m_backend->getTotalSize(), buf, sizeof(buf), 0);
+		m_terminal->write_pad(buf, NUM_W);
+		Int64ToString((int64_t)mount->m_backend->getUsedSize(), buf, sizeof(buf), 0);
+		m_terminal->write_pad(buf, NUM_W);
+		m_terminal->write((int64_t)mount->m_backend->getFreeSize());
+		m_terminal->putln();
+	}
 
 	static constexpr uint8_t MOUNT_W = 10;
 	static constexpr uint8_t NAME_W  = 10;

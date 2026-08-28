@@ -15,7 +15,7 @@ so the same assertions run whether the suite arrived over serial, telnet or ssh.
 
 import base64
 
-from .registry import test, expect_in, expect_not_in, Skip
+from .registry import test, expect_in, expect_not_in, Skip, ssh_port
 
 SSH_DIR = "/etc/ssh"
 AUTHORIZED_KEYS = "/.ssh/authorized_keys"
@@ -45,7 +45,7 @@ def ssh_dial(t, attempts=3, **kwargs):
     last = None
     for attempt in range(attempts):
         try:
-            return SshShell(t.address(), port=22, username=t.username, **kwargs)
+            return SshShell(t.address(), port=ssh_port(t), username=t.username, **kwargs)
         except ShellError as err:
             last = err
             if is_auth_failure(err):
@@ -337,7 +337,7 @@ def _transport_with_mac(t, mac, attempts=4):
     last = None
     for attempt in range(attempts):
         try:
-            sock = socket.create_connection((t.address(), 22), timeout=15)
+            sock = socket.create_connection((t.address(), ssh_port(t)), timeout=15)
             transport = paramiko.Transport(sock)
             transport.get_security_options().digests = (mac,)
             transport.start_client(timeout=15)

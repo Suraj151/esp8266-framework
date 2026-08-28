@@ -52,7 +52,41 @@ struct TailFSCommand : public CommandBase {
 			CommandOption *fileoptn = &m_options[0];
 			CommandOption *countoptn = &m_options[1];
 
-			if(nullptr != fileoptn && nullptr != fileoptn->optionval && fileoptn->optionvalsize > 0){
+			// a piped stage has no file to name, so its lone positional is the
+			// count rather than a path
+			if( isInputRedirected() ){
+
+				CommandOption *streamcountoptn = ( nullptr != fileoptn && nullptr != fileoptn->optionval &&
+												   fileoptn->optionvalsize > 0 ) ? fileoptn : countoptn;
+
+				uint32_t count = 10;
+				if(nullptr != streamcountoptn && nullptr != streamcountoptn->optionval && streamcountoptn->optionvalsize > 0){
+					uint32_t parsed = StringToUint32(streamcountoptn->optionval, streamcountoptn->optionvalsize);
+					if(parsed > 0) count = parsed;
+				}
+
+				// a stream cannot be rewound, so the last lines are the only
+				// ones worth keeping while it drains
+				if(count > PDI_STREAM_TAIL_LINES_MAX) count = PDI_STREAM_TAIL_LINES_MAX;
+
+				pdiutil::vector<pdiutil::string> kept;
+
+				readCommandLines(pdiutil::string(), m_terminal, [&](const pdiutil::string &line)->bool{
+					if(kept.size() == (size_t)count){
+						kept.erase(kept.begin());
+					}
+					kept.push_back(line);
+					return true;
+				});
+
+				m_terminal->putln();
+
+				for(size_t i = 0; i < kept.size(); i++){
+					m_terminal->write(kept[i].c_str());
+					m_terminal->putln();
+					__i_dvc_ctrl.yield();
+				}
+			}else if(nullptr != fileoptn && nullptr != fileoptn->optionval && fileoptn->optionvalsize > 0){
 
 				uint32_t count = 10;
 				if(nullptr != countoptn && nullptr != countoptn->optionval && countoptn->optionvalsize > 0){

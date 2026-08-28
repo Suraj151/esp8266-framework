@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 
 #include "Controller.h"
 #include <webserver/pages/Dashboard.h>
-#include <utility/TaskScheduler.h>
+#include <utility/TaskRecord.h>
 
 #ifdef ENABLE_AUTH_SERVICE
 #include <service_provider/session/SessionManager.h>
@@ -137,13 +137,13 @@ class DashboardController : public Controller {
 				task_t *_task = __task_scheduler.getTaskByIndex(_slot);
 				if (nullptr == _task) continue;
 
-				uint32_t _share = taskCpuShare(_task, _now);
+				uint32_t _share = taskCpuShare(_task->m_total_exec_us, _task->m_created_ms, _now);
 				uint8_t _at = _pickedcount;
 
 				while (_at > 0)
 				{
 					task_t *_ranked = __task_scheduler.getTaskByIndex(_picked[_at - 1]);
-					if (nullptr != _ranked && taskCpuShare(_ranked, _now) >= _share) break;
+					if (nullptr != _ranked && taskCpuShare(_ranked->m_total_exec_us, _ranked->m_created_ms, _now) >= _share) break;
 					if (_at < DASHBOARD_MAX_TASK_ROWS) _picked[_at] = _picked[_at - 1];
 					_at--;
 				}
@@ -169,21 +169,12 @@ class DashboardController : public Controller {
 				_response += pdiutil::to_string((int32_t)_task->m_task_id);
 				_response += CHARPTR_WRAP(",\"");
 
-				// the task name is a read only pointer, so it has to be pulled out
-				// of program space before it can join the payload
-				if (nullptr != _task->m_name)
-				{
-					_response += CHARPTR_WRAP_RO(_task->m_name);
-				}
-				else
-				{
-					_response += "-";
-				}
+				_response += taskDisplayName(_task);
 
 				_response += CHARPTR_WRAP("\",\"");
 				_response += taskStateLetter(_task->m_state);
 				_response += CHARPTR_WRAP("\",\"");
-				appendCpuPercent(_response, taskCpuShare(_task, _now));
+				appendCpuPercent(_response, taskCpuShare(_task->m_total_exec_us, _task->m_created_ms, _now));
 				_response += CHARPTR_WRAP("\"]");
 			}
 
@@ -374,16 +365,6 @@ class DashboardController : public Controller {
 	private:
 
 		/**
-		 * lifetime cpu share of a task, scaled by 100 so it stays integral.
-		 */
-		uint32_t taskCpuShare(task_t *_task, uint32_t _now)
-		{
-			uint64_t _elapsed = (_now > _task->m_created_ms) ? (_now - _task->m_created_ms) : 1;
-			uint64_t _share = (_task->m_total_exec_us * 10ULL) / _elapsed;
-			return (_share > 99999ULL) ? 99999 : (uint32_t)_share;
-		}
-
-		/**
 		 * append a cpu share as a two decimal percentage.
 		 */
 		void appendCpuPercent(pdiutil::string &_response, uint32_t _share)
@@ -392,21 +373,6 @@ class DashboardController : public Controller {
 			_response += ".";
 			if ((_share % 100) < 10) _response += "0";
 			_response += pdiutil::to_string((int32_t)(_share % 100));
-		}
-
-		/**
-		 * ps style state letter of a task.
-		 */
-		const char *taskStateLetter(task_state_t _state)
-		{
-			switch (_state)
-			{
-				case TASK_STATE_RUNNING:  return "R";
-				case TASK_STATE_SLEEPING: return "S";
-				case TASK_STATE_STOPPED:  return "T";
-				case TASK_STATE_ZOMBIE:   return "Z";
-				default:                  return "r";
-			}
 		}
 
 #ifdef ENABLE_AUTH_SERVICE

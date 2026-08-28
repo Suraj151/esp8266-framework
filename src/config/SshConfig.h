@@ -19,6 +19,15 @@ created Date    : 1st June 2025
 #define SSH_MAX_SESSIONS 2
 #endif
 
+/**
+ * How long a client may wait for a pool slot before it is refused. A slot
+ * frees in well under a second, so a short wait serves a client that would
+ * otherwise be turned away while one is being reclaimed.
+ */
+#ifndef SSH_POOL_FULL_GRACE_MS
+#define SSH_POOL_FULL_GRACE_MS 5000
+#endif
+
 #ifndef SSH_HANDSHAKE_IDLE_MS
 #define SSH_HANDSHAKE_IDLE_MS 10000
 #endif
