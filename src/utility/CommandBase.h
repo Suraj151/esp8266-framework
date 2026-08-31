@@ -23,29 +23,6 @@ Created Date    : 1st June 2019
 #undef max
 
 /**
- * @enum cmd_result_t
- * @brief Represents the result of a command execution.
- */
-enum cmd_result : uint8_t {
-    CMD_RESULT_OK = 0,               ///< Command executed successfully.
-    CMD_RESULT_ARGS_ERROR,           ///< Argument error in the command.
-    CMD_RESULT_ARGS_MISSING,         ///< Missing arguments for the command.
-    CMD_RESULT_NOT_FOUND,            ///< Command not found.
-    CMD_RESULT_INVALID,              ///< Invalid command.
-    CMD_RESULT_INVALID_OPTION,       ///< Invalid option provided.
-    CMD_RESULT_NEED_AUTH,            ///< Command requires authentication.
-    CMD_RESULT_INCOMPLETE,           ///< Command execution is incomplete.
-    CMD_RESULT_WRONG_CREDENTIAL,     ///< Wrong credentials provided.
-    CMD_RESULT_FAILED,               ///< Failed
-    CMD_RESULT_ABORTED,              ///< Command execution was aborted.
-    CMD_RESULT_TERMINAL_ERR,         ///< Terminal is not available.
-    CMD_RESULT_TERMINAL_ABORTED,     ///< Terminal was aborted.
-    CMD_RESULT_TERMINAL_HOLD_BUFFER, ///< Terminal is about to hold buffer.
-    CMD_RESULT_MAX                   ///< Unknown or unhandled result.
-};
-typedef enum cmd_result cmd_result_t;
-
-/**
  * @enum cmd_status_t
  * @brief Represents the status of a command.
  */
@@ -82,7 +59,7 @@ class CommandExecutionInterface
 {
 public:
 
-	virtual cmd_result_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_ENTER) = 0;
+	virtual pdi_err_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_ENTER) = 0;
 };
 
 /**
@@ -153,7 +130,7 @@ typedef struct CommandBase {
     iTerminalInterface *m_terminal;              ///< Terminal interface for command interaction.
     session_t *m_owner;                          ///< Session that owns this in-flight command.
     cmd_status_t m_status;                        ///< Status of the command.
-    cmd_result_t m_result;                        ///< Result of the command execution.
+    pdi_err_t m_result;                          ///< Result of the command execution.
     bool m_acceptArgsOptions;                   ///< Flag to accept argumental options.
     const char* m_optionseparator;               ///< Separator for options.
     uint16_t m_iterations;
@@ -475,8 +452,52 @@ typedef struct CommandBase {
      * @param _waiting_option Indicates if the command is waiting for an option.
      * @return The result of the command execution.
      */
-    cmd_result_t executeCommand(char *_args, int16_t _len, bool _waiting_option = false, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE){
-        m_result = CMD_RESULT_MAX;
+    /**
+     * @brief Remove quoting from a value span, in place.
+     *
+     * The quotes are the shell's: they bound the value against the separator
+     * and are not part of what the command was given. Removing them only ever
+     * shortens the span, so the characters that survive are packed towards its
+     * start and the span stays a slice of the line the parser already holds.
+     * A single quoted run is literal, a double quoted one takes a backslash
+     * escape, matching what a shell hands a command.
+     */
+    void stripQuotes(char *_args, int16_t &_start, int16_t &_end){
+
+        while( _end > _start && ' ' == _args[_start] ) _start++;
+        while( _end > _start && ' ' == _args[_end-1] ) _end--;
+
+        int16_t write = _start;
+        bool insingle = false;
+        bool indouble = false;
+
+        for( int16_t read = _start; read < _end; read++ ){
+
+            char c = _args[read];
+
+            if( '\\' == c && !insingle && (read+1) < _end ){
+                _args[write++] = _args[++read];
+                continue;
+            }
+
+            if( '\'' == c && !indouble ){
+                insingle = !insingle;
+                continue;
+            }
+
+            if( '"' == c && !insingle ){
+                indouble = !indouble;
+                continue;
+            }
+
+            _args[write++] = c;
+        }
+
+        _end = write;
+    }
+
+    pdi_err_t executeCommand(char *_args, int16_t _len, bool _waiting_option = false, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE){
+        m_result = CMD_ERROR_UNSET;
         if(_args != nullptr){
             if( !_waiting_option ){
                 int16_t cmd_max_len = _len;
@@ -506,16 +527,21 @@ typedef struct CommandBase {
                                     memcpy(argoptn, _args+optn_start_indx, optn_end_indx-optn_start_indx);
                                     // get the option value start and end indices
                                     int16_t optn_val_start_index = optn_end_indx+strlen(CMD_OPTION_ASSIGN_OPERATOR);
-                                    int16_t optn_val_end_index = __strstr(_args+optn_val_start_index, m_optionseparator);
+                                    int16_t optn_val_end_index = __strstr_unquoted(_args+optn_val_start_index, m_optionseparator);
                                     optn_val_end_index += optn_val_end_index != -1 ? optn_val_start_index : cmd_max_len+1;
+                                    optn_val_end_index = optn_val_end_index > cmd_max_len ? cmd_max_len : optn_val_end_index;
+                                    // the value is taken inside the quotes, the scan still resumes past them
+                                    int16_t val_start_index = optn_val_start_index;
+                                    int16_t val_end_index = optn_val_end_index;
+                                    stripQuotes(_args, val_start_index, val_end_index);
                                     char *argoptntrimmed = __strtrim(argoptn);
                                     int8_t validoptnindex = getOptionIndex(argoptntrimmed);
                                     if( validoptnindex != -1 ){
-                                        m_options[validoptnindex].optionval = __strtrim(_args+optn_val_start_index);
-                                        m_options[validoptnindex].optionvalsize = optn_val_end_index - optn_val_start_index;
-                                        m_result = CMD_RESULT_OK;
+                                        m_options[validoptnindex].optionval = __strtrim(_args+val_start_index);
+                                        m_options[validoptnindex].optionvalsize = val_end_index - val_start_index;
+                                        m_result = PDI_OK;
                                     }else{
-                                        m_result = CMD_RESULT_INVALID_OPTION;
+                                        m_result = CMD_ERROR_OPT;
                                         break;
                                     }
                                     // next option start index will start with last option value end index
@@ -528,7 +554,7 @@ typedef struct CommandBase {
                                     optn_end_indx += optn_end_indx != -1 ? optn_start_indx : 0;
                                 } while ( optn_start_indx > 0 && optn_end_indx > 0 && optn_end_indx < cmd_max_len && optn_start_indx < optn_end_indx);
                             }else{
-                                m_result = CMD_RESULT_ARGS_ERROR;
+                                m_result = CMD_ERROR_INVAL;
                             }
                         }else{
 
@@ -545,13 +571,17 @@ typedef struct CommandBase {
 
                                 do{
                                     // get the option value start and end indices
-                                    optn_val_end_index = __strstr(_args+optn_val_start_index, m_optionseparator);
+                                    optn_val_end_index = __strstr_unquoted(_args+optn_val_start_index, m_optionseparator);
                                     optn_val_end_index += optn_val_end_index != -1 ? optn_val_start_index : cmd_max_len+1;
                                     optn_val_end_index = optn_val_end_index > cmd_max_len ? cmd_max_len : optn_val_end_index;
+                                    // the value is taken inside the quotes, the scan still resumes past them
+                                    int16_t val_start_index = optn_val_start_index;
+                                    int16_t val_end_index = optn_val_end_index;
+                                    stripQuotes(_args, val_start_index, val_end_index);
 
-                                    m_options[option_indx].optionval = __strtrim(_args+optn_val_start_index);
-                                    m_options[option_indx++].optionvalsize = optn_val_end_index - optn_val_start_index;
-                                    m_result = CMD_RESULT_OK;
+                                    m_options[option_indx].optionval = __strtrim(_args+val_start_index);
+                                    m_options[option_indx++].optionvalsize = val_end_index - val_start_index;
+                                    m_result = PDI_OK;
 
                                     // next option value start index will start with last option value end index
                                     optn_val_start_index = optn_val_end_index+strlen(m_optionseparator);
@@ -559,27 +589,27 @@ typedef struct CommandBase {
                             }
 
                             // if command dont have any options by default
-                            m_result = CMD_RESULT_OK;
+                            m_result = PDI_OK;
                         }
                     }else{
-                        m_result = CMD_RESULT_INVALID;
+                        m_result = CMD_ERROR_INVALID;
                     }
                 }else{
-                    m_result = CMD_RESULT_NOT_FOUND;
+                    m_result = CMD_ERROR_NOENT;
                 }
             }else{
                 if( m_waitingoptionindx != -1 && m_waitingoptionindx < m_optionindx ){
                     m_options[m_waitingoptionindx].optionval = _args;
                     m_options[m_waitingoptionindx].optionvalsize = _len;
                     m_waitingoptionindx = -1;
-                    m_result = CMD_RESULT_OK;
+                    m_result = PDI_OK;
                 }else{
                 }
             }
         }
 
         /* execute command if format is ok */
-        if( CMD_RESULT_OK == m_result ){
+        if( PDI_OK == m_result ){
             // if( nullptr != m_terminal ){
             // 	m_terminal->write_ro(RODT_ATTR("Executing cmd : "));
             // 	m_terminal->write(m_cmd);
@@ -595,7 +625,7 @@ typedef struct CommandBase {
             m_result = executeTermInputAction(inseq);
         }
 
-        if( CMD_RESULT_INCOMPLETE != m_result ){
+        if( CMD_ERROR_AGAIN != m_result ){
             m_status = CMD_STATUS_INACTIVE;
             ResultToTerminal(m_result);
             // once executed clear the options
@@ -616,7 +646,7 @@ typedef struct CommandBase {
         m_terminal = nullptr;
         m_owner = nullptr;
         m_status = CMD_STATUS_MAX;
-        m_result = CMD_RESULT_MAX;
+        m_result = CMD_ERROR_UNSET;
         m_acceptArgsOptions = false;
         m_optionseparator = CMD_OPTION_SEPERATOR_COMMA;
         m_iterations = 0;
@@ -639,11 +669,11 @@ typedef struct CommandBase {
      * @brief Outputs the command result to the terminal.
      * @param res The result of the command execution.
      */
-    void ResultToTerminal(cmd_result_t res){
+    void ResultToTerminal(pdi_err_t res){
         if( nullptr != m_terminal && 
-            CMD_RESULT_INCOMPLETE != res && 
-            CMD_RESULT_TERMINAL_ABORTED != res && 
-            CMD_RESULT_OK != res && 
+            CMD_ERROR_AGAIN != res && 
+            CMD_ERROR_INTR != res && 
+            PDI_OK != res && 
             !isWaitingForOption() 
         ){
             m_terminal->writeln();
@@ -652,9 +682,9 @@ typedef struct CommandBase {
             // For argument-shaped failures, append the command's usage line
             // right below the error code — the command already provides it via
             // getUsage(), so we avoid duplicating the string in every command.
-            if( res == CMD_RESULT_ARGS_MISSING ||
-                res == CMD_RESULT_ARGS_ERROR ||
-                res == CMD_RESULT_INVALID_OPTION ){
+            if( res == CMD_ERROR_ARGS_MISSING ||
+                res == CMD_ERROR_INVAL ||
+                res == CMD_ERROR_OPT ){
                 const char *u = this->getUsage();
                 if( nullptr != u ){
                     m_terminal->writeln();
@@ -663,34 +693,34 @@ typedef struct CommandBase {
                 }
             }
             // switch (res){
-            // case CMD_RESULT_ARGS_ERROR:
+            // case CMD_ERROR_INVAL:
             //     // m_terminal->write_ro(RODT_ATTR("Arg Error"));
             //     // break;
-            // case CMD_RESULT_ARGS_MISSING:
+            // case CMD_ERROR_ARGS_MISSING:
             //     // m_terminal->write_ro(RODT_ATTR("Arg Missing"));
             //     // break;
-            // case CMD_RESULT_NOT_FOUND:
+            // case CMD_ERROR_NOENT:
             //     // m_terminal->write_ro(RODT_ATTR("CMD Not Found"));
             //     // break;
-            // case CMD_RESULT_INVALID:
+            // case CMD_ERROR_INVALID:
             //     // m_terminal->write_ro(RODT_ATTR("CMD invalid"));
             //     // break;
-            // case CMD_RESULT_INVALID_OPTION:
+            // case CMD_ERROR_OPT:
             //     // m_terminal->write_ro(RODT_ATTR("Option invalid"));
             //     // break;
-            // case CMD_RESULT_NEED_AUTH:
+            // case CMD_ERROR_PERM:
             //     // m_terminal->write_ro(RODT_ATTR("Required login"));
             //     // break;
-            // case CMD_RESULT_WRONG_CREDENTIAL:
+            // case CMD_ERROR_ACCES:
             //     // m_terminal->write_ro(RODT_ATTR("Wrong Credential"));
             //     // break;
-            // case CMD_RESULT_ABORTED:
+            // case CMD_ERROR_CANCELED:
             //     // m_terminal->write_ro(RODT_ATTR("Aborted!"));
             //     // break;
-            // case CMD_RESULT_MAX:
+            // case CMD_ERROR_UNSET:
             //     // m_terminal->write_ro(RODT_ATTR("Unknown"));
             //     // break;
-            // // case CMD_RESULT_OK:
+            // // case PDI_OK:
             //     // m_terminal->write_ro(RODT_ATTR("Success"));
             //     // break;
             // default:
@@ -744,21 +774,21 @@ typedef struct CommandBase {
      * @brief Executes the command logic.
      * @return The result of the command execution.
      */
-    virtual cmd_result_t execute(cmd_term_inseq_t terminputaction) = 0;
+    virtual pdi_err_t execute(cmd_term_inseq_t terminputaction) = 0;
 
     /**
      * @brief Executes the terminal input action.
      * @param terminputaction The terminal input action to execute.
      * @return The result of the command execution.
      */
-    virtual cmd_result_t executeTermInputAction(cmd_term_inseq_t terminputaction){
+    virtual pdi_err_t executeTermInputAction(cmd_term_inseq_t terminputaction){
 
         if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
             terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
             m_status = CMD_STATUS_INACTIVE;
             ClearOptions();
             m_waitingoptionindx = -1;
-            return CMD_RESULT_ABORTED;
+            return CMD_ERROR_CANCELED;
         }
         return m_result;
     }

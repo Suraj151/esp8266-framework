@@ -1,0 +1,27 @@
+/**************************** Service configurations **************************
+This file is part of the pdi stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 30th Aug 2026
+******************************************************************************/
+
+#ifndef _SERVICE_CONFIG_H_
+#define _SERVICE_CONFIG_H_
+
+#include "Common.h"
+
+#define SERVICE_CONFIG_DIR_ROOT "/etc/"
+#define SERVICE_CONFIG_FILE_SUFFIX ".conf"
+#define SERVICE_CONFIG_KEY_ENABLED "enabled"
+#define SERVICE_CONFIG_HEADER \
+    "# PDI service configuration" TERMINAL_NEW_LINE \
+    "# enabled yes|no" TERMINAL_NEW_LINE
+
+#ifndef SERVICE_NAME_MAX
+#define SERVICE_NAME_MAX 16
+#endif
+
+#endif

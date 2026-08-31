@@ -19,7 +19,7 @@ namespace LWSSH {
  * SSH server class that provides a basic SSH server functionality.
  * It uses iServerInterface to listen for incoming SSH connections.
  */
-class SSHServer : ServiceProvider {
+class SSHServer : public ServiceProvider {
 public:
     SSHServer();
     ~SSHServer();
@@ -65,7 +65,7 @@ protected:
     bool m_handling = false;                    // re-entrancy guard for handle()
     uint32_t m_poolfullsince = 0;               // when the pool was first found full
 
-    // Create SSH_CONFIG_FILE with default policy when it is missing.
+    // Create the service config file with default policy when it is missing.
     void createDefaultSshConfig();
 
     // Create the ed25519 host key in SSH_HOST_KEY_DIR when it is missing.

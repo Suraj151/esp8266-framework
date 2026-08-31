@@ -47,10 +47,10 @@ struct DateCommand : public CommandBase {
 	}
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_TERMINAL_ERR;
+			return CMD_ERROR_NOTTY;
 		}
 
 		bool utc = false;
@@ -101,35 +101,35 @@ struct DateCommand : public CommandBase {
 		if( dosync ){
 #ifdef ENABLE_AUTH_SERVICE
 			if( !__auth_service.getAuthorized() ){
-				return CMD_RESULT_NEED_AUTH;
+				return CMD_ERROR_PERM;
 			}
 #endif
 			__i_ntp.init_ntp_time();
 			m_terminal->putln();
 			m_terminal->writeln_ro(RODT_ATTR("ntp sync triggered"));
-			return CMD_RESULT_OK;
+			return PDI_OK;
 		}
 
 		if( doset ){
 #ifdef ENABLE_AUTH_SERVICE
 			if( !__auth_service.getAuthorized() ){
-				return CMD_RESULT_NEED_AUTH;
+				return CMD_ERROR_PERM;
 			}
 #endif
 			if( setepoch <= (uint32_t)LAUNCH_UNIX_TIME ){
-				return CMD_RESULT_ARGS_ERROR;
+				return CMD_ERROR_INVAL;
 			}
 			if( !__i_ntp.set_ntp_time((pdiutil::epoch_time_t)setepoch) ){
 				m_terminal->putln();
 				m_terminal->writeln_ro(RODT_ATTR("failed to set time"));
-				return CMD_RESULT_FAILED;
+				return CMD_ERROR_FAILED;
 			}
 		}
 
 		if( !__i_ntp.is_valid_ntptime() ){
 			m_terminal->putln();
 			m_terminal->writeln_ro(RODT_ATTR("time not synced"));
-			return CMD_RESULT_OK;
+			return PDI_OK;
 		}
 
 		uint32_t epoch = (uint32_t)__i_ntp.get_ntp_time();
@@ -146,7 +146,7 @@ struct DateCommand : public CommandBase {
 			m_terminal->write_ro(RODT_ATTR(" UTC"));
 		}
 		m_terminal->writeln();
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

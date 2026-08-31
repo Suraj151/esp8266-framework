@@ -148,6 +148,13 @@ void TelnetServiceProvider::handle() {
         }
     }
 
+    // The grace times how long a waiting client is held, so a period with
+    // nobody queued is not one. Left standing, the next client to arrive would
+    // find a grace that expired without it and be refused at once.
+    if (!m_server->hasClient()) {
+        m_poolfullsince = 0;
+    }
+
     // Accept new client connections into any free pool slot. A client that
     // arrives while the pool is full is refused rather than left connected.
     while (m_server->hasClient()) {
@@ -261,10 +268,10 @@ void TelnetServiceProvider::serviceClient(uint8_t slot) {
 
         // process and execute if command has provided
         #ifdef ENABLE_CMD_SERVICE
-        cmd_result_t res = __cmd_service.processTerminalInput(client);
+        pdi_err_t res = __cmd_service.processTerminalInput(client);
         // Only an explicit terminal abort (logout / EOF) closes the channel.
-        // CMD_RESULT_ABORTED = command-scope Ctrl+C/Ctrl+Z; session stays.
-        if( res == CMD_RESULT_TERMINAL_ABORTED ){
+        // CMD_ERROR_CANCELED = command-scope Ctrl+C/Ctrl+Z; session stays.
+        if( res == CMD_ERROR_INTR ){
             #ifdef ENABLE_AUTH_SERVICE
             __auth_service.setAuthorized(false);
             #endif

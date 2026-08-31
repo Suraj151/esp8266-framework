@@ -141,7 +141,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
 
         __utl_event.execute_event(EVENT_WIFI_INTERNET_UP);
         LogI("WiFi Internet Up\n");
-        __task_scheduler.setTimeout( [&]() { this->m_wifi->enableNAPT(true); }, NAPT_INIT_DURATION_AFTER_WIFI_CONNECT, __i_dvc_ctrl.millis_now() );
+        this->serviceSetTimeout( [&]() { this->m_wifi->enableNAPT(true); }, NAPT_INIT_DURATION_AFTER_WIFI_CONNECT, __i_dvc_ctrl.millis_now() );
       }  
     }else{
 
@@ -149,7 +149,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
 
         __utl_event.execute_event(EVENT_WIFI_INTERNET_DOWN);
         LogI("WiFi Internet Down\n");
-        __task_scheduler.setTimeout( [&]() { this->m_wifi->enableNAPT(false); }, MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now() );
+        this->serviceSetTimeout( [&]() { this->m_wifi->enableNAPT(false); }, MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now() );
       }
     }
 
@@ -163,7 +163,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
 
       #ifndef IGNORE_FREE_RELAY_CONNECTIONS
       memcpy( __status_wifi.ignore_bssid, this->m_wifi->BSSID(), 6 );
-      __task_scheduler.setTimeout( [&]() {
+      this->serviceSetTimeout( [&]() {
         this->m_wifi->scanNetworksAsync( [&](int _scanCount) {
           this->scan_aps_and_configure_wifi_station_async(_scanCount);
         }, false);
@@ -352,7 +352,7 @@ void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
     this->m_wifi->softAPdisconnect(false);
     // this->m_wifi->enableAP(false);
 
-    __task_scheduler.setTimeout( [&](){
+    this->serviceSetTimeout( [&](){
       wifi_config_table __wifi_credentials;
       __database_service.get_wifi_config_table(&__wifi_credentials);
       this->configure_wifi_access_point(&__wifi_credentials);
@@ -413,7 +413,7 @@ void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCo
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table(&_wifi_credentials);
   if( this->m_wifi->get_bssid_within_scanned_nw_ignoring_connected_stations( _wifi_credentials.sta_ssid, this->m_temp_mac, __status_wifi.ignore_bssid, _scanCount ) ) {
-    __task_scheduler.setTimeout([&](){
+    this->serviceSetTimeout([&](){
       wifi_config_table __wifi_credentials;
       __database_service.get_wifi_config_table(&__wifi_credentials);
       this->configure_wifi_station( &__wifi_credentials, this->m_temp_mac );
@@ -560,7 +560,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
       this->m_wifi->disconnect(true);
       this->m_wifi->enableSTA(false);
       this->m_wifi->enableAP(false);
-      __task_scheduler.setTimeout( [&]() {
+      this->serviceSetTimeout( [&]() {
         wifi_config_table _wifi_credentials;
         __database_service.get_wifi_config_table(&_wifi_credentials);
         this->m_wifi->init();
@@ -601,7 +601,7 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 
     __int_ip_to_str( _ip, _table.sta_local_ip, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
     __int_ip_to_str( _ip, _table.sta_gateway, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
-    __int_ip_to_str( _ip, _table.sta_subnet, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t\n"));
+    __int_ip_to_str( _ip, _table.sta_subnet, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t")); terminal->putln();
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("Access Configs :"));
@@ -620,6 +620,17 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     terminal->write_ro(RODT_ATTR("AP MAC :"));
     terminal->writeln(this->m_wifi->softAPmacAddress().c_str());
   }
+}
+
+#define WIFI_STATUS_KEY_WIDTH 10
+
+/**
+ * Write one indented status key, padded so the values line up under each other.
+ */
+static void writeStatusKey(iTerminalInterface *terminal, const char *_key, uint32_t _len){
+  terminal->write_ro(RODT_ATTR("         "));
+  terminal->write_pad_ro(_key, _len, WIFI_STATUS_KEY_WIDTH);
+  terminal->write_ro(RODT_ATTR("- "));
 }
 
 /**
@@ -647,20 +658,16 @@ void WiFiServiceProvider::printStatusToTerminal(iTerminalInterface *terminal){
 
       terminal->writeln_ro((RODT_ATTR("station : ")));
 
-      terminal->write_ro((RODT_ATTR("         ")));
-      terminal->write_ro((RODT_ATTR("ssid - ")));
+      writeStatusKey(terminal, RODT_ATTR("ssid"), 4);
       terminal->writeln(stname.c_str());
 
-      terminal->write_ro((RODT_ATTR("         ")));
-      terminal->write_ro((RODT_ATTR("ip - ")));
+      writeStatusKey(terminal, RODT_ATTR("ip"), 2);
       terminal->writeln(((pdiutil::string)this->m_wifi->localIP()).c_str());
 
-      terminal->write_ro((RODT_ATTR("         ")));
-      terminal->write_ro((RODT_ATTR("gateway - ")));
+      writeStatusKey(terminal, RODT_ATTR("gateway"), 7);
       terminal->writeln(((pdiutil::string)this->m_wifi->gatewayIP()).c_str());
 
-      terminal->write_ro((RODT_ATTR("         ")));
-      terminal->write_ro((RODT_ATTR("bssid - ")));
+      writeStatusKey(terminal, RODT_ATTR("bssid"), 5);
       uint8_t *bssid = this->m_wifi->BSSID();
       if(nullptr != bssid){
         char macstr[36] = {0};
@@ -670,12 +677,10 @@ void WiFiServiceProvider::printStatusToTerminal(iTerminalInterface *terminal){
         terminal->putln();
       }
 
-      terminal->write_ro((RODT_ATTR("         ")));
-      terminal->write_ro((RODT_ATTR("rssi - ")));
+      writeStatusKey(terminal, RODT_ATTR("rssi"), 4);
   		terminal->writeln((int32_t)this->m_wifi->RSSI());
 
-      terminal->write_ro((RODT_ATTR("         ")));
-      terminal->write_ro((RODT_ATTR("netstatus - ")));
+      writeStatusKey(terminal, RODT_ATTR("netstatus"), 9);
   		terminal->writeln((int32_t)__status_wifi.internet_available);
 
     }else{
@@ -689,16 +694,13 @@ void WiFiServiceProvider::printStatusToTerminal(iTerminalInterface *terminal){
 
     terminal->writeln_ro((RODT_ATTR("accespoint : ")));
     
-    terminal->write_ro((RODT_ATTR("         ")));
-    terminal->write_ro((RODT_ATTR("ssid - ")));
+    writeStatusKey(terminal, RODT_ATTR("ssid"), 4);
     terminal->writeln(apname.c_str());
     
-    terminal->write_ro((RODT_ATTR("         ")));
-    terminal->write_ro((RODT_ATTR("ip - ")));
+    writeStatusKey(terminal, RODT_ATTR("ip"), 2);
     terminal->writeln(((pdiutil::string)this->m_wifi->softAPIP()).c_str());
 
-    terminal->write_ro((RODT_ATTR("         ")));
-    terminal->write_ro((RODT_ATTR("bssid - ")));
+    writeStatusKey(terminal, RODT_ATTR("bssid"), 5);
     terminal->writeln(this->m_wifi->softAPmacAddress().c_str());
   }
 }

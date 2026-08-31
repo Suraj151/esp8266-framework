@@ -89,6 +89,44 @@ namespace
 
             closeClient();
             m_clientRequest.clear();
+            purgeUploads();
+        }
+
+        /**
+         * @brief Drop whatever a multipart body left in the temp directory.
+         *
+         * An upload is named by the request, so every round that carries one
+         * writes another file. Left alone they accumulate in the emulated
+         * flash and the run dies of memory exhaustion the framework never
+         * caused.
+         */
+        void purgeUploads()
+        {
+#ifdef ENABLE_STORAGE_SERVICE
+            const char *tempdir = __i_fs.getTempDirectory();
+            if (nullptr == tempdir)
+            {
+                return;
+            }
+
+            pdiutil::vector<file_info_t> items;
+            if (__i_fs.getDirFileList(tempdir, items) < 0)
+            {
+                return;
+            }
+
+            for (size_t i = 0; i < items.size(); i++)
+            {
+                if (nullptr != items[i].m_name)
+                {
+                    pdiutil::string path = pdiutil::string(tempdir);
+                    __i_fs.appendFileSeparator(path);
+                    path += items[i].m_name;
+                    __i_fs.deleteFile(path.c_str());
+                    pdiutil::safe_delete_array(items[i].m_name);
+                }
+            }
+#endif
         }
     };
 

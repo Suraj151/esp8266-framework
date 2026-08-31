@@ -32,6 +32,7 @@ public:
 	~AuthServiceProvider();
 
 	bool initService(void *arg = nullptr) override;
+	bool isEssentialService() const override { return true; }
 	bool isAuthorized(const char *username, const char *password);
 
 	void setAuthorized(bool auth);

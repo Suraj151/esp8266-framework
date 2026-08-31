@@ -200,6 +200,30 @@ uint16_t SessionManager::getCurrentGid() {
 #ifdef ENABLE_CMD_SERVICE
 
 /**
+ * Result of the last command the current session ran to completion.
+ */
+pdi_err_t SessionManager::getLastExit() {
+
+  session_t *s = current();
+  return (nullptr != s) ? s->m_lastExit : (pdi_err_t)PDI_OK;
+}
+
+/**
+ * Records a finished command's result; a still running one is ignored.
+ */
+void SessionManager::setLastExit(pdi_err_t status) {
+
+  if (CMD_ERROR_AGAIN == status || CMD_ERROR_HOLD_BUFFER == status) {
+    return;
+  }
+
+  session_t *s = current();
+  if (nullptr != s) {
+    s->m_lastExit = status;
+  }
+}
+
+/**
  * The stream a descriptor resolves to, falling back to the session terminal
  * for the standard three when nothing has claimed them.
  */

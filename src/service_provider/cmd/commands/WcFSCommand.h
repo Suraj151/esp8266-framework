@@ -37,15 +37,15 @@ struct WcFSCommand : public CommandBase {
 	bool needauth() override { return true; }
 #endif
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
-		cmd_result_t result = CMD_RESULT_OK;
+		pdi_err_t result = PDI_OK;
 
 		if(nullptr != m_terminal){
 			CommandOption *cmdoptn = &m_options[0];
@@ -78,7 +78,7 @@ struct WcFSCommand : public CommandBase {
 					m_terminal->putln();
 
 					if(iStatus < 0){
-						result = CMD_RESULT_FAILED;
+						result = CMD_ERROR_FAILED;
 						m_terminal->write_ro(RODT_ATTR("Failed : "));
 						m_terminal->write(filename.c_str());
 						m_terminal->write_ro(RODT_ATTR(" : "));
@@ -96,7 +96,7 @@ struct WcFSCommand : public CommandBase {
 					}
 				}
 			}else{
-				result = CMD_RESULT_ARGS_MISSING;
+				result = CMD_ERROR_ARGS_MISSING;
 			}
 		}
 

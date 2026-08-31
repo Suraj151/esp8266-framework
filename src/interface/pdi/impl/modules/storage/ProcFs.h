@@ -74,6 +74,11 @@ private:
    * Per interface traffic, for the interfaces that can count it.
    */
   pdiutil::string renderNetDev();
+
+  /**
+   * Every TCP endpoint the stack holds, when the port can enumerate them.
+   */
+  pdiutil::string renderNetTcp();
 };
 
 extern ProcFs __i_procfs;

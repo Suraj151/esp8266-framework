@@ -43,10 +43,10 @@ struct TimedatectlCommand : public CommandBase {
 	}
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_TERMINAL_ERR;
+			return CMD_ERROR_NOTTY;
 		}
 
 		bool synced = __i_ntp.is_valid_ntptime();
@@ -69,7 +69,7 @@ struct TimedatectlCommand : public CommandBase {
 		m_terminal->write_ro(RODT_ATTR("NTP server      : "));
 		m_terminal->writeln_ro(RODT_ATTR(NTP_SERVER1));
 
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

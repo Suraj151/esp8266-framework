@@ -109,7 +109,7 @@ class SerialShell(Shell):
         if not chunk:
             return ""
 
-        return chunk.decode(errors="replace")
+        return self.decode(chunk)
 
     def login(self, username=DEFAULT_USER, password=DEFAULT_PASSWORD, timeout=30.0):
         return super().login(username, password, timeout)

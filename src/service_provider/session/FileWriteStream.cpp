@@ -25,7 +25,7 @@ namespace {
  */
 FileWriteStream::FileWriteStream(const char *path, bool append) :
   m_buffer(nullptr), m_fill(0), m_written(0), m_append(append),
-  m_started(false), m_failed(false) {
+  m_started(false), m_failed(false), m_handle(-1) {
 
   if (nullptr != path) {
     m_path = path;
@@ -33,11 +33,18 @@ FileWriteStream::FileWriteStream(const char *path, bool append) :
 
   if (m_path.size() > 0) {
     m_buffer = pdiutil::safe_new_array<uint8_t>(PDI_FILE_STREAM_BUFFER);
+    uint8_t flags = FILE_OPEN_WRITE | FILE_OPEN_CREATE;
+    flags |= append ? FILE_OPEN_APPEND : FILE_OPEN_TRUNCATE;
+    m_handle = __i_fs.openFile(m_path.c_str(), flags);
   }
 }
 
 FileWriteStream::~FileWriteStream() {
   commit();
+  if (m_handle >= 0) {
+    __i_fs.closeFile(m_handle);
+    m_handle = -1;
+  }
   pdiutil::safe_delete_array(m_buffer);
 }
 
@@ -53,7 +60,9 @@ int32_t FileWriteStream::commit() {
 
   bool append = m_append || m_started;
 
-  int status = __i_fs.writeFile(m_path.c_str(), (const char *)m_buffer, m_fill, append);
+  int status = (m_handle >= 0)
+    ? __i_fs.writeFileHandle(m_handle, (const char *)m_buffer, m_fill)
+    : __i_fs.writeFile(m_path.c_str(), (const char *)m_buffer, m_fill, append);
 
   if (status < 0) {
     m_failed = true;
@@ -71,7 +80,20 @@ int32_t FileWriteStream::commit() {
  * Commits what is buffered and reports whether it landed.
  */
 int16_t FileWriteStream::disconnect() {
-  return (0 == commit()) ? (int16_t)0 : (int16_t)-1;
+
+  int32_t status = commit();
+
+  // littlefs holds the tail of a written file until the handle closes, so the
+  // close belongs here, where a caller is still listening for the result
+  if (m_handle >= 0) {
+    if (__i_fs.closeFile(m_handle) < 0) {
+      m_failed = true;
+      status = -1;
+    }
+    m_handle = -1;
+  }
+
+  return (0 == status) ? (int16_t)0 : (int16_t)-1;
 }
 
 /**
@@ -197,6 +219,12 @@ void FileWriteStream::flush(int16_t flushtype) {
 
   if (IsFlushTx(flushtype)) {
     commit();
+
+    // a held handle keeps the tail in the backend's cache, so an explicit
+    // flush has to reach storage for the bytes to be visible to a reader
+    if (m_handle >= 0) {
+      __i_fs.syncFile(m_handle);
+    }
   }
 }
 

@@ -47,13 +47,26 @@ def _nice_of(text, pid):
     return None
 
 
-def _has_task(text, name):
-    return any(parts[-1] == name for parts in _ps_rows(text))
+def _watch_pids(t):
+    """
+    The pids currently listed as 'watch', or None when the listing could not be
+    read at all.
+
+    A watch task clears the display as it runs, which can cut a reading short.
+    A short reading holds no rows, so telling it apart from a genuinely empty
+    table matters: read as an empty table it says the task is gone, which passes
+    a reap assertion that should have waited. Callers poll, so one unreadable
+    listing costs a retry rather than the six a settled read would spend.
+    """
+    text = t.run("ps")
+    if "PID" not in text or "NAME" not in text:
+        return None
+    return [parts[0] for parts in _ps_rows(text) if parts[-1] == "watch"]
 
 
 def _start_background_watch(t, interval_ms):
     """
-    Register a session-owned scheduler task named 'watch' to signal, or skip.
+    Register a session-owned scheduler task named 'watch' and return its pid.
 
     The watched command touches a file in a scratch directory rather than
     printing, so it does not pour command output into the shell between the reads
@@ -62,18 +75,42 @@ def _start_background_watch(t, interval_ms):
     not by reading a reply back over that same clearing stream. A short interval
     is kept so the scheduler visits the task often enough to apply a pending
     signal within the poll window.
+
+    Registration is waited for rather than timed. A fixed drain races the board:
+    under load the task can appear after it, which reads as a task that never
+    started, and any watch already present would be mistaken for this one.
+    Returning the pid lets a caller signal what it started instead of whatever
+    the table happens to list first.
     """
+    before = set(_watch_pids(t) or [])
+
     target = t.workspace("watch_signal")
-    t.shell.send_line("watch c=touch %s/tick; i=%d; n=100" % (target, interval_ms))
+    t.shell.send_line("watch c=touch %s/tick,i=%d,n=100" % (target, interval_ms))
     t.shell.drain(2.0, 5.0)
-    if not _has_task(_read_ps(t), "watch"):
-        raise Skip("could not start a background task to signal")
+
+    for _ in range(12):
+        listed = _watch_pids(t)
+        if listed is not None:
+            fresh = [pid for pid in listed if pid not in before]
+            if fresh:
+                return fresh[0]
+        time.sleep(0.5)
+
+    raise Skip("could not start a background task to signal")
 
 
 def _reap_watch_by_pid(t):
-    for parts in _ps_rows(_read_ps(t)):
-        if parts[-1] == "watch":
-            t.run("kill 9 %s" % parts[0])
+    """
+    Kill every watch task and wait for the table to clear, so the next test does
+    not start against a corpse that has been signalled but not yet reaped.
+    """
+    for pid in (_watch_pids(t) or []):
+        t.run("kill 9 %s" % pid)
+
+    for _ in range(10):
+        if _watch_pids(t) == []:
+            return
+        time.sleep(0.5)
 
 
 @test("ps prints a header", needs=("ps",))
@@ -214,7 +251,7 @@ def top_runs_and_stops(t):
     The summary line (with the free heap) is printed first, then the PID..NAME
     header, so reading up to NAME captures all three in one frame.
     """
-    t.shell.send_line("top i=400; n=2")
+    t.shell.send_line("top i=400,n=2")
     frame = t.shell.expect("NAME", timeout=max(t.timeout, 12))
 
     expect_in("PID", frame, "top shows the ps header")
@@ -228,7 +265,7 @@ def top_runs_and_stops(t):
 @test("watch re-runs a command and stops after n iterations",
       needs=("watch", "whoami"), slow=True)
 def watch_runs_and_stops(t):
-    t.shell.send_line("watch c=whoami; i=400; n=2")
+    t.shell.send_line("watch c=whoami,i=400,n=2")
     frame = t.shell.expect(t.username, timeout=max(t.timeout, 12))
 
     expect_in(t.username, frame, "watch shows the watched command's output")
@@ -283,9 +320,9 @@ def killall_reaps_named_task(t):
     try:
         t.run("killall watch")
 
-        for _ in range(8):
+        for _ in range(10):
             time.sleep(1.0)
-            if not _has_task(_read_ps(t), "watch"):
+            if _watch_pids(t) == []:
                 return
         raise AssertionError("killall did not reap the watch task")
     finally:
@@ -300,9 +337,9 @@ def pkill_reaps_named_task(t):
     try:
         t.run("pkill watch")
 
-        for _ in range(8):
+        for _ in range(10):
             time.sleep(1.0)
-            if not _has_task(_read_ps(t), "watch"):
+            if _watch_pids(t) == []:
                 return
         raise AssertionError("pkill did not reap the watch task")
     finally:
@@ -311,29 +348,26 @@ def pkill_reaps_named_task(t):
 
 @test("kill terminates a task by pid", needs=("kill", "watch", "ps"), slow=True)
 def kill_by_pid_reaps(t):
-    _start_background_watch(t, 1200)
+    pid = _start_background_watch(t, 1200)
 
     reaped = False
     try:
-        rows = [parts for parts in _ps_rows(_read_ps(t)) if parts[-1] == "watch"]
-        if not rows:
-            raise Skip("no task to kill")
-
-        t.run("kill 9 %s" % rows[0][0])
-        for _ in range(8):
+        t.run("kill 9 %s" % pid)
+        for _ in range(10):
             time.sleep(1.0)
-            if not _has_task(_read_ps(t), "watch"):
+            listed = _watch_pids(t)
+            if listed is not None and pid not in listed:
                 reaped = True
                 return
-        raise AssertionError("kill did not reap the task by pid")
+        raise AssertionError("kill did not reap the task with pid %s" % pid)
     finally:
         if not reaped:
             _reap_watch_by_pid(t)
 
 
-def _watch_state(t):
+def _watch_state(t, pid):
     for parts in _ps_rows(_read_ps(t)):
-        if parts[-1] == "watch":
+        if parts[0] == pid and parts[-1] == "watch":
             return parts[2]
     return None
 
@@ -347,20 +381,14 @@ def kill_stop_cont(t):
     back short, so the window is kept wide enough to see a clean one. The state
     column is T while stopped, S/r once resumed.
     """
-    _start_background_watch(t, 2000)
+    pid = _start_background_watch(t, 2000)
 
-    reaped = False
     try:
-        rows = [parts for parts in _ps_rows(_read_ps(t)) if parts[-1] == "watch"]
-        if not rows:
-            raise Skip("no task to signal")
-        pid = rows[0][0]
-
         t.run("kill 19 %s" % pid)
         stopped = False
         for _ in range(16):
             time.sleep(0.6)
-            if _watch_state(t) == "T":
+            if _watch_state(t, pid) == "T":
                 stopped = True
                 break
         if not stopped:
@@ -370,7 +398,7 @@ def kill_stop_cont(t):
         resumed = False
         for _ in range(16):
             time.sleep(0.6)
-            if _watch_state(t) in ("S", "r", "R"):
+            if _watch_state(t, pid) in ("S", "r", "R"):
                 resumed = True
                 break
         if not resumed:
@@ -415,3 +443,21 @@ def srvc_restart(t):
     time.sleep(1.5)
     expect_in("active", t.run("srvc status %s" % service, timeout=10),
               "the service is active again after a restart")
+
+
+@test("a quoted option value keeps the separator inside it",
+      needs=("watch", "echo"), slow=True)
+def watch_quoted_inner_command(t):
+    """
+    watch's c= carries a whole command, which may use the same separator for
+    its own options. Quoting it is what keeps that separator out of watch's
+    parse; if it leaked, i= and n= would never be seen and the watch would
+    never stop.
+    """
+    t.shell.send_line('watch c="echo a,b",i=400,n=2')
+    t.shell.drain(1.0, 8.0)
+
+    if not t.resync():
+        raise AssertionError("watch never stopped, so it did not see n= past "
+                             "the comma in its quoted command")
+    expect_in("/", t.run("pwd"), "the shell is usable after watch")

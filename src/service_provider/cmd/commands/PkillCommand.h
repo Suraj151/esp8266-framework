@@ -55,16 +55,16 @@ struct PkillCommand : public CommandBase {
 	/// Default signal when `s=` is omitted. Overridden by KillallCommand.
 	virtual signal_t defaultSignal() const { return SIG_TERM; }
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_FAILED;
+			return CMD_ERROR_FAILED;
 		}
 
 		// Positional: <name> OR <sig> <name>. First slot with content is the
@@ -76,7 +76,7 @@ struct PkillCommand : public CommandBase {
 		bool have1 = ( nullptr != a1 && nullptr != a1->optionval && a1->optionvalsize > 0 );
 
 		if( !have0 ){
-			return CMD_RESULT_ARGS_MISSING;
+			return CMD_ERROR_ARGS_MISSING;
 		}
 
 		CommandOption *sOpt = have1 ? a0 : nullptr;
@@ -87,8 +87,9 @@ struct PkillCommand : public CommandBase {
 			sig = (signal_t)StringToUint16(sOpt->optionval, sOpt->optionvalsize);
 		}
 		if( sig != SIG_TERM && sig != SIG_KILL && sig != SIG_STOP && sig != SIG_CONT ){
-			m_terminal->writeln_ro(RODT_ATTR("\nunsupported signal (9/15/18/19 only)"));
-			return CMD_RESULT_FAILED;
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("unsupported signal (9/15/18/19 only)"));
+			return CMD_ERROR_FAILED;
 		}
 
 		// Copy the name option into a local NUL-terminated buffer so
@@ -110,13 +111,14 @@ struct PkillCommand : public CommandBase {
 
 		uint16_t hits = __task_scheduler.sendSignalByName(name, sig, cur_sid, isRoot);
 
-		m_terminal->write_ro(RODT_ATTR("\nsignaled "));
+		m_terminal->putln();
+		m_terminal->write_ro(RODT_ATTR("signaled "));
 		char buf[8];
 		Int32ToString((int32_t)hits, buf, 8, 0);
 		m_terminal->write(buf);
 		m_terminal->writeln_ro(RODT_ATTR(" task(s)"));
 
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

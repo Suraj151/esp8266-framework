@@ -22,7 +22,7 @@ What comes out of the box is closer to a small system than to a sketch template:
 
 **A filesystem with users.** Several backends mount into one tree and are routed by longest prefix: LittleFS at the root, a read-only `/proc` of live system nodes, a writable `/sys` where GPIO pins are files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with `null`/`zero`/`random`, and a RAM-backed `/tmp`. Permissions, ownership and per-session umask are enforced in the VFS layer, so `/etc/passwd` and `/etc/shadow` mean what they say and two logged-in users genuinely see different access.
 
-**Scheduling that scales down and up.** Tasks run inline, cooperatively, or preemptively on a hardware tick, with priorities, POSIX nice values and per-task signals. On ESP32 an external relocatable ELF can be loaded from the filesystem and launched as a background process — `elfload <path>` returns a pid you can `ps` and `kill`, no reflash involved.
+**Scheduling that scales down and up.** Tasks run inline, cooperatively, or preemptively on a hardware tick, with priorities, POSIX nice values and per-task signals. Where the port supplies a loader, an external program image can be loaded from the filesystem and launched as a background process — `exec <path>` returns a pid you can `ps` and `kill`, no reflash involved.
 
 **Found on the network without help.** A from-scratch mDNS/DNS-SD responder built straight on lwIP UDP advertises `pdi-<mac>.local` and the services it is listening on, so the device answers to a name and shows up in `avahi-browse -a`. Name lookups walk IP literal, then `/etc/hosts`, then DNS.
 
@@ -443,7 +443,7 @@ The contract is simple: genuinely per-board facts go in the per-port header, and
 ---
 ## 3. Configuration System
 
-Configuration is layered, compile-time and additive. There is no `.ini` file, no runtime parser and no over-the-air feature toggle. Which services exist, how big each table is, what the defaults are and which interfaces a port supplies are all decided when you build.
+Configuration is layered and additive. Which services *exist*, how big each table is, what the defaults are and which interfaces a port supplies are decided when you build. What a service *does* once it exists — including whether it runs at all — is settled at runtime, from text files under `/etc` on any board that has a filesystem. See §3.10.
 
 ### 3.1 Three tiers
 
@@ -632,6 +632,38 @@ To change a live value, go through the portal, the CLI (`net connsta`, `iot seth
 ### 3.9 Conventions worth keeping
 
 Branch on `ENABLE_*` with `#ifdef`, never with a runtime `if` — the unreached branch still needs symbols the link cannot provide. Keep config structs POD and fixed-size; a pointer or a `pdiutil::string` inside one cannot be serialised to NVM. Never include one service config from another; if two need the same value, it belongs in `Common.h`. And gate code on the capability (`ENABLE_WIFI_SERVICE`) rather than on the board (`DEVICE_ESP32`) — the board changes, the capability is what the code actually depends on.
+
+### 3.10 The `/etc` config surface
+
+On a board with a filesystem, a feature keeps its settings in a plain text file at `/etc/<feature>/<feature>.conf`, one `key value` per line, `#` for comments. It is readable with `cat`, editable with `fedit`, copyable off the device over SFTP, and diffable between two devices — configuration becomes portable in the Linux sense rather than something you rebuild for.
+
+`src/helpers/ConfigHelper.h` is the whole API:
+
+| Call | What it does |
+|---|---|
+| `loadConfigFile(path, out)` | every option as key/value pairs |
+| `getConfigValue(path, key, out)` | one option, without holding the rest |
+| `setConfigValue(path, key, value)` | persist one option, leaving comments, ordering and other options untouched |
+| `saveConfigFile(path, kvs, header)` | write the whole file from pairs |
+| `ensureConfigFile(path, defaults, header)` | create the directory and the file with defaults, only if missing |
+| `configValueAsBool` / `configBoolAsValue` | the `yes`/`no` rule, in one place |
+
+`setConfigValue` rewrites through a working copy and renames over the original, so a half-written file never replaces a good one — and it restores the original's permissions and owner afterwards, because a file created on this VFS is stamped with the *writer's* identity. A `0600 root:root` config stays that way.
+
+Values are written with CRLF, the same line ending `fedit` writes and `putln()` sends. `cat` streams file bytes straight to the terminal, so a file with bare newlines would staircase down a raw console.
+
+**Precedence.** Where a filesystem exists, a key present in the conf file wins. A key that is absent leaves whatever the record store or the compiled default supplied, and a value that cannot be read as a boolean keeps the default rather than silently becoming `false`. On a board with no filesystem the whole layer compiles out — the record store is the fallback and the boot-critical minimum, and the UNO keeps working with no `/etc` at all.
+
+**Runtime service enable.** Every service reads `enabled yes|no` from its own conf file at boot, so what runs stops being a compile-time decision:
+
+```
+srvc list                # SERVICE  STATE  ENABLED  TASKS  R/S/Z
+srvc status MQTT         # state, enabled, and the file it came from
+srvc disable MQTT        # persists, and stops it now
+srvc enable MQTT         # persists; starts on the next boot
+```
+
+Both are root-only. A service the device cannot be recovered without — the database, the command line, the serial console, auth, the user store and factory reset — reports `enabled yes` and refuses to be turned off, from the command *and* from a hand-edited conf file. On a board with one console there is no equivalent of walking to the machine.
 
 ---
 ## 4. Task Scheduler
@@ -827,14 +859,18 @@ Root may signal any task; anyone else only tasks owned by their own session. All
 Services are driven the same way, one level up:
 
 ```
-  srvc list             every service: state and task count
-  srvc status <name>    that service's state and the pids it owns
+  srvc list             every service: state, enabled, and task count
+  srvc status <name>    that service's state, config file and the pids it owns
   srvc start <name>     CONT every task the service owns
   srvc stop <name>      STOP every task the service owns   (a freeze, not a teardown)
   srvc restart <name>   stop, then start
+  srvc enable <name>    persist "enabled yes" in the service's own conf file
+  srvc disable <name>   persist "enabled no", and stop it now
 ```
 
-Start, stop and restart need root. Ownership is tracked per service rather than per task name, so renaming a task never breaks service control.
+All of these except `list` and `status` need root. Ownership is tracked per service rather than per task name, so renaming a task never breaks service control.
+
+`start`/`stop` are a freeze and a thaw of the current run; `enable`/`disable` decide what happens on the next boot, and are the ones that survive a restart — see [§3.10](#310-the-etc-config-surface).
 
 ---
 ## 5. Database Layer
@@ -1049,6 +1085,8 @@ Persisted configuration always goes through the database service accessors, neve
 
 The base also offers `signalAllServiceTasks(sig)`, `countServiceTasks(...)` and the task-id iterators; those are what the `srvc` command renders.
 
+A new service is runtime-toggleable for free. The base reads `enabled` from `/etc/x/x.conf` before anything starts and `PDIStack::initialize` gates the `initService` call on `isServiceEnabled()`. Override `getServiceConfigPath` only if the feature genuinely cannot use the derived path. Override `isEssentialService()` to return true only if the device genuinely cannot be recovered without the service; that puts it beyond the reach of `srvc disable` *and* of a hand-edited conf file.
+
 ### 6.2 Service reference
 
 Ordered the way the orchestrator starts them.
@@ -1157,7 +1195,11 @@ Mounting happens during `initialize()`, and the table is five slots by default �
 
 Each prefix is named once, in [src/config/VfsConfig.h](src/config/VfsConfig.h): `PROC_MOUNT_PREFIX`, `SYS_MOUNT_PREFIX`, `DEV_MOUNT_PREFIX` and `TMP_MOUNT_PREFIX` beside the `ENABLE_` flag for the backend that answers there, with the root at `FILE_SEPARATOR`. Code that reaches a synthetic node writes `PROC_MOUNT_PREFIX "/mounts"` rather than the path in full, so moving a mount is one edit.
 
-**procfs** nodes are all `0444` and root-owned; writes fail, and a redirect into one says `cannot write <path>` rather than appearing to succeed. `/proc/uptime` gives seconds since boot in the Linux two-number layout, `/proc/version` gives the release and config version, `/proc/meminfo` the free heap and the largest block it can still hand out, `/proc/mounts` a line per mount, and `/proc/stat` the scheduler's cumulative counters. Every running task has a directory of its own — `/proc/<pid>/{stat,cmdline,status}` — and `/proc/net/{route,dev}` describes the registered interfaces. Everything that reads files works on them — `cat`, `head`, `wc`, `grep`, `hexdump`.
+**procfs** nodes are all `0444` and root-owned; writes fail, and a redirect into one says `cannot write <path>` rather than appearing to succeed. `/proc/uptime` gives seconds since boot in the Linux two-number layout, `/proc/version` gives the release and config version, `/proc/meminfo` the free heap and the largest block it can still hand out, `/proc/mounts` a line per mount, and `/proc/stat` the scheduler's cumulative counters. Every running task has a directory of its own — `/proc/<pid>/{stat,cmdline,status}` — and `/proc/net/{route,dev,tcp}` describes the network: the gateway each interface routes through, the traffic each has carried, and every TCP endpoint the stack holds, listening and connected alike. Everything that reads files works on them — `cat`, `head`, `wc`, `grep`, `hexdump`.
+
+`/proc/net/dev` and `/proc/net/tcp` each fill in only as far as the port can answer. Counters come from the link, and a link that cannot count is left out rather than listed with zeroes that would read as an idle interface — neither ESP core's prebuilt lwIP carries them, since it is compiled with `MIB2_STATS` off. Endpoints come from the stack, and a port that cannot enumerate one leaves the columns empty rather than reporting a device with nothing listening. Both are port capabilities, so a link or stack that can answer fills the node in without anything above changing.
+
+Columns are fixed width rather than tab separated, here and in every command that prints a table: a tab only reaches the next eight-column stop, so one long field would push the rest of the row out of line on a terminal that does no reflowing of its own.
 
 `ps`, `top`, `mount` and `df` read through these nodes rather than reaching into the scheduler or the mount table, so what a command shows and what a file says cannot disagree. `df` takes its list of mounts from `/proc/mounts` and asks the backend behind each prefix for its sizes.
 
@@ -1234,9 +1276,9 @@ The most expensive service in the framework, and the most capable: a full SSH se
             └─ subsystem  ─▶ SFTP
 ```
 
-Host keys live in `/etc/ssh` alongside `sshconfig`, leaving `~/.ssh` to the user's own client keys. The Ed25519 host key is created on service start if it is missing, which takes milliseconds. RSA is generated only when asked for with `sshkgen t=2,f=b`, because 2048-bit keygen on these parts is measured in minutes.
+Host keys live in `/etc/ssh` alongside `ssh.conf`, leaving `~/.ssh` to the user's own client keys. The Ed25519 host key is created on service start if it is missing, which takes milliseconds. RSA is generated only when asked for with `sshkgen t=2,f=b`, because 2048-bit keygen on these parts is measured in minutes.
 
-Both authentication methods are on by default and each can be switched off in `/etc/ssh/sshconfig`, which is created with defaults on first boot. When an attempt fails the server advertises exactly the methods still permitted. [§7.10.1](#7101-ssh-authentication) has the operational detail.
+Both authentication methods are on by default and each can be switched off in `/etc/ssh/ssh.conf`, which is created with defaults on first boot. When an attempt fails the server advertises exactly the methods still permitted. [§7.10.1](#7101-ssh-authentication) has the operational detail.
 
 Two sessions are served concurrently by default, which is what graphical SFTP clients need — they hold a browse connection open and open a second one to move a file. The SFTP subsystem covers path resolution, stat, directory listing, open/read/write, mkdir, rmdir, remove and rename, which is enough for interactive `sftp`, for editing a remote file in FileZilla or WinSCP, and for `scp -s`.
 
@@ -1446,8 +1488,11 @@ Parsing works like this:
 ```
    "gpio p=4,m=3,v=500"
       │     └──┬──┘
-      │        └─ split on the option separator (',' by default; ';' or ' ' if the
-      │           command asks for one), then match each key to a declared option
+      │        └─ split on the option separator (',' by default, ' ' for a command
+      │           that reads positionally) outside any quotes, then match each key
+      │           to a declared option. Never separate on ';' — that is the shell's
+      │           own command separator, and a command using it loses every option
+      │           after the first
       └─ command name, up to the first space
 
    "chmod 0644 /etc/passwd"
@@ -1572,13 +1617,13 @@ Not implemented yet: `;`, `&&` and `||`. They need a per-command exit status, wh
 | date [-u] [-n] [-s \<epoch>] [+\<fmt>] | | Show or set the clock. `-u` for UTC, `+fmt` for a custom format, `-s` to set, `-n` to force an NTP resync. |
 | tdctl | | Clock status: local and universal time, zone, sync state, server. |
 | reboot | | Reboot. |
-| watch | c=, i=, n= | Run a command repeatedly. Options are separated by `;` so the inner command may contain commas. e.g. **watch c=net ip; i=3000; n=10** |
+| watch | c=, i=, n= | Run a command repeatedly. Options are comma separated, as every other command's are, so `;` stays the shell's own command separator. e.g. **watch c=net ip,i=3000,n=10**. Quote the inner command when it carries a comma of its own — **watch c="login u=a,p=b",i=3000** — and the quotes bound the value rather than ending it |
 | db status \| list \| verify \| save \| restore | positional | Inspect the config record store: which medium is live and how full it is, one line per record, a checksum pass over all of them, and saving or restoring the defaults tier. Never prints a record's contents. See [§5.10](#510-from-the-terminal). |
 | iot \<option> | setid, getid, sethost, gethost | Device unique id and IoT host. |
 | help | | Every registered command with its usage line. Works before login. |
 | uptime | | `up Xd Yh Zm Ws`. |
 | tls q=1,t=,l=,n=,i= | | On-device certificate generation, ESP32 with cert generation enabled. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
-| elfload \<path> | | ESP32 only. Load an ELF from the filesystem and run it as a background task, returning its pid. See [§7.13](#713-dynamic-app-loading-esp32). |
+| exec \<path> | | Load a program image from the filesystem and run it as a background task, returning its pid. Present only where the port registers a loader; today that is the ESP32. See [§7.13](#713-dynamic-app-loading). |
 
 Path arguments behave the POSIX way everywhere: a leading `/` is absolute, anything else resolves against the session's working directory, and `cd` also takes `~` and `-`.
 
@@ -1638,10 +1683,10 @@ Directory listings are read once when the directory opens and paginated across r
 
 #### 7.10.1 SSH authentication
 
-Password and public key are both accepted, and `/etc/ssh/sshconfig` decides which are offered:
+Password and public key are both accepted, and `/etc/ssh/ssh.conf` decides which are offered:
 
 ```
-# /etc/ssh/sshconfig
+# /etc/ssh/ssh.conf
 PasswordAuthentication yes
 PubkeyAuthentication   yes
 ```
@@ -1652,7 +1697,7 @@ Passwords are checked against `/etc/shadow` — the same credentials as serial a
 fedit ~/.ssh/authorized_keys        # paste the line, then !w
 ```
 
-Set either option to `no` to switch that method off. With passwords off, only a holder of an authorised private key gets in:
+Set either option to `no` to switch that method off — `yes`/`on`/`1` and `no`/`off`/`0` all read the way you would expect, and a word that means neither leaves the option at its default rather than silently turning it off. The same file also carries `enabled`, which decides whether the SSH service starts at all ([§3.10](#310-the-etc-config-surface)). With passwords off, only a holder of an authorised private key gets in:
 
 ```
 ssh -i ~/.ssh/id_ed25519 pdiStack@<device-ip>
@@ -1703,19 +1748,23 @@ Say you want `temp`.
 
 That is the whole job. Tab completion, history, help, argument-error usage printing and Ctrl+C all come from the base.
 
-A few limits shape command design. Names are capped at eight characters and options at three, each name up to three characters, so a verb that wants more either splits into sub-commands or takes positional arguments. Option values cannot contain the separator, an `=`, or spaces, since there is no quoting — pick a separator that doesn't collide with your payload, which is why `watch` separates on `;`. And `needauth()` is the only permission gate, so put it on anything that changes state.
+A few limits shape command design. Names are capped at eight characters and options at three, each name up to three characters, so a verb that wants more either splits into sub-commands or takes positional arguments. Options are comma separated, and a value that needs to carry a comma, an `=` or a space is **quoted** — single or double, as a shell quotes — so `watch c="login u=a,p=b",i=3000` passes the whole inner command through as one value. The quotes bound the value and are removed before the command sees it. And `needauth()` is the only permission gate, so put it on anything that changes state.
 
-### 7.13 Dynamic app loading (esp32)
+Parsing stays index-based rather than building an argv: the parser hands each command the offsets and lengths of its options within the line it already holds, and quote removal compacts in place inside that span. On a device measured in kilobytes a second copy of every argument is a cost with nothing to show for it, so the index model is the standard here and argv is deliberately not built.
 
-With `ENABLE_PROGRAM_EXEC`, `elfload` reads a relocatable ELF off the filesystem, resolves its external symbols against the running firmware, and launches its `main()` as a background preemptive task:
+### 7.13 Dynamic app loading
+
+With `ENABLE_PROGRAM_EXEC`, `exec` reads a program image off the filesystem, hands it to whatever loader the port registered, and launches it as a background preemptive task:
 
 ```
-elfload /apps/hello.app.elf
+exec /apps/hello.app.elf
 ```
+
+The command knows nothing about image formats. A port declares `DEVICE_SUPPORTS_PROGRAM_EXEC` and registers an `iProgramLoaderInterface`, which owns what an image is and how it is relocated — so a board with a different architecture needs no change on the command side, and a board with no loader simply has no `exec`. Today the ESP32 registers one, over a relocatable ELF loader.
 
 The command returns to the prompt immediately with a pid. The app runs concurrently and its output arrives asynchronously; `ps` lists it and `kill <pid>` ends it. It also ends when `main()` returns, and the image is freed on either path. Because it is a task rather than a scheduler entry, stop and continue don't apply to it.
 
-The path goes through the normal VFS, so apps arrive by SFTP or HTTP upload like any other file. The feature is ESP32-only, needs storage, and brings contextual execution with it.
+The path goes through the normal VFS, so apps arrive by SFTP or HTTP upload like any other file. The feature needs storage and brings contextual execution with it.
 
 The program must be a small position-independent ELF built against the loader — not an ESP-IDF firmware image — calling only symbols the firmware exports; the common libc entries are already there. Build one from Espressif's template with the IDF environment active:
 
@@ -2565,7 +2614,8 @@ Composites are built by multiple inheritance rather than by aggregation, which i
 | `iStorageInterface` | the filesystem, LittleFS | byte-addressable read, write, erase, size |
 | `iFileSystemInterface` | SSH, SFTP, every file command | file and directory CRUD, traversal, line and offset lookup, search, custom attributes |
 | `iWiFiInterface` | WiFi service, `net` | station and AP, sync and async scan, NAPT, mode |
-| `iNetifInterface` | `/sys/class/net`, `/proc/net` | one network link describing itself: name, kind, hardware address, addressing, link state |
+| `iNetifInterface` | `/sys/class/net`, `/proc/net` | one network link describing itself: name, kind, hardware address, addressing, link state. Traffic counters are optional — a link that cannot count says so |
+| `iNetStackInterface` | `/proc/net/tcp` | the stack behind the links, walked for its TCP endpoints. Endpoints belong to the stack rather than to any one interface, so they are asked for here and not through a netif. Optional: a port that cannot enumerate its stack registers none |
 
 #### 13.3.5 Optional
 
@@ -3247,7 +3297,7 @@ GitHub: <https://github.com/Suraj151/pdi-framework>.
   2  srvc list              what actually booted
   3  srvc status <name>     that service's state and its pids
   4  ps                     %CPU finds the hog; OWN ties tasks to sessions
-  5  top i=2000; n=10       the same view over time
+  5  top i=2000,n=10        the same view over time
   6  srvc stop / start      freeze and resume, and watch the state column flip
   7  srvc status DB         NVM validity
   8  reboot                 explicitly, so you keep the serial output

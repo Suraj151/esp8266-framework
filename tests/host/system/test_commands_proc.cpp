@@ -256,7 +256,7 @@ TEST(cmdproc, kill_of_a_pid_that_is_not_there_reports_it)
     std::string out = shell.run("kill 9 30000");
 
     ASSERT_FALSE(saw(out, "PID"));
-    ASSERT_NE(shell.result(), CMD_RESULT_MAX);
+    ASSERT_NE(shell.result(), CMD_ERROR_UNSET);
 }
 
 TEST(cmdproc, pkill_signals_every_task_with_the_name)
@@ -322,7 +322,7 @@ TEST(cmdproc, renice_clamps_a_value_past_the_range)
     char line[32];
     snprintf(line, sizeof(line), "renice 99 %d", (int)id);
     shell.run(line);
-    ASSERT_EQ(shell.result(), CMD_RESULT_OK);
+    ASSERT_EQ(shell.result(), PDI_OK);
     ASSERT_TRUE(saw(shell.run("ps"), "19"));
 
     release(id);
@@ -337,7 +337,7 @@ TEST(cmdproc, srvc_list_names_the_running_services)
     std::string out = shell.run("srvc list");
 
     ASSERT_TRUE(out.length() > 0);
-    ASSERT_EQ(shell.result(), CMD_RESULT_OK);
+    ASSERT_EQ(shell.result(), PDI_OK);
 }
 
 TEST(cmdproc, srvc_status_of_an_unknown_service_is_not_ok)
@@ -345,7 +345,7 @@ TEST(cmdproc, srvc_status_of_an_unknown_service_is_not_ok)
     pditest::Shell shell;
     shell.run("srvc status nosuchservice");
 
-    ASSERT_NE(shell.result(), CMD_RESULT_MAX);
+    ASSERT_NE(shell.result(), CMD_ERROR_UNSET);
 }
 
 /* --------------------------------------------------------------- uptime */
@@ -356,7 +356,7 @@ TEST(cmdproc, uptime_reports_a_duration)
     std::string out = shell.run("uptime");
 
     ASSERT_TRUE(saw(out, "s"));
-    ASSERT_EQ(shell.result(), CMD_RESULT_OK);
+    ASSERT_EQ(shell.result(), PDI_OK);
 }
 
 TEST(cmdproc, uptime_grows_with_the_clock)
@@ -404,7 +404,7 @@ TEST(cmdmisc, an_unknown_command_is_reported_as_not_found)
     pditest::Shell shell;
     shell.run("definitelynotacommand");
 
-    ASSERT_EQ(shell.result(), CMD_RESULT_NOT_FOUND);
+    ASSERT_EQ(shell.result(), CMD_ERROR_NOENT);
 }
 
 TEST(cmdmisc, reboot_asks_the_device_to_restart)

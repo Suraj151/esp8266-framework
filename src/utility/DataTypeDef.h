@@ -145,6 +145,8 @@ namespace pdiutil {
 #define memcpy_ro memcpy
 #endif
 
+#define TERMINAL_NEW_LINE "\r\n"
+
 
 // define weak functions, so when the device doesn't define them,
 // the linker just sets their address to 0
@@ -369,11 +371,11 @@ struct ipaddress_t {
         }
     }
 
-    operator pdiutil::string() {
+    operator pdiutil::string() const {
         return (pdiutil::to_string(ip4[0]) + "." + pdiutil::to_string(ip4[1]) + "." + pdiutil::to_string(ip4[2]) + "." + pdiutil::to_string(ip4[3]));
     }
 
-    operator uint32_t() {
+    operator uint32_t() const {
         if (IS_BIG_ENDIAN()) {
             return (((uint32_t)ip4[0] << 24) | ((uint32_t)ip4[1] << 16) | ((uint32_t)ip4[2] << 8) | ((uint32_t)ip4[3]));
         } else {
@@ -381,11 +383,11 @@ struct ipaddress_t {
         }
     }
 
-    uint8_t operator[](uint8_t index) {
+    uint8_t operator[](uint8_t index) const {
         return index < 4 ? ip4[index] : 0;
     }
 
-    bool isSet() {
+    bool isSet() const {
         return (((uint32_t)*this) != IP4_ADDRESS_NONE) && (((uint32_t)*this) != IP4_ADDRESS_ANY);
     }
 };
@@ -722,6 +724,28 @@ enum file_attr_id_t : uint8_t {
 // (default_perms & ~umask).
 #define FILE_UMASK_DEFAULT      0022
 
+// Handle returned by iFileSystemInterface::openFile. A value of 0 or above is
+// an open file; anything negative is a pdi_err_t. The dispatcher packs the
+// mount a handle belongs to into its top byte, leaving the rest for the
+// backend's own handle.
+typedef int32_t pdi_fhandle_t;
+
+// Reference point for a seek on an open handle.
+enum file_seek_t : uint8_t {
+    FILE_SEEK_SET = 0, ///< from the start of the file
+    FILE_SEEK_CUR,     ///< from the current position
+    FILE_SEEK_END      ///< from the end of the file
+};
+
+// Access and creation flags accepted by openFile, combined with a bitwise or.
+enum file_open_flag_t : uint8_t {
+    FILE_OPEN_READ     = 0x01, ///< open for reading
+    FILE_OPEN_WRITE    = 0x02, ///< open for writing
+    FILE_OPEN_CREATE   = 0x04, ///< create the file when it does not exist
+    FILE_OPEN_TRUNCATE = 0x08, ///< discard existing content on open
+    FILE_OPEN_APPEND   = 0x10  ///< start at, and write at, the end of the file
+};
+
 struct file_info_t {
     // Type of the file
     file_type_t m_type;
@@ -839,6 +863,39 @@ struct netif_counters_t {
     uint32_t m_tx_errors;
 };
 
+/**
+ * @enum net_sock_state_t
+ * @brief The state a TCP endpoint is in, named as TCP itself names them.
+ */
+enum net_sock_state_t : uint8_t {
+    NET_SOCK_CLOSED = 0,
+    NET_SOCK_LISTEN,
+    NET_SOCK_SYN_SENT,
+    NET_SOCK_SYN_RCVD,
+    NET_SOCK_ESTABLISHED,
+    NET_SOCK_FIN_WAIT_1,
+    NET_SOCK_FIN_WAIT_2,
+    NET_SOCK_CLOSE_WAIT,
+    NET_SOCK_CLOSING,
+    NET_SOCK_LAST_ACK,
+    NET_SOCK_TIME_WAIT,
+    NET_SOCK_MAX
+};
+
+/**
+ * @struct net_socket_t
+ * @brief One TCP endpoint, as the stack currently holds it.
+ */
+struct net_socket_t {
+    net_socket_t() : m_localport(0), m_remoteport(0), m_state(NET_SOCK_CLOSED) {}
+
+    ipaddress_t m_localip;
+    ipaddress_t m_remoteip;
+    uint16_t m_localport;
+    uint16_t m_remoteport;
+    net_sock_state_t m_state;
+};
+
 #ifdef ENABLE_AUTH_SERVICE
 struct user_record_t {
     user_record_t() : m_uid(0), m_gid(0) {}
@@ -922,7 +979,7 @@ struct session_t {
 #endif
                   m_autoCompleteIdx(-1), m_prevCmdSize(0)
 #ifdef ENABLE_CMD_SERVICE
-                  , m_fdtable(nullptr)
+                  , m_fdtable(nullptr), m_lastExit(PDI_OK)
 #endif
     {}
 
@@ -956,6 +1013,7 @@ struct session_t {
         m_prevCmdSize = 0;
 #ifdef ENABLE_CMD_SERVICE
         m_fdtable = nullptr;
+        m_lastExit = PDI_OK;
 #endif
     }
 
@@ -987,6 +1045,10 @@ struct session_t {
     int16_t m_prevCmdSize;
 #ifdef ENABLE_CMD_SERVICE
     fd_table_t *m_fdtable;
+
+    // Result of the last command this session ran to completion, PDI_OK until
+    // one has. A command still running leaves it alone.
+    pdi_err_t m_lastExit;
 #endif
 };
 

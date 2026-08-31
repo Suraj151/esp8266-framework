@@ -20,6 +20,7 @@ Created Date    : 27th Aug 2026
 #ifdef ENABLE_NETWORK_SERVICE
 
 #include <interface/pdi/modules/netif/iNetifInterface.h>
+#include <interface/pdi/modules/netif/iNetStackInterface.h>
 #include <config/NetworkConfig.h>
 
 class NetifRegistry {
@@ -56,8 +57,20 @@ public:
    */
   iNetifInterface *find(const char *name) const;
 
+  /**
+   * Take the stack these interfaces carry, for readers that ask about
+   * endpoints rather than links.
+   */
+  void registerStack(iNetStackInterface *stack) { m_stack = stack; }
+
+  /**
+   * The registered stack, or nullptr when the port cannot enumerate one.
+   */
+  iNetStackInterface *stack() const { return m_stack; }
+
 private:
   iNetifInterface *m_netifs[NETIF_MAX_REGISTERED];
+  iNetStackInterface *m_stack;
   uint8_t m_count;
 };
 

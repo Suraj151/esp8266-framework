@@ -48,31 +48,31 @@ struct DatabaseCommand : public CommandBase {
 	bool needauth() override { return true; }
 #endif
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_FAILED;
+			return CMD_ERROR_FAILED;
 		}
 
 		CommandOption *verbOpt = &m_options[0];
 		if( nullptr == verbOpt || nullptr == verbOpt->optionval || 0 == verbOpt->optionvalsize ){
-			return CMD_RESULT_ARGS_MISSING;
+			return CMD_ERROR_ARGS_MISSING;
 		}
 
 		if( matches(verbOpt, RODT_ATTR("status"), 6) ){
 			printStatus();
-			return CMD_RESULT_OK;
+			return PDI_OK;
 		}
 
 		if( matches(verbOpt, RODT_ATTR("list"), 4) ){
 			printList();
-			return CMD_RESULT_OK;
+			return PDI_OK;
 		}
 
 		if( matches(verbOpt, RODT_ATTR("verify"), 6) ){
@@ -81,17 +81,19 @@ struct DatabaseCommand : public CommandBase {
 
 		if( matches(verbOpt, RODT_ATTR("save"), 4) ){
 			bool ok = __database_service.save_defaults();
-			m_terminal->writeln_ro(ok ? RODT_ATTR("\ndefaults saved") : RODT_ATTR("\nno defaults medium to save to"));
-			return ok ? CMD_RESULT_OK : CMD_RESULT_FAILED;
+			m_terminal->putln();
+			m_terminal->writeln_ro(ok ? RODT_ATTR("defaults saved") : RODT_ATTR("no defaults medium to save to"));
+			return ok ? PDI_OK : CMD_ERROR_FAILED;
 		}
 
 		if( matches(verbOpt, RODT_ATTR("restore"), 7) ){
 			bool ok = __database_service.restore_defaults();
-			m_terminal->writeln_ro(ok ? RODT_ATTR("\ndefaults restored") : RODT_ATTR("\nno defaults medium to restore from"));
-			return ok ? CMD_RESULT_OK : CMD_RESULT_FAILED;
+			m_terminal->putln();
+			m_terminal->writeln_ro(ok ? RODT_ATTR("defaults restored") : RODT_ATTR("no defaults medium to restore from"));
+			return ok ? PDI_OK : CMD_ERROR_FAILED;
 		}
 
-		return CMD_RESULT_INVALID_OPTION;
+		return CMD_ERROR_OPT;
 	}
 
 private:
@@ -167,7 +169,7 @@ private:
 	 * run every record past its checksum or its tag. Nothing is copied out, so
 	 * this needs no room to hold a record and never sees a credential.
 	 */
-	cmd_result_t verifyAll(){
+	pdi_err_t verifyAll(){
 
 		uint8_t bad = 0;
 
@@ -188,10 +190,10 @@ private:
 
 		if( 0 == bad ){
 			m_terminal->writeln_ro(RODT_ATTR("every record verified"));
-			return CMD_RESULT_OK;
+			return PDI_OK;
 		}
 
-		return CMD_RESULT_FAILED;
+		return CMD_ERROR_FAILED;
 	}
 
 	static constexpr uint8_t COL_ID  = 4;

@@ -43,18 +43,18 @@ struct ChownCommand : public CommandBase {
 
 	bool needauth() override { return true; }
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
-		if( !__auth_service.getAuthorized() ) return CMD_RESULT_NEED_AUTH;
+		if( !__auth_service.getAuthorized() ) return CMD_ERROR_PERM;
 
-		if( nullptr == m_terminal ) return CMD_RESULT_FAILED;
+		if( nullptr == m_terminal ) return CMD_ERROR_FAILED;
 
 		CommandOption *uopt = &m_options[0];
 		CommandOption *popt = &m_options[1];
 
 		if( nullptr == uopt || nullptr == uopt->optionval || 0 >= uopt->optionvalsize ||
 		    nullptr == popt || nullptr == popt->optionval || 0 >= popt->optionvalsize ){
-			return CMD_RESULT_ARGS_ERROR;
+			return CMD_ERROR_INVAL;
 		}
 
 		// Parse "<uid>" or "<uid>:<gid>". Colon is optional; if absent, gid = uid.
@@ -76,9 +76,9 @@ struct ChownCommand : public CommandBase {
 		if( rc < 0 ){
 			m_terminal->writeln();
 			m_terminal->write_ro(RODT_ATTR("chown: permission denied or not found"));
-			return CMD_RESULT_FAILED;
+			return CMD_ERROR_FAILED;
 		}
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

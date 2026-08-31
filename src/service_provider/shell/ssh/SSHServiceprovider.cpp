@@ -13,6 +13,7 @@ created Date    : 6th Apr 2025
 #if defined(ENABLE_SSH_SERVICE)
 
 #include "SSHServiceprovider.h"
+#include <helpers/ConfigHelper.h>
 #include <utility/SafeAlloc.h>
 #include <utility/crypto/asymmetric/ed25519/ed25519.h>
 #include <service_provider/session/SessionManager.h>
@@ -98,31 +99,31 @@ bool SSHServer::initService(void *arg) {
 }
 
 /**
- * @brief Create SSH_CONFIG_FILE with default policy when it is missing.
+ * @brief Create the service config file with default policy when it is missing.
  */
 void SSHServer::createDefaultSshConfig() {
 
-    pdiutil::string cfgfile = CHARPTR_WRAP(SSH_CONFIG_FILE);
-    pdiutil::string cfgdir = CHARPTR_WRAP(SSH_CONFIG_DIR);
-
-    if (__i_fs.isFileExist(cfgfile.c_str())) {
+    pdiutil::string cfgfile;
+    getServiceConfigPath(cfgfile);
+    if (cfgfile.empty()) {
         return;
     }
 
-    if (!__i_fs.isDirExist(cfgdir.c_str())) {
-        if (__i_fs.createDirectory(cfgdir.c_str()) < 0) {
-            return;
-        }
-    }
+    pdiutil::string header = CHARPTR_WRAP(SSH_CONFIG_HEADER);
 
-    pdiutil::string defaultcfg = CHARPTR_WRAP(
-        "# PDI SSH server configuration\n"
-        "# PasswordAuthentication yes|no\n"
-        "# PubkeyAuthentication yes|no\n"
-        "PasswordAuthentication yes\n"
-        "PubkeyAuthentication yes\n");
+    ssh_config_t defaults;
+    pdiutil::vector<config_kv_t> kvs;
+    config_kv_t kv;
 
-    __i_fs.createFile(cfgfile.c_str(), defaultcfg.c_str());
+    kv.m_key = CHARPTR_WRAP(SSH_CONFIG_KEY_PASSWORD_AUTH);
+    kv.m_value = configBoolAsValue(defaults.m_password_auth);
+    kvs.push_back(kv);
+
+    kv.m_key = CHARPTR_WRAP(SSH_CONFIG_KEY_PUBKEY_AUTH);
+    kv.m_value = configBoolAsValue(defaults.m_pubkey_auth);
+    kvs.push_back(kv);
+
+    ensureConfigFile(cfgfile.c_str(), kvs, header.c_str());
 }
 
 /**
@@ -209,6 +210,13 @@ void SSHServer::handle() {
         }
     }
     m_session = nullptr;
+
+    // The grace times how long a waiting client is held, so a period with
+    // nobody queued is not one. Left standing, the next client to arrive would
+    // find a grace that expired without it and be refused at once.
+    if (!m_server->hasClient()) {
+        m_poolfullsince = 0;
+    }
 
     // Accept new client connections into any free pool slot. A client that
     // arrives while the pool is full is refused rather than left connected.
@@ -326,6 +334,17 @@ void SSHServer::serviceSession() {
                 } else if (m_session->isSessionTimeout()) {
                     m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_TIMEOUT;
                 }
+            }
+        } else {
+
+            // before a channel exists nothing else times this session out, so a
+            // client that stalls mid handshake would hold its pool slot for good
+            m_session->m_session_timeout = SSH_HANDSHAKE_IDLE_MS;
+
+            if (m_session->m_client->available() > 0) {
+                m_session->markActive();
+            } else if (m_session->isSessionTimeout()) {
+                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_TIMEOUT;
             }
         }
 
@@ -459,10 +478,6 @@ void SSHServer::handleVersionExchange() {
         pdiutil::string ssh_prefix = CHARPTR_WRAP("SSH-");
         if (m_session->m_client_version.length() > 4 && m_session->m_client_version.substr(0, 4) == ssh_prefix) {
             m_session->m_state = LWSSHSession::SESSION_STATE_KEX_INIT_RECV;
-        }
-
-        if( m_session->isSessionTimeout() ){
-            m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_TIMEOUT;
         }
     }
 }
@@ -690,7 +705,9 @@ void LWSSH::SSHServer::handleAuthentication(){
             }else if(msg_type == SSH2_MSG_SERVICE_REQUEST){
 
                 if(!m_session->m_ssh_config_loaded){
-                    load_ssh_config(m_session->m_ssh_config);
+                    pdiutil::string cfgfile;
+                    getServiceConfigPath(cfgfile);
+                    load_ssh_config(cfgfile.c_str(), m_session->m_ssh_config);
                     m_session->m_ssh_config_loaded = true;
                 }
 
@@ -813,7 +830,12 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
             uint8_t msg_type = m_session->m_sshpacket.payload[0];
 
-            if(msg_type == SSH2_MSG_CHANNEL_OPEN){
+            if(msg_type == SSH2_MSG_DISCONNECT){
+
+                // the client said it is leaving, so give the slot up now rather
+                // than waiting for the transport to notice the socket went away
+                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_TIMEOUT;
+            }else if(msg_type == SSH2_MSG_CHANNEL_OPEN){
 
                 bool bstatus = parse_channel_open_request(m_session, m_session->m_sshpacket);
 
@@ -959,12 +981,12 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
                             #ifdef ENABLE_CMD_SERVICE
 
-                            cmd_result_t res = __cmd_service.processTerminalInput(m_session->m_sshclient);
+                            pdi_err_t res = __cmd_service.processTerminalInput(m_session->m_sshclient);
 
                             // Only an explicit terminal abort (logout / EOF)
-                            // closes the SSH channel. CMD_RESULT_ABORTED is a
+                            // closes the SSH channel. CMD_ERROR_CANCELED is a
                             // command-scope Ctrl+C/Ctrl+Z — session stays.
-                            if( res == CMD_RESULT_TERMINAL_ABORTED ){
+                            if( res == CMD_ERROR_INTR ){
                                 __auth_service.setAuthorized(false);
                                 SessionManager::changeDirectory(__i_fs.getHomeDirectory());
                                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
@@ -1022,7 +1044,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
                     send_server_ssh_packet(m_session, reply, true);
                     m_session->current_channel.ischannelreqsuccess = -1;
 
-                    __task_scheduler.setTimeout( [&]() {
+                    this->serviceSetTimeout( [&]() {
                         if( nullptr != m_session ){
                             m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                         }
@@ -1087,9 +1109,9 @@ void LWSSH::SSHServer::handleChannelRequest(){
               m_session->current_channel.req_type == rt_pty_pending ) &&
             m_session->m_sshclient->available() > 0
         ){
-            cmd_result_t res = __cmd_service.processTerminalInput(m_session->m_sshclient);
+            pdi_err_t res = __cmd_service.processTerminalInput(m_session->m_sshclient);
 
-            if( res == CMD_RESULT_TERMINAL_ABORTED ){
+            if( res == CMD_ERROR_INTR ){
                 __auth_service.setAuthorized(false);
                 SessionManager::changeDirectory(__i_fs.getHomeDirectory());
                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;

@@ -535,12 +535,28 @@ def removed_topic_is_unsubscribed(t):
         raise Skip("the client never subscribed to %s to drop it" % SUB_SECOND)
 
     portal = portal_for(t)
+    sessions_before = state.broker.connect_count()
     write_form(portal, PUBSUB, pubsub_fields(second_subscription=""))
 
     deadline = time.time() + PUBLISH_WAIT
     while time.time() < deadline:
         if SUB_SECOND in state.broker.unsubscribed:
             return
+
+        # A client that reconnects around the config change subscribes afresh
+        # to what is left and never sends an UNSUBSCRIBE. The owner asked not to
+        # be listening on the topic, and it is not, so that answers the same
+        # question. A session that has not subscribed to anything yet has not
+        # answered it, and is waited on rather than counted.
+        if state.broker.connect_count() > sessions_before:
+            session = state.broker.session()
+            if session is not None and session.subscriptions:
+                if SUB_SECOND not in [topic for topic, _ in session.subscriptions]:
+                    return
+                raise AssertionError("%s was removed from the config but the "
+                                     "client subscribed to it again on "
+                                     "reconnecting" % SUB_SECOND)
+
         time.sleep(1.0)
 
     raise AssertionError("%s was removed from the config but the client never "

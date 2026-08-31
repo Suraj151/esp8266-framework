@@ -38,22 +38,25 @@ struct UseraddCommand : public CommandBase {
 	bool needauth() override { return true; }
 	bool wantsMaskedInput() override { return isWaitingForOption(CMD_OPTION_NAME_P); }
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 
 		if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
 		    terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
-			return CMD_RESULT_ABORTED;
+			return CMD_ERROR_CANCELED;
 		}
 
 		const char *me = __auth_service.getUsername();
-		if( nullptr == me || 0 == me[0] ) return CMD_RESULT_NEED_AUTH;
+		if( nullptr == me || 0 == me[0] ) return CMD_ERROR_PERM;
 		if( SessionManager::getCurrentUid() != USER_STORE_ROOT_UID ){
-			if( nullptr != m_terminal ) m_terminal->writeln_ro(RODT_ATTR("\nroot required"));
-			return CMD_RESULT_FAILED;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("root required"));
+			}
+			return CMD_ERROR_FAILED;
 		}
 
 		CommandOption *uOpt = RetrieveOption(CMD_OPTION_NAME_U);
@@ -64,8 +67,11 @@ struct UseraddCommand : public CommandBase {
 
 		if( !hasU ){
 			setWaitingForOption(CMD_OPTION_NAME_U);
-			if( nullptr != m_terminal ) m_terminal->write_ro(RODT_ATTR("\nuser: "));
-			return CMD_RESULT_INCOMPLETE;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("user: "));
+			}
+			return CMD_ERROR_AGAIN;
 		}
 
 		char uname[USER_STORE_MAX_USERNAME_LEN];
@@ -75,16 +81,22 @@ struct UseraddCommand : public CommandBase {
 
 		user_record_t existing;
 		if( __user_store_service.findUserByName(uname, existing) ){
-			if( nullptr != m_terminal ) m_terminal->writeln_ro(RODT_ATTR("\nuser exists"));
-			return CMD_RESULT_FAILED;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("user exists"));
+			}
+			return CMD_ERROR_FAILED;
 		}
 
 		holdOptionValue(CMD_OPTION_NAME_U);
 
 		if( !hasP ){
 			setWaitingForOption(CMD_OPTION_NAME_P);
-			if( nullptr != m_terminal ) m_terminal->write_ro(RODT_ATTR("\nPass : "));
-			return CMD_RESULT_INCOMPLETE;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("Pass : "));
+			}
+			return CMD_ERROR_AGAIN;
 		}
 
 		char pw[LOGIN_CONFIGS_BUF_SIZE];
@@ -105,13 +117,14 @@ struct UseraddCommand : public CommandBase {
 
 		if( __user_store_service.addUser(newRec, pw) ){
 			if( nullptr != m_terminal ){
-				m_terminal->write_ro(RODT_ATTR("\nadded "));
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("added "));
 				m_terminal->write(uname);
 			}
-			return CMD_RESULT_OK;
+			return PDI_OK;
 		}
 
-		return CMD_RESULT_FAILED;
+		return CMD_ERROR_FAILED;
 	}
 };
 

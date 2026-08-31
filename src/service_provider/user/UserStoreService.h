@@ -25,6 +25,7 @@ public:
   ~UserStoreService();
 
   bool initService(void *arg = nullptr) override;
+  bool isEssentialService() const override { return true; }
 
   bool findUserByName(const char *username, user_record_t &out);
   bool findUserByUid(uint16_t uid, user_record_t &out);

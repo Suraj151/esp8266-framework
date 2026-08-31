@@ -60,23 +60,23 @@ struct PingCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_TERMINAL_ERR;
+			return CMD_ERROR_NOTTY;
 		}
 
 		CommandOption *a0 = &m_options[0];
 		CommandOption *a1 = &m_options[1];
 		if( nullptr == a0->optionval || a0->optionvalsize <= 0 ){
-			return CMD_RESULT_ARGS_MISSING;
+			return CMD_ERROR_ARGS_MISSING;
 		}
 
 		pdiutil::string host(a0->optionval, a0->optionvalsize);
@@ -110,14 +110,14 @@ struct PingCommand : public CommandBase {
 
 		if( __i_ping.isPingBusy() ){
 			m_terminal->writeln_ro(RODT_ATTR("ping: another ping is in progress, try again"));
-			return CMD_RESULT_FAILED;
+			return CMD_ERROR_FAILED;
 		}
 
 		ipaddress_t ip;
 		if( !NameResolver::resolve(host.c_str(), ip) ){
 			m_terminal->write_ro(RODT_ATTR("ping: cannot resolve host: "));
 			m_terminal->writeln(host.c_str());
-			return CMD_RESULT_OK;
+			return PDI_OK;
 		}
 
 		pdiutil::string ipstr = ip;
@@ -147,7 +147,7 @@ struct PingCommand : public CommandBase {
 
 		if( !__i_ping.ping(ip, count, on_packet) ){
 			m_terminal->writeln_ro(RODT_ATTR("ping: could not start"));
-			return CMD_RESULT_FAILED;
+			return CMD_ERROR_FAILED;
 		}
 
 		uint32_t start = __i_dvc_ctrl.millis_now();
@@ -181,7 +181,7 @@ struct PingCommand : public CommandBase {
 			m_terminal->writeln_ro(RODT_ATTR(" ms"));
 		}
 
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

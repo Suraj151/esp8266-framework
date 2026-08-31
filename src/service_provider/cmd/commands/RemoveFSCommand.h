@@ -47,16 +47,16 @@ struct RemoveFSCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
-		cmd_result_t result = CMD_RESULT_OK;
+		pdi_err_t result = PDI_OK;
 
 		if(nullptr != m_terminal){
 			// Get first option which must be the path
@@ -72,7 +72,7 @@ struct RemoveFSCommand : public CommandBase {
 				}
 
 				if(iStatus < 0){
-					result = CMD_RESULT_FAILED;
+					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
 					m_terminal->write_ro(RODT_ATTR("Failed to delete : "));
 					m_terminal->write(fileOrDir.c_str());
@@ -80,7 +80,7 @@ struct RemoveFSCommand : public CommandBase {
 					m_terminal->write((int32_t)iStatus);
 				}
 			}else{
-				result = CMD_RESULT_ARGS_ERROR;
+				result = CMD_ERROR_INVAL;
 			}
 		}
 

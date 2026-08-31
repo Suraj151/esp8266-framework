@@ -63,15 +63,15 @@ struct TlsCommand : public CommandBase {
 #endif
 
     /* execute command with provided options */
-    cmd_result_t execute(cmd_term_inseq_t terminputaction) {
+    pdi_err_t execute(cmd_term_inseq_t terminputaction) {
 
 #ifdef ENABLE_AUTH_SERVICE
         if (needauth() && !__auth_service.getAuthorized()) {
-            return CMD_RESULT_NEED_AUTH;
+            return CMD_ERROR_PERM;
         }
 #endif
 
-        cmd_result_t result = CMD_RESULT_OK;
+        pdi_err_t result = PDI_OK;
         TlsCommandQuery tlsq = TLS_COMMAND_QUERY_MAX;
         CommandOption* cmdoptn = nullptr;
 
@@ -124,7 +124,7 @@ struct TlsCommand : public CommandBase {
 
                 if (params.ip_v4 == 0 &&
                     (params.dns_name == nullptr || params.dns_name[0] == 0)) {
-                    result = CMD_RESULT_FAILED;
+                    result = CMD_ERROR_FAILED;
                     m_terminal->putln();
                     m_terminal->writeln_ro(RODT_ATTR("Provide -n <name> and/or -i <ip>."));
                     return result;
@@ -146,12 +146,12 @@ struct TlsCommand : public CommandBase {
                 if (ok) {
                     m_terminal->writeln_ro(RODT_ATTR("TLS cert generated successfully."));
                 } else {
-                    result = CMD_RESULT_FAILED;
+                    result = CMD_ERROR_FAILED;
                     m_terminal->writeln_ro(RODT_ATTR("Failed to generate TLS cert."));
                 }
             }
         }else{
-            result = CMD_RESULT_ARGS_ERROR;
+            result = CMD_ERROR_INVAL;
         }
 
         return result;

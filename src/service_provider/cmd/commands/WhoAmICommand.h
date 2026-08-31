@@ -33,10 +33,10 @@ struct WhoAmICommand : public CommandBase {
 
 	bool needauth() override { return true; }
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 
 		if( nullptr != m_terminal ){
@@ -46,7 +46,7 @@ struct WhoAmICommand : public CommandBase {
 				m_terminal->write(u);
 			}
 		}
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

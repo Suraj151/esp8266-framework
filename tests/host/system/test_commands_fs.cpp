@@ -132,10 +132,10 @@ TEST(cmdfs, a_command_needing_an_argument_reports_one_missing)
     pditest::Shell shell;
 
     shell.run("touch");
-    ASSERT_EQ(shell.result(), CMD_RESULT_ARGS_ERROR);
+    ASSERT_EQ(shell.result(), CMD_ERROR_INVAL);
 
     shell.run("mkdir");
-    ASSERT_EQ(shell.result(), CMD_RESULT_ARGS_ERROR);
+    ASSERT_EQ(shell.result(), CMD_ERROR_INVAL);
 }
 
 TEST(cmdfs, a_command_with_no_argument_still_runs_when_it_needs_none)
@@ -229,7 +229,7 @@ TEST(cmdfs, cat_of_a_missing_file_does_not_print_content)
 
     std::string out = shell.run("cat absent.txt");
     ASSERT_FALSE(saw(out, "absent content"));
-    ASSERT_NE(shell.result(), CMD_RESULT_MAX);
+    ASSERT_NE(shell.result(), CMD_ERROR_UNSET);
 
     scrub(shell, "/w_catmiss");
 }

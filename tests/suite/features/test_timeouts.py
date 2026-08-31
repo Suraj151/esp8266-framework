@@ -79,6 +79,39 @@ def ssh_handshake_idle_timeout(t):
         sock.close()
 
 
+@test("an ssh connection that stalls after its banner is dropped", slow=True)
+def ssh_stalled_handshake_timeout(t):
+    """A client that sends its version banner and then stops holds a pool slot.
+    Only the banner used to be timed, so a session stalled anywhere later in the
+    handshake kept its slot until the client went away on its own."""
+    try:
+        sock = socket.create_connection((t.address(), ssh_port(t)), timeout=15)
+    except OSError as err:
+        raise Skip("no ssh server reachable: %s" % err)
+
+    sock.settimeout(30)
+    try:
+        sock.sendall(b"SSH-2.0-pdi_stall_probe\r\n")
+
+        start = time.time()
+        closed = False
+        while time.time() - start < 40:
+            try:
+                if not sock.recv(512):
+                    closed = True
+                    break
+            except socket.timeout:
+                break
+
+        elapsed = time.time() - start
+        if not closed:
+            raise AssertionError("the server held a stalled handshake past its idle timeout")
+        if elapsed < 3:
+            raise AssertionError("the connection dropped at once (%.1fs), not on the idle timeout" % elapsed)
+    finally:
+        sock.close()
+
+
 @test("an idle sftp session is closed after the sftp timeout", slow=True)
 def sftp_idle_timeout(t):
     from .test_sftp import sftp_open
@@ -123,7 +156,7 @@ def busy_telnet_survives_idle(t):
     a watch keeps one busy with no keyboard input for longer than the window."""
     peer = _telnet_peer(t)
     try:
-        peer.send_line("watch c=whoami; i=5000; n=1000")
+        peer.send_line("watch c=whoami,i=5000,n=1000")
         peer.drain(2.0)
 
         _keepalive(t, 200)   # past the 180s telnet idle window

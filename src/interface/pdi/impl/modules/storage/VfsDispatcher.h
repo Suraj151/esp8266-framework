@@ -89,6 +89,13 @@ public:
     int setFileOwner(const char* path, uint16_t uid, uint16_t gid) override;
     pdi_err_t touch(const char* path) override;
 
+    pdi_fhandle_t openFile(const char* path, uint8_t flags) override;
+    int readFileHandle(pdi_fhandle_t handle, char* buffer, uint32_t size) override;
+    int writeFileHandle(pdi_fhandle_t handle, const char* content, uint32_t size) override;
+    int64_t seekFile(pdi_fhandle_t handle, int64_t offset, file_seek_t whence) override;
+    pdi_err_t syncFile(pdi_fhandle_t handle) override;
+    pdi_err_t closeFile(pdi_fhandle_t handle) override;
+
     // POSIX-style access-mode bits accepted by checkAccess.
     static constexpr uint8_t VFS_ACCESS_R = 4;
     static constexpr uint8_t VFS_ACCESS_W = 2;
@@ -123,6 +130,11 @@ protected:
     // cross a mount boundary). Returns 0 on success, -1 otherwise.
     int crossCopy(iFileSystemInterface* sb, const char* srel,
                   iFileSystemInterface* db, const char* drel);
+
+    // The backend owns every open file; the dispatcher only carries which mount
+    // a handle came from, packed into the handle itself. Returns nullptr when
+    // the handle names no mounted backend.
+    iFileSystemInterface* resolveHandle(pdi_fhandle_t handle, pdi_fhandle_t& backend_handle) const;
 
     vfs_mount_t m_mounts[VFS_MAX_MOUNTS];
     uint8_t m_mount_count;

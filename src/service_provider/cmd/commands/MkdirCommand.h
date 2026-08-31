@@ -40,15 +40,15 @@ struct MkdirCommand : public CommandBase {
 	bool needauth() override { return true; }
 #endif
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
-		cmd_result_t result = CMD_RESULT_OK;
+		pdi_err_t result = PDI_OK;
 
 		if(nullptr != m_terminal){
 			CommandOption *cmdoptn = &m_options[0];
@@ -56,7 +56,7 @@ struct MkdirCommand : public CommandBase {
 			if( !dirname.empty() ){
 				int bStatus = __i_fs.createDirectory(dirname.c_str());
 				if (bStatus < 0) {
-					result = CMD_RESULT_FAILED;
+					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
 					m_terminal->write_ro(RODT_ATTR("Failed to create directory: "));
 					m_terminal->write(dirname.c_str());
@@ -64,7 +64,7 @@ struct MkdirCommand : public CommandBase {
 					m_terminal->write((int32_t)bStatus);
 				}
 			}else{
-				result = CMD_RESULT_ARGS_ERROR;
+				result = CMD_ERROR_INVAL;
 			}
 		}
 

@@ -67,11 +67,14 @@ created Date    : 1st June 2025
 
 /* SSH server configuration file and its option keys */
 #define SSH_CONFIG_DIR "/etc/ssh"
-#define SSH_CONFIG_FILE "/etc/ssh/sshconfig"
 /* Server host keys live with the server config, ~/.ssh holds the user's client keys */
 #define SSH_HOST_KEY_DIR SSH_CONFIG_DIR
 #define SSH_CONFIG_KEY_PASSWORD_AUTH "PasswordAuthentication"
 #define SSH_CONFIG_KEY_PUBKEY_AUTH "PubkeyAuthentication"
+#define SSH_CONFIG_HEADER \
+    "# PDI SSH server configuration" TERMINAL_NEW_LINE \
+    "# PasswordAuthentication yes|no" TERMINAL_NEW_LINE \
+    "# PubkeyAuthentication yes|no" TERMINAL_NEW_LINE
 
 /* Private host key material, readable only by its owner like the user store */
 #ifndef SSH_PRIVATE_KEY_PERMS
@@ -87,7 +90,7 @@ enum SSHKeyAlgorithm{
     SSH_KEY_ALGO_MAX
 };
 
-/* SSH server auth policy, populated from SSH_CONFIG_FILE.
+/* SSH server auth policy, populated from the service config file.
    Both methods default enabled when the file is absent. */
 typedef struct ssh_config {
     bool m_password_auth;

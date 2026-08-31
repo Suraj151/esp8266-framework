@@ -64,6 +64,12 @@ public:
   virtual ipaddress_t gatewayIP() = 0;
   virtual ipaddress_t dnsIP(uint8_t _dns_no = 0) = 0;
 
+  /**
+   * Traffic either radio interface has carried. A port that cannot count says
+   * so rather than reporting zeroes.
+   */
+  virtual bool getCounters(netif_kind_t _kind, netif_counters_t &_out) { return false; }
+
   // STA WiFi info
   virtual wifi_status_t status() = 0;
   virtual pdiutil::string SSID() const = 0;

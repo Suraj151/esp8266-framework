@@ -46,6 +46,22 @@ def strip_ansi(text):
     return ANSI.sub("", text)
 
 
+def describe(err):
+    """
+    An exception as a reason worth printing.
+
+    Several of the failures a transport hits carry no message at all — a bare
+    EOFError when a banner is cut off, and some paramiko exceptions — so
+    formatting one with %s produces an empty reason and the failure names
+    nothing. The class is always there even when the message is not.
+    """
+    if err is None:
+        return "no reason given"
+
+    text = str(err).strip()
+    return "%s: %s" % (type(err).__name__, text) if text else type(err).__name__
+
+
 class Shell(object):
     """
     Transports implement _send, _recv and close. _recv returns whatever has
@@ -59,6 +75,24 @@ class Shell(object):
     def __init__(self):
         self._buffer = ""
         self._log = ""
+        self._sync = 0
+        self.raw_anomalies = []
+
+    def decode(self, chunk):
+        """
+        Bytes as text, keeping a note of any that were not text.
+
+        Decoding with errors="replace" turns a corrupted byte into U+FFFD and
+        throws the byte away, which is exactly the evidence needed to tell line
+        noise from a framing error from a stray protocol byte. Defect AV has
+        stayed unexplained for that reason.
+        """
+        try:
+            return chunk.decode()
+        except UnicodeDecodeError:
+            if len(self.raw_anomalies) < 20:
+                self.raw_anomalies.append(chunk.hex())
+            return chunk.decode(errors="replace")
 
     def _send(self, data):
         raise NotImplementedError
@@ -211,7 +245,37 @@ class Shell(object):
         """
         return self.expect(LOGIN_PROMPT, timeout, consume=False)
 
+    def settle(self, timeout=DEFAULT_TIMEOUT):
+        """
+        Read past anything the target has already queued.
+
+        A session can open with more than one prompt behind it, and a prompt
+        left in the buffer is matched by the next command's read, which then
+        returns before that command has answered anything — and every command
+        after it reads the previous one's output. Reading up to a token only
+        this call could have produced discards whatever was queued, however
+        much of it there is.
+        """
+        self._sync += 1
+        token = "attach%d" % self._sync
+        budget = min(timeout, 10.0)
+
+        try:
+            self.send_line("echo %s" % token)
+            self.expect(token, budget)
+            self.expect(PROMPT, budget)
+        except ShellError:
+            pass
+
     def attach(self, username, password, timeout=DEFAULT_TIMEOUT):
+        """
+        Reach a usable prompt and leave nothing queued behind it.
+        """
+        reached = self._reach_prompt(username, password, timeout)
+        self.settle(timeout)
+        return reached
+
+    def _reach_prompt(self, username, password, timeout=DEFAULT_TIMEOUT):
         """
         Reach a usable prompt, whatever state the target is in.
 

@@ -78,6 +78,12 @@ int LWSSH::parse_received_packet(LWSSHSession* session, ssh_packet &packet){
 
     session->packets_seq_num_ctos++;
 
+    // a handshake that is progressing is not idle, so the pre-login timer is
+    // held off by the packets themselves rather than by the channel alone
+    if (bStatus) {
+        session->markActive();
+    }
+
     return bStatus ? 0 : PDI_ERR_CORRUPT;
 }
 
@@ -311,7 +317,11 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     }
 
     bool bStatus = (!packet.payload.empty() && packet.payload.size() == payload_length && packet.payload[0] < 101);
-    
+
+    if (bStatus) {
+        session->markActive();
+    }
+
     return bStatus ? 0 : PDI_ERR_CORRUPT;
 }
 
@@ -1074,36 +1084,26 @@ bool LWSSH::parse_userauth_request(const pdiutil::vector<uint8_t>& payload, SSHU
 }
 
 /**
- * @brief Load the SSH auth policy from SSH_CONFIG_FILE.
+ * @brief Load the SSH auth policy from the service config file.
+ * @param cfgfile Absolute path of the config file to read.
  * @param config Output config; left at its defaults when the file is absent.
  */
-void LWSSH::load_ssh_config(ssh_config_t& config) {
+void LWSSH::load_ssh_config(const char* cfgfile, ssh_config_t& config) {
 
-    pdiutil::string cfgfile = CHARPTR_WRAP(SSH_CONFIG_FILE);
     pdiutil::string keyPasswordAuth = CHARPTR_WRAP(SSH_CONFIG_KEY_PASSWORD_AUTH);
     pdiutil::string keyPubkeyAuth = CHARPTR_WRAP(SSH_CONFIG_KEY_PUBKEY_AUTH);
 
     pdiutil::vector<config_kv_t> kvs;
-    if (!loadConfigFile(cfgfile.c_str(), kvs)) {
+    if (!loadConfigFile(cfgfile, kvs)) {
         return;
     }
 
-    pdiutil::string val_no = CHARPTR_WRAP("no");
-    pdiutil::string val_No = CHARPTR_WRAP("No");
-    pdiutil::string val_NO = CHARPTR_WRAP("NO");
-    pdiutil::string val_0 = CHARPTR_WRAP("0");
-    pdiutil::string val_false = CHARPTR_WRAP("false");
-
     for (size_t i = 0; i < kvs.size(); i++) {
 
-        bool enabled = !(kvs[i].m_value == val_no || kvs[i].m_value == val_No ||
-                         kvs[i].m_value == val_NO || kvs[i].m_value == val_0 ||
-                         kvs[i].m_value == val_false);
-
         if (kvs[i].m_key == keyPasswordAuth) {
-            config.m_password_auth = enabled;
+            config.m_password_auth = configValueAsBool(kvs[i].m_value, config.m_password_auth);
         } else if (kvs[i].m_key == keyPubkeyAuth) {
-            config.m_pubkey_auth = enabled;
+            config.m_pubkey_auth = configValueAsBool(kvs[i].m_value, config.m_pubkey_auth);
         }
     }
 }

@@ -41,6 +41,13 @@ bool WiFiStationNetif::getInfo(netif_info_t &out) {
 }
 
 /**
+ * What the port can say about station traffic, and nothing when it cannot.
+ */
+bool WiFiStationNetif::getCounters(netif_counters_t &out) {
+    return __i_wifi.getCounters(NETIF_KIND_WIFI_STA, out);
+}
+
+/**
  * The access point's own address and the network it advertises.
  */
 bool WiFiApNetif::getInfo(netif_info_t &out) {
@@ -58,6 +65,14 @@ bool WiFiApNetif::getInfo(netif_info_t &out) {
     out.m_mac[len] = '\0';
 
     return true;
+}
+
+/**
+ * What the port can say about access point traffic, and nothing when it
+ * cannot.
+ */
+bool WiFiApNetif::getCounters(netif_counters_t &out) {
+    return __i_wifi.getCounters(NETIF_KIND_WIFI_AP, out);
 }
 
 /**

@@ -44,18 +44,18 @@ struct PasswdCommand : public CommandBase {
 		       isWaitingForOption(CMD_OPTION_NAME_C);
 	}
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 
 		const char *username = __auth_service.getUsername();
-		if( nullptr == username || 0 == username[0] ) return CMD_RESULT_FAILED;
+		if( nullptr == username || 0 == username[0] ) return CMD_ERROR_FAILED;
 
 		if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
 		    terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
-			return CMD_RESULT_ABORTED;
+			return CMD_ERROR_CANCELED;
 		}
 
 		CommandOption *pOpt = RetrieveOption(CMD_OPTION_NAME_P);
@@ -68,8 +68,11 @@ struct PasswdCommand : public CommandBase {
 
 		if( !hasP ){
 			setWaitingForOption(CMD_OPTION_NAME_P);
-			if( nullptr != m_terminal ) m_terminal->write_ro(RODT_ATTR("\ncurrent: "));
-			return CMD_RESULT_INCOMPLETE;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("current: "));
+			}
+			return CMD_ERROR_AGAIN;
 		}
 
 		char curPw[LOGIN_CONFIGS_BUF_SIZE];
@@ -78,29 +81,38 @@ struct PasswdCommand : public CommandBase {
 		memcpy(curPw, pOpt->optionval, clen);
 
 		if( !__auth_service.isAuthorized(username, curPw) ){
-			return CMD_RESULT_WRONG_CREDENTIAL;
+			return CMD_ERROR_ACCES;
 		}
 
 		holdOptionValue(CMD_OPTION_NAME_P);
 
 		if( !hasN ){
 			setWaitingForOption(CMD_OPTION_NAME_N);
-			if( nullptr != m_terminal ) m_terminal->write_ro(RODT_ATTR("\nnew: "));
-			return CMD_RESULT_INCOMPLETE;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("new: "));
+			}
+			return CMD_ERROR_AGAIN;
 		}
 
 		holdOptionValue(CMD_OPTION_NAME_N);
 
 		if( !hasC ){
 			setWaitingForOption(CMD_OPTION_NAME_C);
-			if( nullptr != m_terminal ) m_terminal->write_ro(RODT_ATTR("\nconfirm: "));
-			return CMD_RESULT_INCOMPLETE;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("confirm: "));
+			}
+			return CMD_ERROR_AGAIN;
 		}
 
 		if( nOpt->optionvalsize != cOpt->optionvalsize ||
 		    0 != memcmp(nOpt->optionval, cOpt->optionval, nOpt->optionvalsize) ){
-			if( nullptr != m_terminal ) m_terminal->writeln_ro(RODT_ATTR("\nmismatch"));
-			return CMD_RESULT_FAILED;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("mismatch"));
+			}
+			return CMD_ERROR_FAILED;
 		}
 
 		char newPw[LOGIN_CONFIGS_BUF_SIZE];
@@ -109,11 +121,14 @@ struct PasswdCommand : public CommandBase {
 		memcpy(newPw, nOpt->optionval, nlen);
 
 		if( __user_store_service.setPassword(username, newPw) ){
-			if( nullptr != m_terminal ) m_terminal->writeln_ro(RODT_ATTR("\npassword updated"));
-			return CMD_RESULT_OK;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("password updated"));
+			}
+			return PDI_OK;
 		}
 
-		return CMD_RESULT_FAILED;
+		return CMD_ERROR_FAILED;
 	}
 };
 

@@ -51,29 +51,29 @@ struct HostCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_TERMINAL_ERR;
+			return CMD_ERROR_NOTTY;
 		}
 
 		CommandOption *cmdoptn = &m_options[0];
 		if( nullptr == cmdoptn->optionval || cmdoptn->optionvalsize <= 0 ){
-			return CMD_RESULT_ARGS_MISSING;
+			return CMD_ERROR_ARGS_MISSING;
 		}
 
 		const char *blob = cmdoptn->optionval;
 		int16_t nlen = 0;
 		while( nlen < cmdoptn->optionvalsize && blob[nlen] != '\0' && blob[nlen] != ' ' ) nlen++;
 		if( nlen == 0 ){
-			return CMD_RESULT_ARGS_MISSING;
+			return CMD_ERROR_ARGS_MISSING;
 		}
 
 		pdiutil::string name(blob, nlen);
@@ -90,7 +90,7 @@ struct HostCommand : public CommandBase {
 			m_terminal->writeln(name.c_str());
 		}
 
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

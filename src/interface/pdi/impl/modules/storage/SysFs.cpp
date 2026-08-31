@@ -217,7 +217,7 @@ pdiutil::string SysFs::render(const char* path) {
     char buf[12];
     Uint32ToString(v, buf, sizeof(buf));
     pdiutil::string out(buf);
-    out += "\n";
+    out += TERMINAL_NEW_LINE;
     return out;
 #else
     return pdiutil::string();
@@ -334,7 +334,7 @@ pdiutil::string SysFs::renderNetAttr(uint8_t index, uint8_t leaf) {
 
     // a leaf that has nothing to say still reads as a line, so a reader can
     // tell an empty value from a node that is not there
-    out += "\n";
+    out += TERMINAL_NEW_LINE;
     return out;
 }
 #endif

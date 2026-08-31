@@ -36,22 +36,25 @@ struct UserdelCommand : public CommandBase {
 
 	bool needauth() override { return true; }
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 
 		if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
 		    terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
-			return CMD_RESULT_ABORTED;
+			return CMD_ERROR_CANCELED;
 		}
 
 		const char *me = __auth_service.getUsername();
-		if( nullptr == me || 0 == me[0] ) return CMD_RESULT_NEED_AUTH;
+		if( nullptr == me || 0 == me[0] ) return CMD_ERROR_PERM;
 		if( SessionManager::getCurrentUid() != USER_STORE_ROOT_UID ){
-			if( nullptr != m_terminal ) m_terminal->writeln_ro(RODT_ATTR("\nroot required"));
-			return CMD_RESULT_FAILED;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("root required"));
+			}
+			return CMD_ERROR_FAILED;
 		}
 
 		CommandOption *uOpt = RetrieveOption(CMD_OPTION_NAME_U);
@@ -59,8 +62,11 @@ struct UserdelCommand : public CommandBase {
 
 		if( !hasU ){
 			setWaitingForOption(CMD_OPTION_NAME_U);
-			if( nullptr != m_terminal ) m_terminal->write_ro(RODT_ATTR("\nuser: "));
-			return CMD_RESULT_INCOMPLETE;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("user: "));
+			}
+			return CMD_ERROR_AGAIN;
 		}
 
 		char uname[USER_STORE_MAX_USERNAME_LEN];
@@ -69,30 +75,40 @@ struct UserdelCommand : public CommandBase {
 		memcpy(uname, uOpt->optionval, ulen);
 
 		if( 0 == strcmp(uname, me) ){
-			if( nullptr != m_terminal ) m_terminal->writeln_ro(RODT_ATTR("\ncannot delete self"));
-			return CMD_RESULT_FAILED;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("cannot delete self"));
+			}
+			return CMD_ERROR_FAILED;
 		}
 
 		user_record_t target;
 		if( !__user_store_service.findUserByName(uname, target) ){
-			if( nullptr != m_terminal ) m_terminal->writeln_ro(RODT_ATTR("\nno such user"));
-			return CMD_RESULT_FAILED;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("no such user"));
+			}
+			return CMD_ERROR_FAILED;
 		}
 
 		if( target.m_uid == USER_STORE_ROOT_UID ){
-			if( nullptr != m_terminal ) m_terminal->writeln_ro(RODT_ATTR("\ncannot delete root"));
-			return CMD_RESULT_FAILED;
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("cannot delete root"));
+			}
+			return CMD_ERROR_FAILED;
 		}
 
 		if( __user_store_service.removeUser(uname) ){
 			if( nullptr != m_terminal ){
-				m_terminal->write_ro(RODT_ATTR("\nremoved "));
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("removed "));
 				m_terminal->write(uname);
 			}
-			return CMD_RESULT_OK;
+			return PDI_OK;
 		}
 
-		return CMD_RESULT_FAILED;
+		return CMD_ERROR_FAILED;
 	}
 };
 

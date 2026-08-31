@@ -20,7 +20,7 @@ created Date    : 19th July 2026
  * e.g.
  *   top                     refresh every 2s, forever (until stopRunningInBackground)
  *   top i=1000              refresh every 1s
- *   top i=2000; n=5         5 refreshes, then stop
+ *   top i=2000,n=5          5 refreshes, then stop
  *   top u=1                 filter by owner session id 1
  */
 struct TopCommand : public CommandBase {
@@ -34,7 +34,7 @@ struct TopCommand : public CommandBase {
 		AddOption(CMD_OPTION_NAME_I);
 		AddOption(CMD_OPTION_NAME_N);
 		AddOption(CMD_OPTION_NAME_U);
-		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SEMICOLON);
+		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_COMMA);
 	}
 
 	~TopCommand(){
@@ -48,7 +48,7 @@ struct TopCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("top [i=<ms>; n=<iters>; u=<sid>]  refreshed ps view; Ctrl+C to stop");
+		return RODT_ATTR("top [i=<ms>,n=<iters>,u=<sid>]  refreshed ps view; Ctrl+C to stop");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -62,16 +62,16 @@ struct TopCommand : public CommandBase {
 		return CommandBase::stopRunningInBackground();
 	}
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_FAILED;
+			return CMD_ERROR_FAILED;
 		}
 
 		uint32_t interval = 2000;
@@ -108,11 +108,11 @@ struct TopCommand : public CommandBase {
 		}, interval, 0, __i_dvc_ctrl.millis_now(), iterations, CMD_NAME_TOP );
 
 		if( m_toptaskid < 0 ){
-			return CMD_RESULT_FAILED;
+			return CMD_ERROR_FAILED;
 		}
 
 		m_runinbackground = true;
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

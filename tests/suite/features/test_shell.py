@@ -12,6 +12,7 @@ These mirror tests/host/system/test_shell_redirect.cpp.
 """
 
 import re
+import time
 
 from .registry import test, expect_in, expect_not_in, Skip
 
@@ -35,6 +36,51 @@ def free_heap(t):
     if found is None:
         raise Skip("this target does not report free heap")
     return int(found.group(1))
+
+
+def quiescent_heap(t, samples=4):
+    """
+    The heap with nothing transiently held, as the highest of several samples.
+
+    A single reading is not a measurement: the board legitimately takes and gives
+    back a block of a few kilobytes while services run, so one sample says only
+    whether that block happened to be held at the instant it was taken. Comparing
+    two such instants reported a 4 KB leak on a board whose heap was, across 120
+    pipelines, a few bytes higher at the end than the start. The maximum is the
+    level with nothing in flight, and a real leak lowers it just the same.
+    """
+    best = free_heap(t)
+    for _ in range(samples - 1):
+        time.sleep(0.4)
+        best = max(best, free_heap(t))
+    return best
+
+
+def assert_no_leak(t, before, rounds, what, budget=512):
+    """
+    Fail only on a drop that survives a settle, because a leak does and a held
+    block does not.
+
+    Sampling alone is not enough. The board holds a transient block for longer
+    than a sampling window can outlast: a measured series of 8 cycles of 20
+    redirects saw one cycle dip 1976 bytes and recover 2332 in the next idle
+    phase, ending 336 bytes above where it started across 160 redirects. That dip
+    is the size the two failing runs reported, so a wider window would only have
+    made the false failure rarer. Re-reading after the board has had a moment
+    separates them by what they do rather than by how large they are: a leak is
+    still there, a held block has been given back.
+    """
+    after = quiescent_heap(t)
+    if before - after <= budget:
+        return
+
+    time.sleep(6.0)
+    settled = quiescent_heap(t)
+    if before - settled <= budget:
+        return
+
+    raise AssertionError("heap fell %d bytes over %d %s (%d -> %d, still %d after a settle)"
+                         % (before - settled, rounds, what, before, after, settled))
 
 
 @test("a command with no redirect handling of its own is captured", needs=("pwd", "cat"))
@@ -270,17 +316,13 @@ def redirect_releases_everything(t):
     for _ in range(3):
         t.run("echo settle > leak.txt")
 
-    before = free_heap(t)
+    before = quiescent_heap(t)
 
     for _ in range(20):
         t.run("echo repeated > leak.txt")
 
-    after = free_heap(t)
-
     # a per-redirect leak of even 64 bytes would show as 1280 across 20 rounds
-    if before - after > 512:
-        raise AssertionError("heap fell %d bytes over 20 redirects (%d -> %d)"
-                             % (before - after, before, after))
+    assert_no_leak(t, before, 20, "redirects")
 
 
 @test("piping many times does not leak", needs=("echo", "wc", "ps"), slow=True)
@@ -289,16 +331,12 @@ def pipeline_releases_everything(t):
     for _ in range(3):
         t.run("echo settle | wc")
 
-    before = free_heap(t)
+    before = quiescent_heap(t)
 
     for _ in range(15):
         t.run("echo repeated here | wc")
 
-    after = free_heap(t)
-
-    if before - after > 512:
-        raise AssertionError("heap fell %d bytes over 15 pipelines (%d -> %d)"
-                             % (before - after, before, after))
+    assert_no_leak(t, before, 15, "pipelines")
 
 
 @test("a redirect works on a memory filesystem too", needs=("echo", "cat"), mounts=("/tmp",))
@@ -393,3 +431,336 @@ def source_missing_is_refused(t):
 @test("a dangling source operator is a syntax error", needs=("wc",))
 def source_dangling(t):
     expect_in("syntax error", t.run("wc <"), "a source that was never named")
+
+
+@test("a semicolon runs both commands", needs=("echo", "cat"))
+def sequence_semicolon(t):
+    t.workspace(W + "shseq")
+
+    # the typed line is echoed back over every transport, so the markers are
+    # read out of files whose names carry none of them
+    t.run("echo aa > one.txt ; echo bb > two.txt")
+
+    expect_in("aa", t.run("cat one.txt"), "the first segment ran")
+    expect_in("bb", t.run("cat two.txt"), "the second segment ran")
+
+
+@test("a semicolon runs the second command even after a failure", needs=("echo", "cat"))
+def sequence_semicolon_after_failure(t):
+    t.workspace(W + "shseqf")
+
+    t.run("nosuchcommand ; echo cc > after.txt")
+
+    expect_in("cc", t.run("cat after.txt"), "the segment after a failure")
+
+
+@test("and-and skips the second command after a failure", needs=("echo", "ls"))
+def sequence_and_skips(t):
+    t.workspace(W + "shand")
+
+    t.run("nosuchcommand && echo dd > guard.txt")
+
+    expect_not_in("guard.txt", t.run("ls"), "the guarded segment must not have run")
+
+
+@test("and-and runs the second command after success", needs=("echo", "cat", "pwd"))
+def sequence_and_runs(t):
+    t.workspace(W + "shand2")
+
+    t.run("pwd && echo ee > ran.txt")
+
+    expect_in("ee", t.run("cat ran.txt"), "the segment after a success")
+
+
+@test("or-or runs the second command only after a failure", needs=("echo", "cat", "ls"))
+def sequence_or(t):
+    t.workspace(W + "shor")
+
+    t.run("nosuchcommand || echo ff > fallback.txt")
+    expect_in("ff", t.run("cat fallback.txt"), "the fallback after a failure")
+
+    t.run("pwd || echo gg > unused.txt")
+    expect_not_in("unused.txt", t.run("ls"), "the fallback after a success")
+
+
+@test("the last exit status reads back through the question mark",
+      needs=("echo", "cat", "pwd"))
+def sequence_exit_status(t):
+    t.workspace(W + "shstat")
+
+    t.run("pwd ; echo $? > ok.txt")
+    expect_in("0", t.run("cat ok.txt"), "the status of a command that worked")
+
+    t.run("nosuchcommand ; echo $? > bad.txt")
+    # CMD_ERROR_NOENT, the whole cmd band being -36xx
+    expect_in("-36", t.run("cat bad.txt"), "the status of a command that failed")
+
+
+@test("single quotes suppress the status expansion", needs=("echo", "cat", "pwd"))
+def sequence_quotes_suppress(t):
+    t.workspace(W + "shquote")
+
+    t.run("pwd")
+    t.run("echo '$?' > quoted.txt")
+
+    expect_in("$?", t.run("cat quoted.txt"), "a single quoted word is literal")
+
+
+@test("double quotes still expand the status", needs=("echo", "cat", "pwd"))
+def sequence_double_quotes_expand(t):
+    t.workspace(W + "shdq")
+
+    t.run("pwd")
+    t.run('echo "$?" > dq.txt')
+
+    out = t.run("cat dq.txt")
+    expect_in("0", out, "a double quoted word still expands")
+    expect_not_in("$?", out, "the operator itself must not survive")
+
+
+@test("a chain stops at the first failure", needs=("echo", "ls", "pwd"))
+def sequence_chain_stops(t):
+    t.workspace(W + "shchain")
+
+    t.run("pwd && nosuchcommand && echo hh > third.txt")
+
+    expect_not_in("third.txt", t.run("ls"), "the segment past the failure")
+
+
+@test("a skipped segment leaves the status of the one that ran",
+      needs=("echo", "cat", "pwd"))
+def sequence_skipped_keeps_status(t):
+    t.workspace(W + "shskip")
+
+    # the second segment never runs, so the status is still nosuchcommand's
+    t.run("nosuchcommand && pwd")
+    t.run("echo $? > kept.txt")
+
+    expect_in("-36", t.run("cat kept.txt"), "the status of the segment that ran")
+
+
+@test("a pipeline still works inside a segment", needs=("echo", "wc", "cat", "pwd"))
+def sequence_pipeline_inside(t):
+    t.workspace(W + "shseqpipe")
+
+    t.run("pwd && echo iii | wc > piped.txt")
+
+    counted = counts(t.run("cat piped.txt"))
+    if counted is None or counted[2] != 4:
+        raise AssertionError("a pipeline inside a segment: %r" % counted)
+
+
+@test("a redirect binds to its own segment, not to the line",
+      needs=("echo", "cat", "ls"))
+def sequence_redirect_binds_to_segment(t):
+    t.workspace(W + "shseqredir")
+
+    t.run("echo jj > left.txt ; echo kk")
+
+    # the redirect belongs to the first segment alone
+    expect_in("jj", t.run("cat left.txt"), "the first segment was redirected")
+    expect_not_in("kk", t.run("cat left.txt"), "the second segment was not")
+
+
+@test("a trailing separator is not a syntax error", needs=("echo", "cat"))
+def sequence_trailing_separator(t):
+    t.workspace(W + "shtrail")
+
+    out = t.run("echo ll > trail.txt ;")
+    expect_not_in("syntax error", out, "a line may end on a separator")
+
+    expect_in("ll", t.run("cat trail.txt"), "the segment before it still ran")
+
+
+@test("a dangling sequence operator is a syntax error", needs=("echo",))
+def sequence_dangling_operator(t):
+    expect_in("syntax error", t.run("echo mm &&"), "and-and with nothing after it")
+    expect_in("syntax error", t.run("echo nn ||"), "or-or with nothing after it")
+
+
+@test("a quoted operator is text, not an operator", needs=("echo", "cat", "ls"))
+def sequence_quoted_operator_is_text(t):
+    base = t.workspace(W + "shquoteop")
+
+    # each of these used to be taken as the operator it names
+    t.run('echo "a && b" > q1.txt')
+    expect_in("&&", t.run("cat q1.txt"), "a quoted and-and is text")
+
+    t.run('echo "a | b" > q2.txt')
+    expect_in("|", t.run("cat q2.txt"), "a quoted pipe is text")
+
+    t.run('echo "a ; b" > q3.txt')
+    expect_in(";", t.run("cat q3.txt"), "a quoted separator is text")
+
+
+@test("a quoted redirect operator does not redirect", needs=("echo", "ls"))
+def sequence_quoted_redirect_is_text(t):
+    t.workspace(W + "shquoteredir")
+
+    out = t.run('echo "a > b"')
+
+    # the shell must not have made a file out of the quoted word
+    expect_not_in("b", t.run("ls"), "a quoted redirect must not create a file")
+    expect_in(">", out, "the quoted operator is printed instead")
+
+
+@test("a redirect on a middle pipeline stage takes that stage's output",
+      needs=("echo", "wc", "cat"))
+def pipeline_stage_redirect(t):
+    t.workspace(W + "shstage")
+
+    # the redirect is applied after the pipe, so the file takes the output and
+    # the next stage reads an empty pipe
+    out = t.run("echo oo > mid.txt | wc")
+
+    counted = counts(out)
+    if counted is None or counted != [0, 0, 0]:
+        raise AssertionError("the downstream stage should read nothing: %r" % counted)
+
+    expect_in("oo", t.run("cat mid.txt"), "the redirected stage wrote its file")
+
+
+@test("and-or chains associate to the left", needs=("echo", "cat", "pwd", "ls"))
+def sequence_left_association(t):
+    t.workspace(W + "shassoc")
+
+    # (nosuchcommand || pwd) && echo, so the last segment runs
+    t.run("nosuchcommand || pwd && echo rr > assoc.txt")
+    expect_in("rr", t.run("cat assoc.txt"), "and-and after a recovered failure")
+
+    # (pwd || nosuchcommand) && echo, the or-or is skipped and the and-and runs
+    t.run("pwd || nosuchcommand && echo ss > assoc2.txt")
+    expect_in("ss", t.run("cat assoc2.txt"), "and-and after a skipped or-or")
+
+
+@test("a line may not begin with an operator", needs=("echo", "wc"))
+def sequence_leading_operator(t):
+    expect_in("syntax error", t.run("&& echo tt"), "a leading and-and")
+    expect_in("syntax error", t.run("|| echo uu"), "a leading or-or")
+    expect_in("syntax error", t.run("; echo vv"), "a leading separator")
+    expect_in("syntax error", t.run("| wc"), "a leading pipe")
+
+
+@test("a doubled separator is a syntax error", needs=("echo",))
+def sequence_doubled_separator(t):
+    expect_in("syntax error", t.run("echo ww ;; echo xx"), "two separators in a row")
+
+
+@test("an unterminated quote is a syntax error", needs=("echo",))
+def sequence_unterminated_quote(t):
+    expect_in("syntax error", t.run('echo "yy'), "a double quote never closed")
+    expect_in("syntax error", t.run("echo 'zz"), "a single quote never closed")
+
+
+@test("a line carries more than two segments", needs=("echo", "cat"))
+def sequence_three_segments(t):
+    t.workspace(W + "shthree")
+
+    t.run("echo s1 > a1.txt ; echo s2 > a2.txt ; echo s3 > a3.txt")
+
+    expect_in("s1", t.run("cat a1.txt"), "the first segment")
+    expect_in("s2", t.run("cat a2.txt"), "the second segment")
+    expect_in("s3", t.run("cat a3.txt"), "the third segment")
+
+
+@test("an append inside a segment adds to what the first one wrote",
+      needs=("echo", "wc"))
+def sequence_append_inside(t):
+    t.workspace(W + "shappseq")
+
+    t.run("echo b1 > both.txt ; echo b2 >> both.txt")
+
+    counted = counts(t.run("wc both.txt"))
+    if counted is None or counted[0] != 2:
+        raise AssertionError("the append should have added a second line: %r" % counted)
+
+
+@test("the status expands inside a longer word", needs=("echo", "cat", "pwd"))
+def sequence_status_inside_word(t):
+    t.workspace(W + "shembed")
+
+    t.run("pwd ; echo code=$? > embedded.txt")
+
+    expect_in("code=0", t.run("cat embedded.txt"), "the status inside a word")
+
+
+@test("the status after a pipeline is the last stage's", needs=("echo", "wc", "cat"))
+def sequence_status_after_pipeline(t):
+    t.workspace(W + "shpipestat")
+
+    t.run("echo cc | wc ; echo $? > pstat.txt")
+
+    expect_in("0", t.run("cat pstat.txt"), "a pipeline that worked")
+
+
+@test("quotes are removed from what a command is given", needs=("echo", "wc", "cat"))
+def quote_removal(t):
+    t.workspace(W + "shqrem")
+
+    # the quotes are the shell's own: they keep the spacing together and then
+    # go, so the file holds four characters and a terminator, not six
+    t.run('echo "a  b" > sp.txt')
+
+    counted = counts(t.run("wc sp.txt"))
+    if counted is None or counted[2] != 5:
+        raise AssertionError("a quoted word should reach the file without its "
+                             "quotes: %r" % counted)
+
+    expect_in("a  b", t.run("cat sp.txt"), "the spacing inside the quotes is kept")
+
+
+@test("an empty quoted word is empty, not two quote characters",
+      needs=("echo", "wc"))
+def empty_quoted_word(t):
+    t.workspace(W + "shqempty")
+
+    t.run('echo "" > empty.txt')
+
+    counted = counts(t.run("wc empty.txt"))
+    if counted is None or counted[2] != 1:
+        raise AssertionError("an empty quoted word should write only the line "
+                             "ending: %r" % counted)
+
+
+@test("quotes are removed from the middle of a word too", needs=("echo", "cat"))
+def quote_removal_interior(t):
+    t.workspace(W + "shqmid")
+
+    # the quoting is the shell's wherever it appears, not only around the whole
+    t.run('echo a"b"c > mid.txt')
+    expect_in("abc", t.run("cat mid.txt"), "an interior quoted run")
+
+    t.run('echo x" "y > gap.txt')
+    expect_in("x y", t.run("cat gap.txt"), "a quoted run holding a space")
+
+
+@test("a backslash escapes a quote", needs=("echo", "cat"))
+def quote_escape(t):
+    t.workspace(W + "shqesc")
+
+    t.run('echo a\\"b > esc.txt')
+    expect_in('a"b', t.run("cat esc.txt"), "an escaped quote is the character")
+
+
+@test("single quotes suppress expansion and double quotes do not",
+      needs=("echo", "cat", "pwd"))
+def quote_expansion_rules(t):
+    t.workspace(W + "shqexp")
+
+    t.run("pwd")
+    t.run("echo 'lit $? here' > lit.txt")
+    expect_in("$?", t.run("cat lit.txt"), "a single quoted run is literal")
+
+    t.run('echo "exp $? here" > exp.txt')
+    out = t.run("cat exp.txt")
+    expect_in("exp 0 here", out, "a double quoted run still expands")
+    expect_not_in("$?", out, "the operator itself does not survive")
+
+
+@test("a redirect target may be quoted", needs=("echo", "cat"))
+def quoted_redirect_target(t):
+    t.workspace(W + "shqtgt")
+
+    # the quotes belong to the shell, so the file is named by what they enclose
+    t.run('echo hi > "my file.txt"')
+    expect_in("hi", t.run('cat "my file.txt"'), "a quoted target names the file")

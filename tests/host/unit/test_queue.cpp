@@ -205,3 +205,85 @@ TEST(proto, ring_buffer_carries_a_binary_payload_unchanged)
     ASSERT_EQ(outlen, (uint16_t)sizeof(packet));
     ASSERT_MEMEQ(out, packet, sizeof(packet));
 }
+
+/* ------------------------------------------------- behaviour under pressure */
+
+TEST(queue, a_full_queue_refuses_rather_than_making_room)
+{
+    // Each message frames to 18 bytes, so two fit and the third cannot.
+    ScopedQueue queue(40);
+
+    uint8_t first[16], second[16], late[16];
+    memset(first, 0xA1, sizeof(first));
+    memset(second, 0xB2, sizeof(second));
+    memset(late, 0xC3, sizeof(late));
+
+    ASSERT_GT(QUEUE_Puts(&queue, first, sizeof(first)), 0);
+    ASSERT_GT(QUEUE_Puts(&queue, second, sizeof(second)), 0);
+    ASSERT_LT(QUEUE_Puts(&queue, late, sizeof(late)), 0);
+
+    uint8_t out[256];
+    uint16_t outlen = 0;
+    ASSERT_EQ(QUEUE_Gets(&queue, out, &outlen, sizeof(out)), 0);
+    ASSERT_EQ(outlen, (uint16_t)sizeof(first));
+    ASSERT_MEMEQ(out, first, sizeof(first));
+}
+
+TEST(queue, a_refused_put_leaves_the_queue_exactly_as_it_was)
+{
+    ScopedQueue queue(32);
+
+    uint8_t filler[20], oversize[20];
+    memset(filler, 0x11, sizeof(filler));
+    memset(oversize, 0x22, sizeof(oversize));
+
+    ASSERT_GT(QUEUE_Puts(&queue, filler, sizeof(filler)), 0);
+
+    size_t before = queue.queue.rb.fill_cnt;
+    ASSERT_LT(QUEUE_Puts(&queue, oversize, sizeof(oversize)), 0);
+    ASSERT_EQ((uint32_t)queue.queue.rb.fill_cnt, (uint32_t)before);
+
+    uint8_t out[256];
+    uint16_t outlen = 0;
+    ASSERT_EQ(QUEUE_Gets(&queue, out, &outlen, sizeof(out)), 0);
+    ASSERT_EQ(outlen, (uint16_t)sizeof(filler));
+    ASSERT_MEMEQ(out, filler, sizeof(filler));
+    ASSERT_TRUE(QUEUE_IsEmpty(&queue));
+}
+
+TEST(queue, room_freed_by_a_read_admits_the_message_that_was_refused)
+{
+    ScopedQueue queue(40);
+
+    uint8_t first[16], late[16];
+    memset(first, 0xA1, sizeof(first));
+    memset(late, 0xC3, sizeof(late));
+
+    ASSERT_GT(QUEUE_Puts(&queue, first, sizeof(first)), 0);
+    ASSERT_GT(QUEUE_Puts(&queue, first, sizeof(first)), 0);
+    ASSERT_LT(QUEUE_Puts(&queue, late, sizeof(late)), 0);
+
+    uint8_t out[256];
+    uint16_t outlen = 0;
+    ASSERT_EQ(QUEUE_Gets(&queue, out, &outlen, sizeof(out)), 0);
+
+    ASSERT_GT(QUEUE_Puts(&queue, late, sizeof(late)), 0);
+}
+
+TEST(proto, an_orphaned_fragment_does_not_corrupt_the_next_message)
+{
+    ScopedQueue queue(32);
+
+    uint8_t oversize[64], good[8];
+    memset(oversize, 0x33, sizeof(oversize));
+    memset(good, 0x44, sizeof(good));
+
+    ASSERT_LT(QUEUE_Puts(&queue, oversize, sizeof(oversize)), 0);
+    ASSERT_GT(QUEUE_Puts(&queue, good, sizeof(good)), 0);
+
+    uint8_t out[256];
+    uint16_t outlen = 0;
+    ASSERT_EQ(QUEUE_Gets(&queue, out, &outlen, sizeof(out)), 0);
+    ASSERT_EQ(outlen, (uint16_t)sizeof(good));
+    ASSERT_MEMEQ(out, good, sizeof(good));
+}

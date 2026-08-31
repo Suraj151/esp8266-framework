@@ -305,6 +305,162 @@ pdi_err_t VfsDispatcher::touch(const char* path) {
 
 #undef VFS_ROUTE_PATH
 
+iFileSystemInterface* VfsDispatcher::resolveHandle(pdi_fhandle_t handle, pdi_fhandle_t& backend_handle) const {
+
+    if (handle < 0) {
+        return nullptr;
+    }
+
+    uint8_t mount_id = (uint8_t)((handle >> VFS_HANDLE_MOUNT_SHIFT) & VFS_HANDLE_MOUNT_MAX);
+    if (0 == mount_id || mount_id > m_mount_count) {
+        return nullptr;
+    }
+
+    backend_handle = handle & VFS_HANDLE_BACKEND_MASK;
+    return m_mounts[mount_id - 1].m_backend;
+}
+
+/**
+ * @brief Opens a file on whichever mount owns the path. The backend keeps the
+ *        open file; the handle handed back only records which mount it came
+ *        from, so nothing is tracked here.
+ * @param path The path of the file to open.
+ * @param flags Combination of file_open_flag_t values.
+ * @return A handle of 0 or above, or a negative error code on failure. A mount
+ *         whose backend has no handles answers PDI_ERR_NOT_SUPPORTED, and the
+ *         caller falls back to the path based calls.
+ */
+pdi_fhandle_t VfsDispatcher::openFile(const char* path, uint8_t flags) {
+
+    if (!path || '\0' == path[0]) {
+        return (pdi_fhandle_t)STORAGE_ERROR_BAD_PATH;
+    }
+
+    uint8_t need = 0;
+    if (flags & FILE_OPEN_READ) need |= VFS_ACCESS_R;
+    if (flags & (FILE_OPEN_WRITE | FILE_OPEN_CREATE | FILE_OPEN_TRUNCATE | FILE_OPEN_APPEND)) need |= VFS_ACCESS_W;
+    if (need && !checkAccess(path, need)) {
+        return (pdi_fhandle_t)PDI_ERR_PERM;
+    }
+
+    const char* rel = nullptr;
+    iFileSystemInterface* backend = resolve(path, &rel);
+    if (!backend) {
+        return (pdi_fhandle_t)STORAGE_ERROR_NOT_MOUNTED;
+    }
+
+    uint8_t mount_id = 0;
+    for (uint8_t i = 0; i < m_mount_count; ++i) {
+        if (m_mounts[i].m_backend == backend) {
+            mount_id = (uint8_t)(i + 1);
+            break;
+        }
+    }
+
+    if (0 == mount_id) {
+        return (pdi_fhandle_t)STORAGE_ERROR_NOT_MOUNTED;
+    }
+
+    pdi_fhandle_t handle = backend->openFile(rel, flags);
+    if (handle < 0) {
+        return handle;
+    }
+
+    if (handle > VFS_HANDLE_BACKEND_MASK) {
+        backend->closeFile(handle);
+        return (pdi_fhandle_t)PDI_ERR_RANGE;
+    }
+
+    return (pdi_fhandle_t)(((pdi_fhandle_t)mount_id << VFS_HANDLE_MOUNT_SHIFT) | handle);
+}
+
+/**
+ * @brief Reads from an open handle, advancing its position by what it read.
+ * @param handle Handle returned by openFile.
+ * @param buffer Destination for the bytes read.
+ * @param size Capacity of the buffer in bytes.
+ * @return The number of bytes read, 0 at end of file, or a negative error code.
+ */
+int VfsDispatcher::readFileHandle(pdi_fhandle_t handle, char* buffer, uint32_t size) {
+
+    pdi_fhandle_t bh = 0;
+    iFileSystemInterface* backend = resolveHandle(handle, bh);
+    if (!backend) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    return backend->readFileHandle(bh, buffer, size);
+}
+
+/**
+ * @brief Writes to an open handle, advancing its position by what it wrote.
+ * @param handle Handle returned by openFile.
+ * @param content The bytes to write.
+ * @param size The number of bytes to write.
+ * @return The number of bytes written, or a negative error code on failure.
+ */
+int VfsDispatcher::writeFileHandle(pdi_fhandle_t handle, const char* content, uint32_t size) {
+
+    pdi_fhandle_t bh = 0;
+    iFileSystemInterface* backend = resolveHandle(handle, bh);
+    if (!backend) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    return backend->writeFileHandle(bh, content, size);
+}
+
+/**
+ * @brief Moves the position of an open handle.
+ * @param handle Handle returned by openFile.
+ * @param offset Offset to move by, relative to whence.
+ * @param whence Reference point for the offset.
+ * @return The new position, or a negative error code on failure.
+ */
+int64_t VfsDispatcher::seekFile(pdi_fhandle_t handle, int64_t offset, file_seek_t whence) {
+
+    pdi_fhandle_t bh = 0;
+    iFileSystemInterface* backend = resolveHandle(handle, bh);
+    if (!backend) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    return backend->seekFile(bh, offset, whence);
+}
+
+/**
+ * @brief Pushes anything an open handle still holds out to storage, leaving the
+ *        handle open.
+ * @param handle Handle returned by openFile.
+ * @return 0 on success, or a negative error code on failure.
+ */
+pdi_err_t VfsDispatcher::syncFile(pdi_fhandle_t handle) {
+
+    pdi_fhandle_t bh = 0;
+    iFileSystemInterface* backend = resolveHandle(handle, bh);
+    if (!backend) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    return backend->syncFile(bh);
+}
+
+/**
+ * @brief Closes an open handle, committing anything the backend still holds.
+ * @param handle Handle returned by openFile.
+ * @return 0 on success, or a negative error code on failure.
+ */
+pdi_err_t VfsDispatcher::closeFile(pdi_fhandle_t handle) {
+
+    pdi_fhandle_t bh = 0;
+    iFileSystemInterface* backend = resolveHandle(handle, bh);
+    if (!backend) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    return backend->closeFile(bh);
+}
+
 int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSystemInterface* db, const char* drel) {
     // Only regular files stream across a mount boundary.
     if (!sb->isFileExist(srel) || sb->isDirectory(srel)) return STORAGE_ERROR_NOT_A_FILE;

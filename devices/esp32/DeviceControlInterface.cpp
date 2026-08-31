@@ -12,6 +12,11 @@ created Date    : 1st Jan 2024
 #include "ExceptionsNotifier.h"
 #include "PingInterface.h"
 #include "SerialInterface.h"
+
+#if defined(ENABLE_NETWORK_SERVICE) && defined(PDI_NET_STACK_LWIP)
+#include <interface/pdi/impl/modules/netif/NetifRegistry.h>
+#include <interface/pdi/impl/modules/netif/lwip/LwipNetStack.h>
+#endif
 #ifdef ENABLE_HTTP_CLIENT
 #include <transports/http/HTTPClient.h>
 #endif
@@ -20,7 +25,7 @@ created Date    : 1st Jan 2024
 #include <esp_timer.h>
 
 #ifdef ENABLE_PROGRAM_EXEC
-#include "cmd/ElfLoadCommand.h"
+#include "ProgramLoaderInterface.h"
 #endif
 
 /**
@@ -467,8 +472,12 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
 {
     __i_ping.init_ping( &__i_wifi );
 
+    #if defined(ENABLE_NETWORK_SERVICE) && defined(PDI_NET_STACK_LWIP)
+    __netif_registry.registerStack( &__lwip_net_stack );
+    #endif
+
     #ifdef ENABLE_PROGRAM_EXEC
-    ElfLoadCommand::RegisterCommand();
+    registerProgramLoader( &__i_program_loader );
     #endif
 
     #ifdef ENABLE_EXCEPTION_NOTIFIER

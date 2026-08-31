@@ -9,118 +9,410 @@ created Date    : 26th Aug 2026
 ******************************************************************************/
 
 #include "ShellParser.h"
+#include <utility/DataTypeConversions.h>
 
 #if defined(ENABLE_CMD_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
 
 namespace {
 
-  void trimSpan(const char *line, int16_t &start, int16_t &end) {
-    while (start < end && ' ' == line[start]) start++;
-    while (end > start && ' ' == line[end - 1]) end--;
+  bool isBlank(char c) {
+    return ' ' == c || '\t' == c;
+  }
+
+  // Where an operator starts, so a word knows where to end.
+  bool isOperatorStart(char c) {
+    return '|' == c || '&' == c || ';' == c || '<' == c || '>' == c;
   }
 }
 
 /**
- * Reads the stages and the output target off a line, reporting an empty
- * stage or a dangling operator as malformed.
+ * Splits a line into tokens, honouring quotes and backslash escapes.
+ * False when a quote is never closed.
+ */
+bool ShellParser::tokenize(const char *line, int16_t len, pdiutil::vector<Token> &tokens) {
+
+  tokens.clear();
+
+  if (nullptr == line || len <= 0) {
+    return false;
+  }
+
+  int16_t i = 0;
+
+  while (i < len) {
+
+    while (i < len && isBlank(line[i])) i++;
+    if (i >= len) break;
+
+    Token token;
+    token.m_start = i;
+
+    // operators first, so a word never starts on one
+    if (isOperatorStart(line[i])) {
+
+      char c = line[i];
+      bool doubled = ((i + 1) < len) && (line[i + 1] == c);
+
+      if ('|' == c) {
+        token.m_type = doubled ? TOKEN_OR_IF : TOKEN_PIPE;
+      } else if ('&' == c) {
+        // a lone '&' is not an operator here, so it stays part of a word
+        if (!doubled) {
+          token.m_type = TOKEN_WORD;
+        } else {
+          token.m_type = TOKEN_AND_IF;
+        }
+      } else if (';' == c) {
+        token.m_type = TOKEN_SEMI;
+      } else if ('>' == c) {
+        token.m_type = doubled ? TOKEN_DGT : TOKEN_GT;
+      } else {
+        token.m_type = TOKEN_LT;
+      }
+
+      if (TOKEN_WORD != token.m_type) {
+        token.m_len = (doubled && (TOKEN_SEMI != token.m_type)) ? 2 : 1;
+        tokens.push_back(token);
+        i += token.m_len;
+        continue;
+      }
+    }
+
+    // a word runs to the next blank or operator, with quotes and escapes
+    // holding those characters inside it
+    while (i < len) {
+
+      char c = line[i];
+
+      if (isBlank(c)) break;
+
+      if ('\\' == c) {
+        i += ((i + 1) < len) ? 2 : 1;
+        continue;
+      }
+
+      if ('\'' == c || '"' == c) {
+
+        char quote = c;
+        i++;
+
+        while (i < len && line[i] != quote) {
+          if ('"' == quote && '\\' == line[i] && (i + 1) < len) {
+            i += 2;
+            continue;
+          }
+          i++;
+        }
+
+        if (i >= len) {
+          tokens.clear();
+          return false;
+        }
+
+        i++;
+        continue;
+      }
+
+      // a lone '&' belongs to the word; a doubled one ends it
+      if ('&' == c) {
+        if ((i + 1) < len && '&' == line[i + 1]) break;
+        i++;
+        continue;
+      }
+
+      if (isOperatorStart(c)) break;
+
+      i++;
+    }
+
+    token.m_type = TOKEN_WORD;
+    token.m_len = i - token.m_start;
+
+    if (token.m_len > 0) {
+      tokens.push_back(token);
+    }
+  }
+
+  return tokens.size() > 0;
+}
+
+/**
+ * Whether a span holds anything the expander would rewrite.
+ */
+bool ShellParser::expandable(const char *src, int16_t len) {
+
+  for (int16_t i = 0; i < len; i++) {
+    if ('$' == src[i]) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Copies a span with expansions applied. A single quoted run is literal, so
+ * nothing inside it expands; a double quoted one still does.
+ */
+void ShellParser::expand(const char *src, int16_t len, pdi_err_t lastexit, pdiutil::string &out,
+                         bool unquote) {
+
+  char number[12] = {0};
+  bool rendered = false;
+  bool insingle = false;
+  bool indouble = false;
+
+  for (int16_t i = 0; i < len; i++) {
+
+    char c = src[i];
+
+    if ('\\' == c && !insingle && (i + 1) < len) {
+      if (!unquote) out += c;
+      out += src[i + 1];
+      i++;
+      continue;
+    }
+
+    if ('\'' == c && !indouble) {
+      insingle = !insingle;
+      if (!unquote) out += c;
+      continue;
+    }
+
+    if ('"' == c && !insingle) {
+      indouble = !indouble;
+      if (!unquote) out += c;
+      continue;
+    }
+
+    if ('$' == c && !insingle && (i + 1) < len && '?' == src[i + 1]) {
+
+      if (!rendered) {
+        Int32ToString((int32_t)lastexit, number, sizeof(number) - 1);
+        rendered = true;
+      }
+
+      out += number;
+      i++;
+      continue;
+    }
+
+    out += c;
+  }
+}
+
+/**
+ * Text of one command without its redirections, expansions applied.
+ */
+bool ShellParser::Line::commandText(const char *line, int16_t index, pdiutil::string &out,
+                                    pdi_err_t lastexit) const {
+
+  out.clear();
+
+  if (nullptr == line || index < 0 || index >= (int16_t)m_commands.size()) {
+    return false;
+  }
+
+  const Command &command = m_commands[index];
+  if (command.m_word_count <= 0) {
+    return false;
+  }
+
+  int16_t first = m_words[command.m_word_start].m_start;
+  const Token &lastword = m_words[command.m_word_start + command.m_word_count - 1];
+  int16_t last = lastword.m_start + lastword.m_len;
+
+  // nothing of the command's own redirections falls between its first and last
+  // word in the common case, so the line can be handed over as it was typed
+  bool contiguous = true;
+  for (int16_t r = 0; r < command.m_redirect_count; r++) {
+    const Redirect &redirect = m_redirects[command.m_redirect_start + r];
+    if (redirect.m_start > first && redirect.m_start < last) {
+      contiguous = false;
+      break;
+    }
+  }
+
+  if (contiguous && !expandable(line + first, last - first)) {
+    out.append(line + first, (pdiutil::string::size_type)(last - first));
+    return true;
+  }
+
+  if (contiguous) {
+    expand(line + first, last - first, lastexit, out);
+    return true;
+  }
+
+  for (int16_t w = 0; w < command.m_word_count; w++) {
+    const Token &word = m_words[command.m_word_start + w];
+    if (w > 0) out += ' ';
+    expand(line + word.m_start, word.m_len, lastexit, out);
+  }
+
+  return true;
+}
+
+/**
+ * Redirection of the given kind on one command, if it has one.
+ */
+const ShellParser::Redirect *ShellParser::Line::findRedirect(int16_t command, redirect_op_t op) const {
+
+  if (command < 0 || command >= (int16_t)m_commands.size()) {
+    return nullptr;
+  }
+
+  const Command &c = m_commands[command];
+
+  for (int16_t r = 0; r < c.m_redirect_count; r++) {
+    const Redirect &redirect = m_redirects[c.m_redirect_start + r];
+    if (redirect.m_op == op) {
+      return &redirect;
+    }
+  }
+
+  return nullptr;
+}
+
+/**
+ * Reads a whole line into pipelines, commands and redirections.
  */
 ShellParser::Line ShellParser::parse(const char *line, int16_t len) {
 
   Line out;
 
-  if (nullptr == line || len <= 0) {
+  pdiutil::vector<Token> tokens;
+  if (!tokenize(line, len, tokens)) {
+    out.m_malformed = true;
     return out;
   }
 
-  int16_t body_end = len;
+  uint16_t at = 0;
+  join_t join = JOIN_FIRST;
 
-  int16_t op = -1;
-  for (int16_t i = 0; i < len; i++) {
-    if ('>' == line[i] || '<' == line[i]) {
-      op = i;
-      break;
-    }
-  }
+  while (at < tokens.size()) {
 
-  if (op >= 0) {
-    body_end = op;
-  }
+    Pipeline pipeline;
+    pipeline.m_join = join;
+    pipeline.m_command_start = (int16_t)out.m_commands.size();
+    pipeline.m_command_count = 0;
 
-  // each operator owns the span up to the next one, so one line can name an
-  // input and an output in either order
-  while (op >= 0 && op < len) {
+    // a pipeline is one or more commands joined by '|'
+    while (true) {
 
-    bool append = ('>' == line[op]) && ((op + 1) < len) && ('>' == line[op + 1]);
-    int16_t pathstart = op + (append ? 2 : 1);
+      Command command;
+      command.m_word_start = (int16_t)out.m_words.size();
+      command.m_redirect_start = (int16_t)out.m_redirects.size();
+      command.m_word_count = 0;
+      command.m_redirect_count = 0;
 
-    int16_t next = -1;
-    for (int16_t i = pathstart; i < len; i++) {
-      if ('>' == line[i] || '<' == line[i]) {
-        next = i;
+      while (at < tokens.size()) {
+
+        const Token &token = tokens[at];
+
+        if (TOKEN_WORD == token.m_type) {
+          out.m_words.push_back(token);
+          command.m_word_count++;
+          at++;
+          continue;
+        }
+
+        if (TOKEN_LT == token.m_type || TOKEN_GT == token.m_type || TOKEN_DGT == token.m_type) {
+
+          // a redirection needs a path, and only one of each kind per command
+          if ((at + 1) >= tokens.size() || TOKEN_WORD != tokens[at + 1].m_type) {
+            out.m_malformed = true;
+            return out;
+          }
+
+          Redirect redirect;
+          redirect.m_op = (TOKEN_LT == token.m_type) ? REDIRECT_IN
+                        : (TOKEN_DGT == token.m_type) ? REDIRECT_APPEND : REDIRECT_OUT;
+          redirect.m_start = tokens[at + 1].m_start;
+          redirect.m_len = tokens[at + 1].m_len;
+
+          for (int16_t r = 0; r < command.m_redirect_count; r++) {
+            const Redirect &seen = out.m_redirects[command.m_redirect_start + r];
+            bool bothOut = (REDIRECT_IN != seen.m_op) && (REDIRECT_IN != redirect.m_op);
+            if (seen.m_op == redirect.m_op || bothOut) {
+              out.m_malformed = true;
+              return out;
+            }
+          }
+
+          out.m_redirects.push_back(redirect);
+          command.m_redirect_count++;
+          at += 2;
+          continue;
+        }
+
         break;
       }
+
+      if (0 == command.m_word_count) {
+        out.m_malformed = true;
+        return out;
+      }
+
+      out.m_commands.push_back(command);
+      pipeline.m_command_count++;
+
+      if (at < tokens.size() && TOKEN_PIPE == tokens[at].m_type) {
+        at++;
+        continue;
+      }
+
+      break;
     }
 
-    int16_t pathend = (next >= 0) ? next : len;
-    trimSpan(line, pathstart, pathend);
+    out.m_pipelines.push_back(pipeline);
 
-    if (pathstart >= pathend) {
+    if (at >= tokens.size()) {
+      break;
+    }
+
+    if (TOKEN_SEMI == tokens[at].m_type) {
+      join = JOIN_ALWAYS;
+    } else if (TOKEN_AND_IF == tokens[at].m_type) {
+      join = JOIN_ON_SUCCESS;
+    } else if (TOKEN_OR_IF == tokens[at].m_type) {
+      join = JOIN_ON_FAILURE;
+    } else {
       out.m_malformed = true;
       return out;
     }
 
-    if ('>' == line[op]) {
+    at++;
 
-      if (out.m_redirected) {
+    // a trailing ';' ends the line, anything else is left dangling
+    if (at >= tokens.size()) {
+      if (JOIN_ALWAYS != join) {
         out.m_malformed = true;
-        return out;
       }
-
-      out.m_redirected = true;
-      out.m_append = append;
-      out.m_outpath.append(line + pathstart, (pdiutil::string::size_type)(pathend - pathstart));
-    } else {
-
-      if (out.m_sourced) {
-        out.m_malformed = true;
-        return out;
-      }
-
-      out.m_sourced = true;
-      out.m_inpath.append(line + pathstart, (pdiutil::string::size_type)(pathend - pathstart));
-    }
-
-    op = next;
-  }
-
-  int16_t start = 0;
-  for (int16_t i = 0; i <= body_end; i++) {
-
-    if (i == body_end || '|' == line[i]) {
-
-      int16_t s = start;
-      int16_t e = i;
-      trimSpan(line, s, e);
-
-      if (s >= e) {
-        out.m_malformed = true;
-        return out;
-      }
-
-      Stage stage;
-      stage.m_start = s;
-      stage.m_len = e - s;
-      out.m_stages.push_back(stage);
-
-      start = i + 1;
+      return out;
     }
   }
 
-  if (0 == out.m_stages.size()) {
+  if (0 == out.m_pipelines.size()) {
     out.m_malformed = true;
   }
 
   return out;
+}
+
+/**
+ * Whether a pipeline runs, given what the one before it answered.
+ */
+bool ShellParser::shouldRun(join_t join, pdi_err_t previous) {
+
+  if (JOIN_ON_SUCCESS == join) {
+    return PDI_OK == previous;
+  }
+
+  if (JOIN_ON_FAILURE == join) {
+    return PDI_OK != previous;
+  }
+
+  return true;
 }
 
 #endif

@@ -37,25 +37,25 @@ struct GroupsCommand : public CommandBase {
 
 	bool needauth() override { return true; }
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 
-		if( nullptr == m_terminal ) return CMD_RESULT_OK;
+		if( nullptr == m_terminal ) return PDI_OK;
 
 		const char *u = __auth_service.getUsername();
 		m_terminal->putln();
 
-		if( nullptr == u || 0 == u[0] ) return CMD_RESULT_OK;
+		if( nullptr == u || 0 == u[0] ) return PDI_OK;
 
 		char numbuf[8];
 
 		// the session's gid is what group access is judged by
 		Uint32ToString((uint32_t)SessionManager::getCurrentGid(), numbuf, sizeof(numbuf));
 		m_terminal->write(numbuf);
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

@@ -56,16 +56,16 @@ struct NetworkCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
-		cmd_result_t result = CMD_RESULT_OK;
+		pdi_err_t result = PDI_OK;
 		CommandOption *cmdoptn1 = &m_options[0];
 
 		if( nullptr != cmdoptn1 && nullptr != cmdoptn1->optionval && cmdoptn1->optionvalsize > 0
@@ -126,7 +126,7 @@ struct NetworkCommand : public CommandBase {
 					strncpy(_wifi_credentials.sta_ssid, cmdoptn2->optionval, cmdoptn2->optionvalsize);
 				}else{
 					// ssid is must
-					return CMD_RESULT_ARGS_MISSING;
+					return CMD_ERROR_ARGS_MISSING;
 				}
 
 				if( nullptr != cmdoptn3 && nullptr != cmdoptn3->optionval && cmdoptn3->optionvalsize > 0 
@@ -149,10 +149,10 @@ struct NetworkCommand : public CommandBase {
 				m_terminal->writeln_ro(RODT_ATTR("Check Station Status after 10 second using 'net ip' command"));
 			}else{
 				// subverb parsed but did not match any known keyword
-				result = CMD_RESULT_INVALID_OPTION;
+				result = CMD_ERROR_OPT;
 			}
 		}else{
-			result = CMD_RESULT_ARGS_ERROR;
+			result = CMD_ERROR_INVAL;
 		}
 
 		return result;

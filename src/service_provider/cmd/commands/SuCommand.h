@@ -43,15 +43,15 @@ struct SuCommand : public CommandBase {
 	bool needauth() override { return true; }
 	bool wantsMaskedInput() override { return isWaitingForOption(SLOT_PASS); }
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 
 		if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
 		    terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
-			return CMD_RESULT_ABORTED;
+			return CMD_ERROR_CANCELED;
 		}
 
 		char _username[LOGIN_CONFIGS_BUF_SIZE];
@@ -68,9 +68,10 @@ struct SuCommand : public CommandBase {
 		if( !isU ){
 			setWaitingForOption(SLOT_USER);
 			if( nullptr != m_terminal ){
-				m_terminal->write_ro(RODT_ATTR("\nuser: "));
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("user: "));
 			}
-			return CMD_RESULT_INCOMPLETE;
+			return CMD_ERROR_AGAIN;
 		}
 
 		uint16_t ulen = unameopt->optionvalsize < LOGIN_CONFIGS_BUF_SIZE - 1 ? unameopt->optionvalsize : LOGIN_CONFIGS_BUF_SIZE - 1;
@@ -80,20 +81,21 @@ struct SuCommand : public CommandBase {
 			holdOptionValue(SLOT_USER);
 			setWaitingForOption(SLOT_PASS);
 			if( nullptr != m_terminal ){
-				m_terminal->write_ro(RODT_ATTR("\nPass : "));
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("Pass : "));
 			}
-			return CMD_RESULT_INCOMPLETE;
+			return CMD_ERROR_AGAIN;
 		}
 
 		uint16_t plen = passopt->optionvalsize < LOGIN_CONFIGS_BUF_SIZE - 1 ? passopt->optionvalsize : LOGIN_CONFIGS_BUF_SIZE - 1;
 		memcpy(_password, passopt->optionval, plen);
 
 		if( 0 == strlen(_username) || 0 == strlen(_password) ){
-			return CMD_RESULT_WRONG_CREDENTIAL;
+			return CMD_ERROR_ACCES;
 		}
 
 		if( !__auth_service.isAuthorized(_username, _password) ){
-			return CMD_RESULT_WRONG_CREDENTIAL;
+			return CMD_ERROR_ACCES;
 		}
 
 		__auth_service.setAuthorized(true);
@@ -105,7 +107,7 @@ struct SuCommand : public CommandBase {
 		}
 #endif
 
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

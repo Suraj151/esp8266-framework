@@ -32,6 +32,7 @@ created Date    : 1st Jan 2024
 #include "TcpClientInterface.cpp"
 #include "TcpServerInterface.cpp"
 #include "UdpInterface.cpp"
+#include "NetStackInterface.cpp"
 #endif
 #ifdef ENABLE_SERIAL_SERVICE
 #include "SerialInterface.cpp"

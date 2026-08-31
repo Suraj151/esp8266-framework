@@ -51,6 +51,56 @@ int __strstr(const char *str, const char *substr, int _len)
     return -1;
 }
 
+int __strstr_unquoted(const char *str, const char *substr, int _len)
+{
+    if (nullptr == str || nullptr == substr || 0 == strlen(str) || 0 == strlen(substr))
+    {
+        return -1;
+    }
+
+    int n = 0;
+    bool insingle = false;
+    bool indouble = false;
+
+    while (*(str + n) && n < _len)
+    {
+        char c = *(str + n);
+
+        if ('\'' == c && !indouble)
+        {
+            insingle = !insingle;
+            n++;
+            continue;
+        }
+
+        if ('"' == c && !insingle)
+        {
+            indouble = !indouble;
+            n++;
+            continue;
+        }
+
+        if (!insingle && !indouble)
+        {
+            char *pattern = (char *)substr;
+
+            int p = 0;
+            while (*(str + n + p) && *pattern && *(str + n + p) == *pattern)
+            {
+                p++;
+                pattern++;
+            }
+
+            if (!*pattern)
+                return n;
+        }
+
+        n++;
+    }
+
+    return -1;
+}
+
 int32_t __strstr(const char *str, uint32_t _strlen, const char *substr, uint32_t _substrlen, uint32_t _from)
 {
     if (nullptr == str || nullptr == substr || 0 == _substrlen || _substrlen > _strlen)
@@ -78,6 +128,46 @@ int32_t __strstr(const char *str, uint32_t _strlen, const char *substr, uint32_t
     }
 
     return -1;
+}
+
+/**
+ * Appends text as one fixed width column, padding it out or truncating it to
+ * the width, the way iTerminalInterface::write_pad writes one.
+ */
+void __append_padded(pdiutil::string &_out, const char *_str, uint32_t _width, bool _prepad, char _pad)
+{
+    uint32_t len = (nullptr != _str) ? strlen(_str) : 0;
+
+    if (len >= _width) {
+        for (uint32_t i = 0; i < _width; i++) {
+            _out += _str[i];
+        }
+        return;
+    }
+
+    for (uint32_t i = 0; _prepad && (i < _width - len); i++) {
+        _out += _pad;
+    }
+
+    if (0 != len) {
+        _out += _str;
+    }
+
+    for (uint32_t i = 0; !_prepad && (i < _width - len); i++) {
+        _out += _pad;
+    }
+}
+
+/**
+ * Appends a number as one fixed width column.
+ */
+void __append_padded_num(pdiutil::string &_out, int64_t _value, uint32_t _width, bool _prepad, char _pad)
+{
+    char buf[24];
+
+    memset(buf, 0, sizeof(buf));
+    Int64ToString(_value, buf, sizeof(buf), 0);
+    __append_padded(_out, buf, _width, _prepad, _pad);
 }
 
 /**

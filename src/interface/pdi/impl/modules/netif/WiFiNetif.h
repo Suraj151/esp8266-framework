@@ -34,6 +34,11 @@ public:
    * The station's addresses and the access point it is associated with.
    */
   bool getInfo(netif_info_t &out) override;
+
+  /**
+   * What the port can say about station traffic, and nothing when it cannot.
+   */
+  bool getCounters(netif_counters_t &out) override;
 };
 
 class WiFiApNetif : public iNetifInterface {
@@ -48,6 +53,12 @@ public:
    * The access point's own address and the network it advertises.
    */
   bool getInfo(netif_info_t &out) override;
+
+  /**
+   * What the port can say about access point traffic, and nothing when it
+   * cannot.
+   */
+  bool getCounters(netif_counters_t &out) override;
 };
 
 /**

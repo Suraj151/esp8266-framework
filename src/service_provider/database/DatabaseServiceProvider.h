@@ -54,6 +54,7 @@ public:
   ~DatabaseServiceProvider();
 
   bool initService(void *arg = nullptr) override;
+  bool isEssentialService() const override { return true; }
 
   /**
    * reset every table to the defaults the device falls back to.

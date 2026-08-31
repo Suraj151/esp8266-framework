@@ -25,6 +25,10 @@ created Date    : 16th Aug 2026
 #include <interface/pdi/impl/modules/netif/NetifRegistry.h>
 #include <pditest.h>
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+
 static VfsDispatcher *mountedVfs()
 {
     return pditest::mountedVfs();
@@ -338,7 +342,18 @@ TEST(procfs, mounts_gives_each_line_the_type_the_mount_carries)
     VfsDispatcher *fs = mountedVfs();
     pdiutil::string mounts = slurp(fs, "/proc/mounts");
 
-    ASSERT_TRUE(mounts.find("procfs /proc procfs rw 0 0") != pdiutil::string::npos);
+    // the fields sit in fixed width columns, so the assertion walks them in
+    // order rather than pinning the padding between them
+    size_t name = mounts.find("procfs");
+    ASSERT_TRUE(name != pdiutil::string::npos);
+
+    size_t prefix = mounts.find("/proc", name);
+    ASSERT_TRUE(prefix != pdiutil::string::npos);
+
+    size_t type = mounts.find("procfs", prefix);
+    ASSERT_TRUE(type != pdiutil::string::npos);
+
+    ASSERT_TRUE(mounts.find("rw 0 0", type) != pdiutil::string::npos);
 }
 
 TEST(procfs, a_read_stops_at_the_string_it_was_told_to_stop_at)
@@ -422,15 +437,21 @@ TEST(procfs, stat_counts_the_tasks_the_scheduler_holds)
 
     pdiutil::string stat = slurp(fs, "/proc/stat");
 
-    char line[32];
-    __snprintf(line, sizeof(line), "processes %d", (int)__task_scheduler.getTaskCount());
+    char count[16];
+    __snprintf(count, sizeof(count), "%d", (int)__task_scheduler.getTaskCount());
 
     __task_scheduler.remove_task(id);
 
-    ASSERT_TRUE(stat.find("cpu 0 0 ") == 0);
-    ASSERT_TRUE(stat.find(line) != pdiutil::string::npos);
-    ASSERT_TRUE(stat.find("ctxt ") != pdiutil::string::npos);
-    ASSERT_TRUE(stat.find("procs_running ") != pdiutil::string::npos);
+    // the keys sit in a fixed width column, so each is found and its value
+    // looked for after it rather than pinning the padding between the two
+    ASSERT_TRUE(stat.find("cpu") == 0);
+
+    size_t procs = stat.find("processes");
+    ASSERT_TRUE(procs != pdiutil::string::npos);
+    ASSERT_TRUE(stat.find(count, procs) != pdiutil::string::npos);
+
+    ASSERT_TRUE(stat.find("ctxt") != pdiutil::string::npos);
+    ASSERT_TRUE(stat.find("procs_running") != pdiutil::string::npos);
 }
 
 TEST(procfs, stat_busy_and_idle_add_up_to_the_uptime)
@@ -438,12 +459,14 @@ TEST(procfs, stat_busy_and_idle_add_up_to_the_uptime)
     VfsDispatcher *fs = mountedVfs();
     pdiutil::string stat = slurp(fs, "/proc/stat");
 
-    // "cpu 0 0 <busy> <idle>" - the pair is a partition of the elapsed time,
-    // which is what makes a ratio taken from it meaningful
-    pdiutil::string::size_type at = stat.find("cpu 0 0 ");
-    ASSERT_TRUE(at == 0);
+    // "cpu<pad>0 0 <busy> <idle>" - the pair is a partition of the elapsed
+    // time, which is what makes a ratio taken from it meaningful
+    ASSERT_TRUE(stat.find("cpu") == 0);
 
-    pdiutil::string rest = stat.substr(8);
+    pdiutil::string::size_type at = stat.find("0 0 ");
+    ASSERT_TRUE(at != pdiutil::string::npos);
+
+    pdiutil::string rest = stat.substr(at + 4);
     pdiutil::string::size_type gap = rest.find(' ');
     ASSERT_TRUE(gap != pdiutil::string::npos);
 
@@ -556,13 +579,19 @@ TEST(procfs, status_reports_the_same_pid_as_the_directory)
     __snprintf(path, sizeof(path), "/proc/%d/status", (int)id);
     pdiutil::string status = slurp(fs, path);
 
-    char pidline[24];
-    __snprintf(pidline, sizeof(pidline), "Pid:\t%d", (int)id);
+    char pidval[16];
+    __snprintf(pidval, sizeof(pidval), "%d", (int)id);
 
     __task_scheduler.remove_task(id);
 
-    ASSERT_TRUE(status.find("Name:\tfsprobe") != pdiutil::string::npos);
-    ASSERT_TRUE(status.find(pidline) != pdiutil::string::npos);
+    // the keys sit in a fixed width column, so the assertions name the key and
+    // its value rather than pinning the padding between them
+    ASSERT_TRUE(status.find("Name:") == 0);
+    ASSERT_TRUE(status.find("fsprobe") != pdiutil::string::npos);
+
+    size_t pidkey = status.find("Pid:");
+    ASSERT_TRUE(pidkey != pdiutil::string::npos);
+    ASSERT_TRUE(status.find(pidval, pidkey) != pdiutil::string::npos);
 }
 
 TEST(procfs, the_root_lists_a_directory_per_running_task)
@@ -651,7 +680,7 @@ TEST(procfs, a_pid_that_never_ran_is_absent)
     ASSERT_EQ(fs->getFileSize("/proc/60000/stat"), (int64_t)PDI_ERR_NOT_FOUND);
 }
 
-TEST(procfs, the_net_directory_holds_route_and_dev)
+TEST(procfs, the_net_directory_holds_route_dev_and_tcp)
 {
     VfsDispatcher *fs = mountedVfs();
     pditest::readyNetifs();
@@ -659,6 +688,7 @@ TEST(procfs, the_net_directory_holds_route_and_dev)
     ASSERT_TRUE(fs->isDirExist("/proc/net"));
     ASSERT_TRUE(fs->isFileExist("/proc/net/route"));
     ASSERT_TRUE(fs->isFileExist("/proc/net/dev"));
+    ASSERT_TRUE(fs->isFileExist("/proc/net/tcp"));
     ASSERT_FALSE(fs->isFileExist("/proc/net/bogus"));
 }
 
@@ -701,6 +731,57 @@ TEST(procfs, dev_lists_only_interfaces_that_can_count)
 
         ASSERT_TRUE(dev.find(netif->name()) == pdiutil::string::npos);
     }
+}
+
+TEST(procfs, tcp_lists_a_socket_the_process_is_listening_on)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+
+    int listener = socket(AF_INET, SOCK_STREAM, 0);
+    ASSERT_TRUE(listener >= 0);
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+
+    ASSERT_EQ(bind(listener, (struct sockaddr *)&addr, sizeof(addr)), 0);
+    ASSERT_EQ(listen(listener, 1), 0);
+
+    socklen_t addrlen = sizeof(addr);
+    ASSERT_EQ(getsockname(listener, (struct sockaddr *)&addr, &addrlen), 0);
+
+    char portbuf[8];
+    Int32ToString((int32_t)ntohs(addr.sin_port), portbuf, sizeof(portbuf), 0);
+
+    pdiutil::string tcp = slurp(fs, "/proc/net/tcp");
+
+    ASSERT_TRUE(tcp.find("Local") == 0);
+    ASSERT_TRUE(tcp.find("127.0.0.1:") != pdiutil::string::npos);
+    ASSERT_TRUE(tcp.find(portbuf) != pdiutil::string::npos);
+    ASSERT_TRUE(tcp.find("LISTEN") != pdiutil::string::npos);
+
+    close(listener);
+}
+
+TEST(procfs, tcp_is_a_header_and_nothing_else_when_the_port_cannot_answer)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+
+    iNetStackInterface *had = __netif_registry.stack();
+    __netif_registry.registerStack(nullptr);
+
+    pdiutil::string tcp = slurp(fs, "/proc/net/tcp");
+
+    // the columns still name themselves, so the reader can tell a port that
+    // cannot enumerate from a device with nothing listening
+    ASSERT_TRUE(tcp.find("Local") == 0);
+    ASSERT_TRUE(tcp.find("LISTEN") == pdiutil::string::npos);
+
+    __netif_registry.registerStack(had);
 }
 
 /* ------------------------------------------------------------------- sysfs */
@@ -1529,7 +1610,8 @@ TEST(sysfs, operstate_reads_up_or_down)
     pditest::readyNetifs();
     pdiutil::string state = slurp(fs, "/sys/class/net/wlan0/operstate");
 
-    ASSERT_TRUE(state == pdiutil::string("up\n") || state == pdiutil::string("down\n"));
+    ASSERT_TRUE(state == pdiutil::string("up" TERMINAL_NEW_LINE) ||
+                state == pdiutil::string("down" TERMINAL_NEW_LINE));
 }
 
 TEST(sysfs, the_address_leaf_reads_the_interface_mac)

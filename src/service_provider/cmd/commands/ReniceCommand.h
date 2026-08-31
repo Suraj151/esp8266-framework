@@ -56,16 +56,16 @@ struct ReniceCommand : public CommandBase {
 	bool needauth() override { return true; }
 #endif
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_FAILED;
+			return CMD_ERROR_FAILED;
 		}
 
 		CommandOption *nOpt = &m_options[0];
@@ -74,7 +74,7 @@ struct ReniceCommand : public CommandBase {
 		if( nullptr == nOpt || nullptr == nOpt->optionval || 0 == nOpt->optionvalsize ||
 		    nullptr == pOpt || nullptr == pOpt->optionval || 0 == pOpt->optionvalsize ){
 			// Usage line is printed by CommandBase::ResultToTerminal.
-			return CMD_RESULT_ARGS_MISSING;
+			return CMD_ERROR_ARGS_MISSING;
 		}
 
 		// Parse signed nice manually — StringToUintN doesn't accept a leading '-'.
@@ -93,8 +93,9 @@ struct ReniceCommand : public CommandBase {
 
 		task_t *t = __task_scheduler.get_task(pid);
 		if( nullptr == t || t->m_state == TASK_STATE_ZOMBIE ){
-			m_terminal->writeln_ro(RODT_ATTR("\nno such pid"));
-			return CMD_RESULT_FAILED;
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("no such pid"));
+			return CMD_ERROR_FAILED;
 		}
 		uint8_t task_owner = t->m_owner;
 
@@ -104,19 +105,21 @@ struct ReniceCommand : public CommandBase {
 			session_t *cur = SessionManager::current();
 			uint8_t cur_sid = (nullptr != cur) ? cur->m_sid : 0;
 			if( task_owner != cur_sid ){
-				m_terminal->writeln_ro(RODT_ATTR("\nnot owner"));
-				return CMD_RESULT_FAILED;
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("not owner"));
+				return CMD_ERROR_FAILED;
 			}
 		}
 #endif
 
 		if( !__task_scheduler.setTaskNice(pid, nice) ){
-			m_terminal->writeln_ro(RODT_ATTR("\nsetTaskNice failed"));
-			return CMD_RESULT_FAILED;
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("setTaskNice failed"));
+			return CMD_ERROR_FAILED;
 		}
 		__task_scheduler.rebaseAndRestartPrioTasks();
 
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

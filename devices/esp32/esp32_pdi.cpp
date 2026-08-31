@@ -45,6 +45,9 @@ created Date    : 1st Jan 2024
 #include "StorageInterface.cpp"
 #include "FileSystemInterface.cpp"
 #endif
+#ifdef ENABLE_PROGRAM_EXEC
+#include "ProgramLoaderInterface.cpp"
+#endif
 #include "InstanceInterface.cpp"
 
 #ifdef ENABLE_CONTEXTUAL_EXECUTION

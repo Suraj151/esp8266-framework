@@ -17,7 +17,7 @@ handling and its flush.
 import socket
 import time
 
-from .shell import Shell, ShellError
+from .shell import Shell, ShellError, describe
 
 DEFAULT_PORT = 23
 DEFAULT_USER = "pdiStack"
@@ -53,7 +53,7 @@ class TelnetShell(Shell):
                 last = err
 
         if self._socket is None:
-            raise ShellError("telnet to %s:%s failed: %s" % (host, candidates, last))
+            raise ShellError("telnet to %s:%s failed: %s" % (host, candidates, describe(last)))
 
         self._socket.setblocking(False)
 
@@ -93,7 +93,7 @@ class TelnetShell(Shell):
         if IAC in chunk:
             chunk = self._strip_iac(chunk)
 
-        return chunk.decode(errors="replace")
+        return self.decode(chunk)
 
     @staticmethod
     def _strip_iac(chunk):

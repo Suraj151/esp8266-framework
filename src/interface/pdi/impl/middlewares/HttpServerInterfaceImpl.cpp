@@ -553,6 +553,15 @@ void HttpServerInterfaceImpl::parseRequest(){
 
     __i_instance.getUtilityInstance().yield(); // Yield to allow other tasks to run
 
+    // a body is bounded before it is believed, the header is a peer's claim
+    if(!isForm && contentLength > HTTP_MAX_BODY_SIZE) {
+        SysLogE("HTTP request: body of %u bytes refused, limit is %u\n",
+            (unsigned)contentLength,
+            (unsigned)HTTP_MAX_BODY_SIZE);
+        m_clientRequest.body.clear();
+        return;
+    }
+
     // read body if content length is specified
     if(!isForm && contentLength > 0) {
 

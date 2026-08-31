@@ -405,6 +405,17 @@ def run_device_interleaved(specs, feature, verbose, timeout, username, password,
 
         began = [read_uptime(lane.target.shell, timeout) for lane in lanes]
 
+        # Every lane drives the same board, so a command waits behind the other
+        # lanes' work as well as its own. The per-command budget is a
+        # single-transport figure; hold it fixed here and the mode's own
+        # contention reads as a failure.
+        if len(lanes) > 1:
+            shared = timeout * len(lanes)
+            for lane in lanes:
+                lane.target.timeout = shared
+            say("%sper-command budget %.0fs (%.0fs x %d lanes)%s"
+                % (DIM, shared, timeout, len(lanes), RESET))
+
         say("%sinterleaving %d transports: %s%s"
             % (DIM, len(lanes), ", ".join(lane.label for lane in lanes), RESET))
         _, failed, _ = registry.run_interleaved(lanes, only=feature, verbose=verbose)

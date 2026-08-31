@@ -37,6 +37,8 @@ created Date    : 1st Jan 2026
 
 #define SERIAL_BOOT_RX_QUIET_MS       (MILLISECOND_DURATION_1000/20)
 
+#define PDI_NET_STACK_LWIP
+
 /**
  * session table and the transport pools that draw from it
  */

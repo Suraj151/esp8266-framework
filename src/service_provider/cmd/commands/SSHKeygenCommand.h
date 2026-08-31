@@ -60,21 +60,21 @@ struct SSHKeygenCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
 		    terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
-			return CMD_RESULT_ABORTED;
+			return CMD_ERROR_CANCELED;
 		}
 
-		cmd_result_t result = CMD_RESULT_OK;
+		pdi_err_t result = PDI_OK;
 		SSHKeyAlgorithm sshk = SSH_KEY_ALGO_MAX;
 		CommandOption *cmdoptn = nullptr;
 
@@ -84,7 +84,7 @@ struct SSHKeygenCommand : public CommandBase {
 		}
 
 		if( nullptr == m_terminal || sshk <= SSH_KEY_ALGO_MIN || sshk >= SSH_KEY_ALGO_MAX ){
-			return CMD_RESULT_ARGS_ERROR;
+			return CMD_ERROR_INVAL;
 		}
 
 		CommandOption *diroptn = RetrieveOption(CMD_OPTION_NAME_F);
@@ -95,7 +95,7 @@ struct SSHKeygenCommand : public CommandBase {
 			setWaitingForOption(CMD_OPTION_NAME_F);
 			m_terminal->putln();
 			m_terminal->write_ro(RODT_ATTR("key directory a] ~/.ssh  b] /etc/ssh (b is default) : "));
-			return CMD_RESULT_INCOMPLETE;
+			return CMD_ERROR_AGAIN;
 		}
 
 		pdiutil::string keydir = resolveKeyDir(diroptn);
@@ -107,7 +107,7 @@ struct SSHKeygenCommand : public CommandBase {
 				m_terminal->write_ro(RODT_ATTR("SSH keys generated in "));
 				m_terminal->writeln(keydir.c_str());
 			}else{
-				result = CMD_RESULT_FAILED;
+				result = CMD_ERROR_FAILED;
 				m_terminal->putln();
 				m_terminal->writeln_ro(RODT_ATTR("Failed to save SSH keys."));
 			}
@@ -116,7 +116,7 @@ struct SSHKeygenCommand : public CommandBase {
 
 			rsa_key *key = pdiutil::safe_new<rsa_key>();
 			if( nullptr == key ){
-				result = CMD_RESULT_FAILED;
+				result = CMD_ERROR_FAILED;
 				m_terminal->putln();
 				m_terminal->writeln_ro(RODT_ATTR("Not enough memory for RSA key."));
 			}else{
@@ -133,7 +133,7 @@ struct SSHKeygenCommand : public CommandBase {
 					m_terminal->write_ro(RODT_ATTR("SSH keys generated in "));
 					m_terminal->writeln(keydir.c_str());
 				}else{
-					result = CMD_RESULT_FAILED;
+					result = CMD_ERROR_FAILED;
 					m_terminal->writeln_ro(RODT_ATTR("Failed to generate/save RSA keys."));
 				}
 

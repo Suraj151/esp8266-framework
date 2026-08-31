@@ -13,6 +13,11 @@ created Date    : 1st Jan 2024
 #include "core/Espnow.h"
 #include "PingInterface.h"
 #include "SerialInterface.h"
+
+#if defined(ENABLE_NETWORK_SERVICE) && defined(PDI_NET_STACK_LWIP)
+#include <interface/pdi/impl/modules/netif/NetifRegistry.h>
+#include <interface/pdi/impl/modules/netif/lwip/LwipNetStack.h>
+#endif
 #ifdef ENABLE_CONTEXTUAL_EXECUTION
 #include "threading/Preemptive.h"
 #endif
@@ -236,6 +241,10 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
 
     #ifdef ENABLE_NETWORK_SERVICE
     __i_ping.init_ping( &__i_wifi );
+    #endif
+
+    #if defined(ENABLE_NETWORK_SERVICE) && defined(PDI_NET_STACK_LWIP)
+    __netif_registry.registerStack( &__lwip_net_stack );
     #endif
 
     #ifdef ENABLE_EXCEPTION_NOTIFIER

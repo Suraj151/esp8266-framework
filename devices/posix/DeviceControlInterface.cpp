@@ -10,6 +10,11 @@ created Date    : 16th Aug 2026
 
 #include "DeviceControlInterface.h"
 
+#ifdef ENABLE_NETWORK_SERVICE
+#include "NetStackInterface.h"
+#include <interface/pdi/impl/modules/netif/NetifRegistry.h>
+#endif
+
 #ifndef MOCK_DEVICE_TEST
 #include <stdlib.h>
 #include <unistd.h>
@@ -162,6 +167,10 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
     {
         getTerminal(TERMINAL_TYPE_SERIAL)->open();
     }
+
+#ifdef ENABLE_NETWORK_SERVICE
+    __netif_registry.registerStack(&__i_net_stack);
+#endif
 }
 
 /**

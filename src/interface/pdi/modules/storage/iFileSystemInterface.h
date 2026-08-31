@@ -395,6 +395,60 @@ public:
      * @return 0 on success, or a negative error code on failure.
      */
     virtual pdi_err_t touch(const char *path) = 0;
+
+    /**
+     * @brief Opens a file and returns a handle for repeated reads or writes.
+     *        Additive: every path-based call above keeps working unchanged, and
+     *        a backend that does not implement handles is emulated by the
+     *        dispatcher over its path calls.
+     * @param path The path of the file to open.
+     * @param flags Combination of file_open_flag_t values.
+     * @return A handle of 0 or above, or a negative error code on failure.
+     */
+    virtual pdi_fhandle_t openFile(const char *path, uint8_t flags) { return PDI_ERR_NOT_SUPPORTED; }
+
+    /**
+     * @brief Reads from an open handle, advancing its position by what it read.
+     * @param handle Handle returned by openFile.
+     * @param buffer Destination for the bytes read.
+     * @param size Capacity of the buffer in bytes.
+     * @return The number of bytes read, 0 at end of file, or a negative error code.
+     */
+    virtual int readFileHandle(pdi_fhandle_t handle, char *buffer, uint32_t size) { return PDI_ERR_NOT_SUPPORTED; }
+
+    /**
+     * @brief Writes to an open handle, advancing its position by what it wrote.
+     * @param handle Handle returned by openFile.
+     * @param content The bytes to write.
+     * @param size The number of bytes to write.
+     * @return The number of bytes written, or a negative error code on failure.
+     */
+    virtual int writeFileHandle(pdi_fhandle_t handle, const char *content, uint32_t size) { return PDI_ERR_NOT_SUPPORTED; }
+
+    /**
+     * @brief Moves the position of an open handle.
+     * @param handle Handle returned by openFile.
+     * @param offset Offset to move by, relative to whence.
+     * @param whence Reference point for the offset.
+     * @return The new position, or a negative error code on failure.
+     */
+    virtual int64_t seekFile(pdi_fhandle_t handle, int64_t offset, file_seek_t whence) { return PDI_ERR_NOT_SUPPORTED; }
+
+    /**
+     * @brief Pushes anything an open handle still holds out to storage, leaving
+     *        the handle open. Without this a backend that caches writes only
+     *        makes them visible at close.
+     * @param handle Handle returned by openFile.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    virtual pdi_err_t syncFile(pdi_fhandle_t handle) { return PDI_ERR_NOT_SUPPORTED; }
+
+    /**
+     * @brief Closes an open handle, committing anything still buffered.
+     * @param handle Handle returned by openFile.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    virtual pdi_err_t closeFile(pdi_fhandle_t handle) { return PDI_ERR_NOT_SUPPORTED; }
 protected:
     /**
      * @brief Get current wall-clock time as seconds since Unix epoch, or 0

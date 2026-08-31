@@ -44,16 +44,16 @@ struct MountCommand : public CommandBase {
 	bool needauth() override { return true; }
 #endif
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_FAILED;
+			return CMD_ERROR_FAILED;
 		}
 
 		m_terminal->writeln();
@@ -84,7 +84,7 @@ struct MountCommand : public CommandBase {
 		}
 #endif
 
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 
 private:

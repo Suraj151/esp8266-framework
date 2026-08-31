@@ -48,16 +48,16 @@ struct CopyFSCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
-		cmd_result_t result = CMD_RESULT_OK;
+		pdi_err_t result = PDI_OK;
 
 		if(nullptr != m_terminal){
 			// Get first option which must be the old path and second option which must be the new path
@@ -75,7 +75,7 @@ struct CopyFSCommand : public CommandBase {
 					int iStatus = 0;
 
 					if( !__i_fs.isFileExist(srcpath.c_str()) || __i_fs.isFileExist(dstpath.c_str()) ){
-						result = CMD_RESULT_FAILED;
+						result = CMD_ERROR_FAILED;
 						m_terminal->putln();
 						m_terminal->writeln_ro(RODT_ATTR("src not exist OR dst exist"));
 					}else{
@@ -83,7 +83,7 @@ struct CopyFSCommand : public CommandBase {
 					}
 
 					if (iStatus < 0) {
-						result = CMD_RESULT_FAILED;
+						result = CMD_ERROR_FAILED;
 						m_terminal->putln();
 						m_terminal->write_ro(RODT_ATTR("Failed to copy file: "));
 						m_terminal->write(srcpath.c_str());
@@ -94,7 +94,7 @@ struct CopyFSCommand : public CommandBase {
 					}
 				}
 			}else{
-				result = CMD_RESULT_ARGS_ERROR;
+				result = CMD_ERROR_INVAL;
 			}
 		}
 

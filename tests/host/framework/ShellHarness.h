@@ -92,11 +92,13 @@ namespace pditest
     }
 
     /**
-     * @brief Put the wifi interfaces in the netif registry, the way boot does.
+     * @brief Put the network layer in the registry, the way boot does.
      *
-     * PdiStack::initialize registers them right after the wifi service starts.
-     * Without it the registry is empty, so /sys/class/net has no interfaces to
-     * list and /proc/net/route has nothing to route.
+     * PdiStack::initialize registers the wifi interfaces right after the wifi
+     * service starts, and gives the port its own chance to register before
+     * that. Without both the registry is empty, so /sys/class/net has no
+     * interfaces to list, /proc/net/route has nothing to route and
+     * /proc/net/tcp has no stack to walk.
      */
     inline void readyNetifs()
     {
@@ -108,6 +110,7 @@ namespace pditest
         }
         done = true;
 
+        __i_dvc_ctrl.initDeviceSpecificFeatures();
         registerWiFiNetifs();
 #endif
     }
@@ -231,7 +234,7 @@ namespace pditest
         /**
          * @brief Result the last run reported.
          */
-        cmd_result_t result() const { return m_result; }
+        pdi_err_t result() const { return m_result; }
 
         /**
          * @brief The terminal underneath, for feeding a command that prompts.
@@ -243,7 +246,7 @@ namespace pditest
     private:
         StringTerminal m_terminal;
         session_t *m_session = nullptr;
-        cmd_result_t m_result = CMD_RESULT_MAX;
+        pdi_err_t m_result = CMD_ERROR_UNSET;
     };
 
     /**

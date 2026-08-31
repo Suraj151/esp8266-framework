@@ -78,7 +78,9 @@ typedef enum services{
  * (they still run, but srvc stop/start/status won't see them). Raise if a
  * service needs more — cost is 2 bytes/slot per service instance.
  */
+#ifndef MAX_SERVICE_TASKS
 #define MAX_SERVICE_TASKS 6
+#endif
 
 /**
  * ServiceProvider class
@@ -90,7 +92,7 @@ class ServiceProvider{
     /**
      * ServiceProvider constructor.
      */
-    ServiceProvider(service_t st, const char *_svc_name) : m_service_name(_svc_name), m_service_t(st), m_service_routine_task_id(-1), m_service_task_count(0) {
+    ServiceProvider(service_t st, const char *_svc_name) : m_service_name(_svc_name), m_service_t(st), m_service_routine_task_id(-1), m_service_task_count(0), m_service_enabled(true) {
       m_services[st] = this;
       for (uint8_t i = 0; i < MAX_SERVICE_TASKS; i++) {
         m_service_task_ids[i] = -1;
@@ -279,6 +281,34 @@ class ServiceProvider{
     }
     
     /**
+     * Absolute path of the file this service reads its options from.
+     */
+    virtual void getServiceConfigPath(pdiutil::string &_out);
+
+    /**
+     * A service the device cannot be recovered without, which therefore stays
+     * beyond the reach of a runtime disable.
+     */
+    virtual bool isEssentialService() const { return false; }
+
+    /**
+     * Read the persisted enable state into the service, so later callers answer
+     * from memory rather than from storage.
+     */
+    bool loadServiceEnabled();
+
+    /**
+     * Whether this service is meant to run, as the last load left it.
+     */
+    bool isServiceEnabled() const { return m_service_enabled || isEssentialService(); }
+
+    /**
+     * Persist whether this service is meant to run, so the choice survives a
+     * restart. An essential service refuses to be turned off.
+     */
+    bool setServiceEnabled(bool _enabled);
+
+    /**
      * print service config to terminal
      * @param terminal Pointer to the terminal interface.
      */
@@ -339,6 +369,8 @@ class ServiceProvider{
      * @brief Number of populated slots in m_service_task_ids.
      */
     uint8_t m_service_task_count;
+
+    bool m_service_enabled;
 };
 
 #endif

@@ -15,7 +15,7 @@ so wait_for_boot and login are satisfied without sending anything.
 
 import time
 
-from .shell import Shell, ShellError, PROMPT
+from .shell import Shell, ShellError, PROMPT, describe
 
 try:
     import paramiko
@@ -86,7 +86,7 @@ class SshShell(Shell):
                 look_for_keys=False,
             )
         except Exception as err:
-            raise ShellError("ssh to %s@%s:%d failed: %s" % (username, host, port, err))
+            raise ShellError("ssh to %s@%s:%d failed: %s" % (username, host, port, describe(err)))
 
         try:
             self._channel = self._client.invoke_shell(term=term, width=width, height=height)
@@ -113,7 +113,7 @@ class SshShell(Shell):
         deadline = time.time() + timeout
         while True:
             if self._channel.recv_ready():
-                return self._channel.recv(4096).decode(errors="replace")
+                return self.decode(self._channel.recv(4096))
 
             if self._channel.exit_status_ready() and not self._channel.recv_ready():
                 return ""

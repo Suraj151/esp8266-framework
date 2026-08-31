@@ -120,6 +120,11 @@ private:
   bool m_append;
   bool m_started;
   bool m_failed;
+
+  // Held open for the life of the stream when the backend has handles, so a
+  // block costs one write instead of an open, a seek and a close. Negative when
+  // the backend has none and the path calls are used instead.
+  pdi_fhandle_t m_handle;
 };
 
 #endif

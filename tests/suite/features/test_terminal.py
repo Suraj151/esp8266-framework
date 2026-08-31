@@ -275,9 +275,9 @@ def interrupt_waiting_command(t):
     t.shell.send_raw(CTRL_C)
     out = t.shell.drain(0.6, 8.0)
 
-    # CMD_RESULT_ABORTED — the interrupt reached the command rather than the
+    # CMD_ERROR_CANCELED — the interrupt reached the command rather than the
     # line editor, at the first of its prompts as well as the masked one
-    expect_in("CmdErr : 10", out, "the waiting command was aborted")
+    expect_in("CmdErr : -3609", out, "the waiting command was aborted")
     expect_in(t.username, t.run("whoami"), "the shell came back to the prompt")
 
 

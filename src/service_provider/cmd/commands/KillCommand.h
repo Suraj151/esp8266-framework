@@ -53,16 +53,16 @@ struct KillCommand : public CommandBase {
 	bool needauth() override { return true; }
 #endif
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_FAILED;
+			return CMD_ERROR_FAILED;
 		}
 
 		// Positional: <pid> OR <sig> <pid>. First slot is the signal only when a
@@ -73,7 +73,7 @@ struct KillCommand : public CommandBase {
 		bool have1 = ( nullptr != a1 && nullptr != a1->optionval && a1->optionvalsize > 0 );
 
 		if( !have0 ){
-			return CMD_RESULT_ARGS_MISSING;
+			return CMD_ERROR_ARGS_MISSING;
 		}
 
 		CommandOption *sOpt = have1 ? a0 : nullptr;
@@ -85,14 +85,16 @@ struct KillCommand : public CommandBase {
 			sig = (signal_t)StringToUint16(sOpt->optionval, sOpt->optionvalsize);
 		}
 		if( sig != SIG_TERM && sig != SIG_KILL && sig != SIG_STOP && sig != SIG_CONT ){
-			m_terminal->writeln_ro(RODT_ATTR("\nunsupported signal (9/15/18/19 only)"));
-			return CMD_RESULT_FAILED;
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("unsupported signal (9/15/18/19 only)"));
+			return CMD_ERROR_FAILED;
 		}
 
 		task_t *t = __task_scheduler.get_task(pid);
 		if( nullptr == t || t->m_state == TASK_STATE_ZOMBIE ){
-			m_terminal->writeln_ro(RODT_ATTR("\nno such pid"));
-			return CMD_RESULT_FAILED;
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("no such pid"));
+			return CMD_ERROR_FAILED;
 		}
 		uint8_t task_owner = t->m_owner;
 
@@ -102,18 +104,26 @@ struct KillCommand : public CommandBase {
 			session_t *cur = SessionManager::current();
 			uint8_t cur_sid = (nullptr != cur) ? cur->m_sid : 0;
 			if( task_owner != cur_sid ){
-				m_terminal->writeln_ro(RODT_ATTR("\nnot owner"));
-				return CMD_RESULT_FAILED;
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("not owner"));
+				return CMD_ERROR_FAILED;
 			}
 		}
 #endif
 
-		if( !__task_scheduler.sendSignal(pid, sig) ){
-			m_terminal->writeln_ro(RODT_ATTR("\nsignal delivery failed"));
-			return CMD_RESULT_FAILED;
+		if( (SIG_STOP == sig || SIG_CONT == sig) && !t->m_stoppable ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("task cannot be stopped or continued"));
+			return CMD_ERROR_FAILED;
 		}
 
-		return CMD_RESULT_OK;
+		if( !__task_scheduler.sendSignal(pid, sig) ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("signal delivery failed"));
+			return CMD_ERROR_FAILED;
+		}
+
+		return PDI_OK;
 	}
 };
 

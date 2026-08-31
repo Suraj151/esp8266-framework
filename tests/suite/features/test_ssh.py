@@ -130,7 +130,7 @@ def host_keys_on_disk(t):
         raise Skip("no %s on this target" % SSH_DIR)
 
     expect_in("ed25519", listing, "an ed25519 host key in %s" % SSH_DIR)
-    expect_in("sshconfig", listing, "the ssh config in %s" % SSH_DIR)
+    expect_in("ssh.conf", listing, "the ssh config in %s" % SSH_DIR)
 
 
 @test("the private host key is not world readable", needs=("ls",))
@@ -153,7 +153,7 @@ def host_key_permissions(t):
 
         mode = fields[0]
         name = fields[-1]
-        if mode.startswith("d") or name.endswith(".pub") or name == "sshconfig":
+        if mode.startswith("d") or name.endswith(".pub") or name.endswith(".conf"):
             continue
 
         # drwxr-xr-x style; the last triplet is other
@@ -163,9 +163,9 @@ def host_key_permissions(t):
 
 @test("the ssh config declares both authentication methods", needs=("cat",))
 def ssh_config_contents(t):
-    body = t.run("cat %s/sshconfig" % SSH_DIR)
+    body = t.run("cat %s/ssh.conf" % SSH_DIR)
     if "CmdErr" in body or "no such" in body.lower():
-        raise Skip("no sshconfig on this target")
+        raise Skip("no ssh.conf on this target")
 
     expect_in("PasswordAuthentication", body, "the password auth switch")
     expect_in("PubkeyAuthentication", body, "the pubkey auth switch")

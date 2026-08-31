@@ -133,9 +133,17 @@ void PDIStack::initialize(){
   SessionManager::attach(terminal);
   #endif
 
+  // what each service is meant to do is persisted, so read it before any start
+  for (uint8_t i = 0; i < SERVICE_MAX; i++) {
+    ServiceProvider *svc = ServiceProvider::getService((service_t)i);
+    if (nullptr != svc) svc->loadServiceEnabled();
+  }
+
   // start the syslog sink first so subsequent services' SysLog lines are persisted
   #ifdef ENABLE_SYSLOG_SERVICE
-  __syslog_service.initService();
+  if (__syslog_service.isServiceEnabled()) {
+    __syslog_service.initService();
+  }
   #endif
 
   __database_service.initService();
@@ -145,34 +153,46 @@ void PDIStack::initialize(){
   #endif
 
   #ifdef ENABLE_WIFI_SERVICE
-  __wifi_service.initService( &__i_wifi );
-  registerWiFiNetifs();
+  if (__wifi_service.isServiceEnabled()) {
+    __wifi_service.initService( &__i_wifi );
+    registerWiFiNetifs();
+  }
   #endif
 
   #ifdef ENABLE_OTA_SERVICE
-  __ota_service.initService( this->m_client );
+  if (__ota_service.isServiceEnabled()) {
+    __ota_service.initService( this->m_client );
+  }
   #endif
-  
+
   #ifdef ENABLE_GPIO_SERVICE
-  __gpio_service.initService( 
-    #ifdef ENABLE_HTTP_CLIENT
-    this->m_client 
-    #endif
-    );
+  if (__gpio_service.isServiceEnabled()) {
+    __gpio_service.initService(
+      #ifdef ENABLE_HTTP_CLIENT
+      this->m_client
+      #endif
+      );
+  }
   #endif
-  
+
   #ifdef ENABLE_MQTT_SERVICE
-  __mqtt_service.initService( this->m_client );
+  if (__mqtt_service.isServiceEnabled()) {
+    __mqtt_service.initService( this->m_client );
+  }
   #endif
 
   #ifdef ENABLE_EMAIL_SERVICE
-  __email_service.initService( this->m_client );
+  if (__email_service.isServiceEnabled()) {
+    __email_service.initService( this->m_client );
+  }
   #endif
 
   __factory_reset.initService();
 
   #ifdef ENABLE_DEVICE_IOT
-  __device_iot_service.initService( this->m_client );
+  if (__device_iot_service.isServiceEnabled()) {
+    __device_iot_service.initService( this->m_client );
+  }
   #endif
 
   #ifdef ENABLE_AUTH_SERVICE
@@ -188,21 +208,29 @@ void PDIStack::initialize(){
   #endif
 
   #ifdef ENABLE_MDNS_SERVICE
-  __mdns_service.initService();
+  if (__mdns_service.isServiceEnabled()) {
+    __mdns_service.initService();
+  }
   #endif
 
   #ifdef ENABLE_HTTP_SERVER
-  __web_server.initService( this->m_server );
+  if (__web_server.isServiceEnabled()) {
+    __web_server.initService( this->m_server );
+  }
   #endif
 
   #ifdef ENABLE_TELNET_SERVICE
   uint16_t telnet_port = 23; // Default Telnet port
-  __telnet_service.initService(&telnet_port);
+  if (__telnet_service.isServiceEnabled()) {
+    __telnet_service.initService(&telnet_port);
+  }
   #endif
 
   #ifdef ENABLE_SSH_SERVICE
   uint16_t ssh_port = 22; // Default SSH port
-  __sshserver_service.initService(&ssh_port);
+  if (__sshserver_service.isServiceEnabled()) {
+    __sshserver_service.initService(&ssh_port);
+  }
   #endif
 
   #ifdef ENABLE_CMD_SERVICE

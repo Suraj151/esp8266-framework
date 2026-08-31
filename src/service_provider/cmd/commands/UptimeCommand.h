@@ -30,7 +30,7 @@ struct UptimeCommand : public CommandBase {
 		return RODT_ATTR("uptime  time since boot as Xd Yh Zm Ws");
 	}
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		if(nullptr != m_terminal){
 			uint32_t ms = __i_dvc_ctrl.millis_now();
@@ -51,7 +51,7 @@ struct UptimeCommand : public CommandBase {
 			m_terminal->write_ro(RODT_ATTR("s"));
 		}
 
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

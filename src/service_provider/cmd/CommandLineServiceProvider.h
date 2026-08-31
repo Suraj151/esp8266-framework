@@ -63,6 +63,7 @@ created Date    : 1st June 2019
 #include "commands/HeadFSCommand.h"
 #include "commands/TailFSCommand.h"
 #include "commands/GrepFSCommand.h"
+#include "commands/ExecCommand.h"
 #include "ShellParser.h"
 
 
@@ -97,9 +98,10 @@ public:
      * init service
      */
     bool initService(void *arg = nullptr) override;
+    bool isEssentialService() const override { return true; }
 
-	cmd_result_t processTerminalInput(iTerminalInterface *terminal);
-	cmd_result_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE) override;
+	pdi_err_t processTerminalInput(iTerminalInterface *terminal);
+	pdi_err_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE) override;
 	static void startInteraction();
     bool useTerminal(iTerminalInterface *terminal);
 	void releaseSession(session_t *session);
@@ -122,6 +124,13 @@ private:
 
 	int16_t getCommandWaitingForUserInput();
 	cmd_t* getCommandToExecute(const char *cmdname);
+
+	/**
+	 * Names the first word of what was not found. A line can hold several
+	 * commands, so the one that failed is not always the one the line starts
+	 * with.
+	 */
+	void reportUnknownCommand(const char *text, uint16_t len);
 #ifdef ENABLE_STORAGE_SERVICE
 	/**
 	 * Points the session output descriptor at the redirect target, resolved
@@ -139,7 +148,8 @@ private:
 	 * Runs every stage in turn, carrying each one's output into the next
 	 * through a pipe and sending the last one to the target or the terminal.
 	 */
-	cmd_result_t runPipeline(const char *line, const ShellParser::Line &parsed);
+	pdi_err_t runPipeline(const char *line, const ShellParser::Line &parsed, uint16_t index);
+
 #endif
 	cmd_t* getActiveCommandByName(const char* _cmd);
 };

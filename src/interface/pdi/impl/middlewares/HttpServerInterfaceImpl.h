@@ -13,6 +13,10 @@ created Date    : 1st June 2025
 
 #include <interface/pdi/middlewares/iServerInterface.h>
 
+// pulled in directly because Config.h only reaches the http settings when a
+// http role is enabled, and this header is parsed either way
+#include <config/HttpConfig.h>
+
 /**
  * HttpServerInterfaceImpl class
  */

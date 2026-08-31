@@ -17,7 +17,7 @@ Created Date    : 27th Aug 2026
 
 NetifRegistry __netif_registry;
 
-NetifRegistry::NetifRegistry() : m_count(0) {
+NetifRegistry::NetifRegistry() : m_stack(nullptr), m_count(0) {
     for (uint8_t i = 0; i < NETIF_MAX_REGISTERED; i++) {
         m_netifs[i] = nullptr;
     }

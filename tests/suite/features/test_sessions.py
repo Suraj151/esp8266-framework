@@ -71,6 +71,19 @@ def dropped_prompt_is_not_inherited(t):
     try:
         # a fresh client must get a shell, not the abandoned prompt
         out = second.run("whoami", t.timeout)
+
+        # An empty answer here says the session was granted and then said
+        # nothing, which is a different defect from inheriting the prompt and
+        # needs different evidence. Ask the lane that still works what the
+        # board thinks it is holding, because this has only ever happened
+        # inside a full run and the next occurrence has to be the one that
+        # explains itself.
+        if not out.strip():
+            raise AssertionError(
+                "the new session was granted but answered nothing.\n"
+                "who says:\n%s\nfree heap:\n%s"
+                % (t.run("who"), t.run("cat /proc/meminfo")))
+
         expect_in(t.username, out, "the new session runs its own command")
         expect_not_in("user:", out, "no inherited prompt")
         expect_not_in("Pass", out, "no inherited prompt")
@@ -137,6 +150,54 @@ def full_table_refuses_cleanly(t):
     try:
         expect_in(t.username, recovered.run("whoami", t.timeout),
                   "the pool did not recover after the sessions closed")
+    finally:
+        recovered.close()
+
+
+@test("the pool grants a session after a quiet interval once it has been full",
+      needs=("whoami",), slow=True)
+def pool_recovers_after_quiet(t):
+    """
+    The pool marks when it filled and gives a waiting client a grace before
+    refusing it. That marker used to survive the pool emptying, so a client
+    arriving after a quiet interval found a grace that had expired without it
+    and was refused at once. Recovery has to hold after the quiet, not only
+    on the reconnect that follows immediately.
+    """
+    import time
+
+    from ..driver.shell import ShellError
+
+    peers = []
+    filled = False
+    try:
+        for _ in range(8):
+            try:
+                peer = t.dial()
+                peer.attach(t.username, t.password, timeout=min(t.timeout, 12.0))
+            except ShellError:
+                filled = True
+                break
+
+            peers.append(peer)
+
+        if not peers:
+            raise Skip("could not open a session to fill the table")
+        if not filled:
+            raise Skip("the table did not fill in eight connections")
+    finally:
+        for peer in peers:
+            try:
+                peer.close()
+            except Exception:
+                pass
+
+    time.sleep(8.0)
+
+    recovered = t.peer()
+    try:
+        expect_in(t.username, recovered.run("whoami", t.timeout),
+                  "the pool refused a session dialled after the quiet interval")
     finally:
         recovered.close()
 

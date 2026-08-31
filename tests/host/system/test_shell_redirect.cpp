@@ -22,6 +22,23 @@ created Date    : 26th Aug 2026
 
 namespace
 {
+
+    std::string cmdText(const ShellParser::Line &p, const char *line, int16_t index)
+    {
+        pdiutil::string out;
+        p.commandText(line, index, out);
+        return std::string(out.c_str());
+    }
+
+    std::string redirTarget(const ShellParser::Line &p, const char *line, ShellParser::redirect_op_t op)
+    {
+        for (int16_t c = 0; c < (int16_t)p.m_commands.size(); c++) {
+            const ShellParser::Redirect *r = p.findRedirect(c, op);
+            if (nullptr != r) return std::string(line + r->m_start, (size_t)r->m_len);
+        }
+        return std::string();
+    }
+
     std::string slurp(const char *path)
     {
         std::string out;
@@ -38,11 +55,11 @@ TEST(redirect, the_parser_finds_a_replacing_target)
     const char *line = "echo hi > /tmp/out.txt";
     ShellParser::Line t = ShellParser::parse(line, (int16_t)strlen(line));
 
-    ASSERT_TRUE(t.m_redirected);
-    ASSERT_FALSE(t.m_append);
+    ASSERT_TRUE(nullptr != t.findRedirect(0, ShellParser::REDIRECT_OUT));
+    ASSERT_TRUE(nullptr == t.findRedirect(0, ShellParser::REDIRECT_APPEND));
     ASSERT_FALSE(t.m_malformed);
-    ASSERT_EQ((int)t.m_stages[0].m_len, 7);
-    ASSERT_STREQ(t.m_outpath.c_str(), "/tmp/out.txt");
+    ASSERT_EQ((int)cmdText(t, line, 0).size(), 7);
+    ASSERT_STREQ(redirTarget(t, line, ShellParser::REDIRECT_OUT).c_str(), "/tmp/out.txt");
 }
 
 TEST(redirect, the_parser_finds_an_appending_target)
@@ -50,9 +67,9 @@ TEST(redirect, the_parser_finds_an_appending_target)
     const char *line = "echo hi >> /tmp/out.txt";
     ShellParser::Line t = ShellParser::parse(line, (int16_t)strlen(line));
 
-    ASSERT_TRUE(t.m_append);
-    ASSERT_EQ((int)t.m_stages[0].m_len, 7);
-    ASSERT_STREQ(t.m_outpath.c_str(), "/tmp/out.txt");
+    ASSERT_TRUE(nullptr != t.findRedirect(0, ShellParser::REDIRECT_APPEND));
+    ASSERT_EQ((int)cmdText(t, line, 0).size(), 7);
+    ASSERT_STREQ(redirTarget(t, line, ShellParser::REDIRECT_APPEND).c_str(), "/tmp/out.txt");
 }
 
 TEST(redirect, a_line_with_no_operator_is_left_whole)
@@ -60,9 +77,9 @@ TEST(redirect, a_line_with_no_operator_is_left_whole)
     const char *line = "echo hi";
     ShellParser::Line t = ShellParser::parse(line, (int16_t)strlen(line));
 
-    ASSERT_FALSE(t.m_redirected);
+    ASSERT_TRUE(nullptr == t.findRedirect(0, ShellParser::REDIRECT_OUT));
     ASSERT_TRUE(t.isPlain());
-    ASSERT_EQ((int)t.m_stages[0].m_len, 7);
+    ASSERT_EQ((int)cmdText(t, line, 0).size(), 7);
 }
 
 TEST(redirect, a_dangling_operator_is_malformed)
@@ -191,9 +208,9 @@ TEST(pipeline, the_parser_splits_every_stage)
 
     ASSERT_FALSE(t.m_malformed);
     ASSERT_FALSE(t.isPlain());
-    ASSERT_EQ((int)t.m_stages.size(), 3);
-    ASSERT_EQ((int)t.m_stages[0].m_len, 7);
-    ASSERT_EQ((int)t.m_stages[2].m_len, 2);
+    ASSERT_EQ((int)t.m_commands.size(), 3);
+    ASSERT_EQ((int)cmdText(t, line, 0).size(), 7);
+    ASSERT_EQ((int)cmdText(t, line, 2).size(), 2);
 }
 
 TEST(pipeline, a_target_binds_to_the_last_stage)
@@ -201,21 +218,26 @@ TEST(pipeline, a_target_binds_to_the_last_stage)
     const char *line = "echo hi | wc > /tmp/o.txt";
     ShellParser::Line t = ShellParser::parse(line, (int16_t)strlen(line));
 
-    ASSERT_EQ((int)t.m_stages.size(), 2);
-    ASSERT_TRUE(t.m_redirected);
-    ASSERT_STREQ(t.m_outpath.c_str(), "/tmp/o.txt");
-    ASSERT_EQ((int)t.m_stages[1].m_len, 2);
+    ASSERT_EQ((int)t.m_commands.size(), 2);
+    ASSERT_TRUE(nullptr == t.findRedirect(0, ShellParser::REDIRECT_OUT));
+    ASSERT_TRUE(nullptr != t.findRedirect(1, ShellParser::REDIRECT_OUT));
+    ASSERT_STREQ(redirTarget(t, line, ShellParser::REDIRECT_OUT).c_str(), "/tmp/o.txt");
+    ASSERT_EQ((int)cmdText(t, line, 1).size(), 2);
 }
 
 TEST(pipeline, an_empty_stage_is_malformed)
 {
     const char *a = "echo hi |";
     const char *b = "| wc";
-    const char *c = "echo hi || wc";
+    const char *c = "echo hi | | wc";
 
     ASSERT_TRUE(ShellParser::parse(a, (int16_t)strlen(a)).m_malformed);
     ASSERT_TRUE(ShellParser::parse(b, (int16_t)strlen(b)).m_malformed);
     ASSERT_TRUE(ShellParser::parse(c, (int16_t)strlen(c)).m_malformed);
+
+    // '||' is the or-if operator, so this one is a valid line
+    const char *orif = "echo hi || wc";
+    ASSERT_TRUE(!ShellParser::parse(orif, (int16_t)strlen(orif)).m_malformed);
 }
 
 TEST(pipeline, output_of_one_stage_becomes_input_of_the_next)
@@ -350,7 +372,7 @@ TEST(pipeline, a_command_given_no_input_is_unaffected)
 
     // wc with neither a file nor a pipe still reports a missing argument
     sh.run("wc");
-    ASSERT_EQ((int)sh.result(), (int)CMD_RESULT_ARGS_MISSING);
+    ASSERT_EQ((int)sh.result(), (int)CMD_ERROR_ARGS_MISSING);
 }
 
 
@@ -359,12 +381,12 @@ TEST(source, the_parser_finds_an_input_source)
     const char *line = "wc < /tmp/in.txt";
     ShellParser::Line t = ShellParser::parse(line, (int16_t)strlen(line));
 
-    ASSERT_TRUE(t.m_sourced);
-    ASSERT_FALSE(t.m_redirected);
+    ASSERT_TRUE(nullptr != t.findRedirect(0, ShellParser::REDIRECT_IN));
+    ASSERT_TRUE(nullptr == t.findRedirect(0, ShellParser::REDIRECT_OUT));
     ASSERT_FALSE(t.m_malformed);
     ASSERT_FALSE(t.isPlain());
-    ASSERT_EQ((int)t.m_stages[0].m_len, 2);
-    ASSERT_STREQ(t.m_inpath.c_str(), "/tmp/in.txt");
+    ASSERT_EQ((int)cmdText(t, line, 0).size(), 2);
+    ASSERT_STREQ(redirTarget(t, line, ShellParser::REDIRECT_IN).c_str(), "/tmp/in.txt");
 }
 
 TEST(source, a_line_can_name_a_source_and_a_target)
@@ -372,11 +394,11 @@ TEST(source, a_line_can_name_a_source_and_a_target)
     const char *line = "wc < /tmp/in.txt > /tmp/out.txt";
     ShellParser::Line t = ShellParser::parse(line, (int16_t)strlen(line));
 
-    ASSERT_TRUE(t.m_sourced);
-    ASSERT_TRUE(t.m_redirected);
-    ASSERT_STREQ(t.m_inpath.c_str(), "/tmp/in.txt");
-    ASSERT_STREQ(t.m_outpath.c_str(), "/tmp/out.txt");
-    ASSERT_EQ((int)t.m_stages[0].m_len, 2);
+    ASSERT_TRUE(nullptr != t.findRedirect(0, ShellParser::REDIRECT_IN));
+    ASSERT_TRUE(nullptr != t.findRedirect(0, ShellParser::REDIRECT_OUT));
+    ASSERT_STREQ(redirTarget(t, line, ShellParser::REDIRECT_IN).c_str(), "/tmp/in.txt");
+    ASSERT_STREQ(redirTarget(t, line, ShellParser::REDIRECT_OUT).c_str(), "/tmp/out.txt");
+    ASSERT_EQ((int)cmdText(t, line, 0).size(), 2);
 }
 
 TEST(source, the_order_of_the_operators_does_not_matter)
@@ -384,8 +406,8 @@ TEST(source, the_order_of_the_operators_does_not_matter)
     const char *line = "wc > /tmp/out.txt < /tmp/in.txt";
     ShellParser::Line t = ShellParser::parse(line, (int16_t)strlen(line));
 
-    ASSERT_STREQ(t.m_inpath.c_str(), "/tmp/in.txt");
-    ASSERT_STREQ(t.m_outpath.c_str(), "/tmp/out.txt");
+    ASSERT_STREQ(redirTarget(t, line, ShellParser::REDIRECT_IN).c_str(), "/tmp/in.txt");
+    ASSERT_STREQ(redirTarget(t, line, ShellParser::REDIRECT_OUT).c_str(), "/tmp/out.txt");
 }
 
 TEST(source, a_dangling_or_repeated_operator_is_malformed)
@@ -454,6 +476,71 @@ TEST(source, a_missing_source_is_refused_and_hands_the_terminal_back)
 
     ASSERT_NULL(SessionManager::current()->m_fdtable);
     ASSERT_TRUE(sh.run("echo back").find("back") != std::string::npos);
+}
+
+TEST(redirect, repeating_a_redirect_holds_on_to_nothing)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    __i_fs.deleteFile("/redir_many.txt");
+
+    // VFS_MAX_OPEN_FILES backend handles exist, so a redirect that kept one
+    // would stop opening after that many rounds; the descriptor table has to be
+    // released every round too, not merely on the last one
+    for (uint16_t round = 0; round < 40; round++) {
+        sh.run("echo repeated > /redir_many.txt");
+        ASSERT_NULL(SessionManager::current()->m_fdtable);
+    }
+
+    ASSERT_TRUE(slurp("/redir_many.txt").find("repeated") != std::string::npos);
+    ASSERT_TRUE(sh.run("echo back").find("back") != std::string::npos);
+
+    __i_fs.deleteFile("/redir_many.txt");
+}
+
+TEST(pipeline, repeating_a_pipeline_holds_on_to_nothing)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    for (uint16_t round = 0; round < 40; round++) {
+        sh.run("echo repeated here | wc");
+        ASSERT_NULL(SessionManager::current()->m_fdtable);
+    }
+
+    ASSERT_TRUE(sh.run("echo back").find("back") != std::string::npos);
+}
+
+TEST(source, repeating_a_source_holds_on_to_nothing)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    __i_fs.writeFile("/src_many.txt", "one\ntwo\n", 8, false);
+
+    for (uint16_t round = 0; round < 40; round++) {
+        sh.run("wc < /src_many.txt");
+        ASSERT_NULL(SessionManager::current()->m_fdtable);
+    }
+
+    ASSERT_TRUE(sh.run("echo back").find("back") != std::string::npos);
+
+    __i_fs.deleteFile("/src_many.txt");
+}
+
+TEST(redirect, a_middle_pipeline_stage_keeps_its_own_target)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    __i_fs.deleteFile("/mid_stage.txt");
+
+    // the redirect is applied after the pipe, so the file takes the output and
+    // the stage downstream reads an empty pipe
+    std::string seen = sh.run("echo mid > /mid_stage.txt | wc");
+
+    ASSERT_TRUE(seen.find("0") != std::string::npos);
+    ASSERT_TRUE(slurp("/mid_stage.txt").find("mid") != std::string::npos);
+
+    __i_fs.deleteFile("/mid_stage.txt");
 }
 
 #endif

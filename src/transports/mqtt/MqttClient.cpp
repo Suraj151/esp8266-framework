@@ -134,6 +134,23 @@ void MQTTClient::add_to_subscribed_topics(char *_topic, uint8_t _qos)
   }
 }
 
+/**
+ * Queue one packet for sending, refusing rather than making room. A caller
+ * that is told no has not sent anything and must not record that it did.
+ */
+bool MQTTClient::queue_packet(uint8_t *_data, uint16_t _len)
+{
+  if (QUEUE_Puts(&this->m_mqttClient.msgQueue, _data, _len) != -1)
+  {
+    return true;
+  }
+
+  SysLogW("MQTT: send queue full, packet refused, queue(%d/%d)\n",
+          this->m_mqttClient.msgQueue.rb.fill_cnt,
+          this->m_mqttClient.msgQueue.rb.size);
+  return false;
+}
+
 bool MQTTClient::remove_from_subscribed_topics(char *_topic)
 {
   for (uint16_t i = 0; i < this->m_mqttClient.subscribed_topics.size(); i++)
@@ -295,9 +312,9 @@ void MQTTClient::mqtt_client_recv()
         if (1 == msg_qos || 2 == msg_qos)
         {
           LogI("MQTT: Queue response QoS: %d\r\n", msg_qos);
-          if (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
+          if (!this->queue_packet(this->m_mqttClient.mqtt_state.outbound_message->data,
+                                  this->m_mqttClient.mqtt_state.outbound_message->length))
           {
-            LogW("MQTT: Queue full\n");
           }
         }
 
@@ -321,20 +338,16 @@ void MQTTClient::mqtt_client_recv()
 
         this->m_mqttClient.mqtt_state.outbound_message = mqtt_msg_pubrel(&this->m_mqttClient.mqtt_state.mqtt_connection, msg_id);
 
-        if (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
-        {
-          LogW("MQTT: Queue full\n");
-        }
+        this->queue_packet(this->m_mqttClient.mqtt_state.outbound_message->data,
+                           this->m_mqttClient.mqtt_state.outbound_message->length);
         break;
 
       case MQTT_MSG_TYPE_PUBREL:
 
         this->m_mqttClient.mqtt_state.outbound_message = mqtt_msg_pubcomp(&this->m_mqttClient.mqtt_state.mqtt_connection, msg_id);
 
-        if (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
-        {
-          LogW("MQTT: Queue full\n");
-        }
+        this->queue_packet(this->m_mqttClient.mqtt_state.outbound_message->data,
+                           this->m_mqttClient.mqtt_state.outbound_message->length);
         break;
 
       case MQTT_MSG_TYPE_PUBCOMP:
@@ -353,10 +366,8 @@ void MQTTClient::mqtt_client_recv()
 
         this->m_mqttClient.mqtt_state.outbound_message = mqtt_msg_pingresp(&this->m_mqttClient.mqtt_state.mqtt_connection);
 
-        if (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
-        {
-          LogW("MQTT: Queue full\n");
-        }
+        this->queue_packet(this->m_mqttClient.mqtt_state.outbound_message->data,
+                           this->m_mqttClient.mqtt_state.outbound_message->length);
         break;
 
       case MQTT_MSG_TYPE_PINGRESP:
@@ -611,14 +622,10 @@ bool MQTTClient::Subscribe(char *topic, uint8_t qos)
   LogI("MQTT: queue subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id);
   // bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length );
 
-  while (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
+  if (!this->queue_packet(this->m_mqttClient.mqtt_state.outbound_message->data,
+                          this->m_mqttClient.mqtt_state.outbound_message->length))
   {
-    LogW("MQTT: Queue full\n");
-    if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == -1)
-    {
-      SysLogE("MQTT: Serious buffer error\n");
-      return false;
-    }
+    return false;
   }
 
   if (!this->is_topic_subscribed(topic))
@@ -642,14 +649,10 @@ bool MQTTClient::UnSubscribe(char *topic)
 
   LogI("MQTT: queue un-subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id);
 
-  while (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
+  if (!this->queue_packet(this->m_mqttClient.mqtt_state.outbound_message->data,
+                          this->m_mqttClient.mqtt_state.outbound_message->length))
   {
-    LogW("MQTT: Queue full\n");
-    if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == -1)
-    {
-      SysLogE("MQTT: Serious buffer error\n");
-      return false;
-    }
+    return false;
   }
 
   this->remove_from_subscribed_topics(topic);
@@ -680,14 +683,10 @@ bool MQTTClient::Publish(const char *topic, const char *data, size_t data_length
     return false;
   }
   LogI("MQTT: queuing publish, length: %d, queue size(%d/%d)\r\n", this->m_mqttClient.mqtt_state.outbound_message->length, this->m_mqttClient.msgQueue.rb.fill_cnt, this->m_mqttClient.msgQueue.rb.size);
-  while (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
+  if (!this->queue_packet(this->m_mqttClient.mqtt_state.outbound_message->data,
+                          this->m_mqttClient.mqtt_state.outbound_message->length))
   {
-    LogW("MQTT: Queue full\n");
-    if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == -1)
-    {
-      SysLogE("MQTT: Serious buffer error\n");
-      return false;
-    }
+    return false;
   }
   this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
   return true;

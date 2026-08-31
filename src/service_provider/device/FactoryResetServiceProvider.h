@@ -30,6 +30,7 @@ public:
 	~DeviceFactoryReset();
 
 	bool initService(void *arg = nullptr) override;
+	bool isEssentialService() const override { return true; }
 	void factory_reset(void);
 	void check_device_factory_request(void);
 

@@ -31,6 +31,7 @@ public:
 	~SerialServiceProvider();
 
 	bool initService(void *arg = nullptr) override;
+	bool isEssentialService() const override { return true; }
 	void processSerial(serial_event_t *se);
 
 	void appendSerialJsonPayload(pdiutil::string &_payload, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);

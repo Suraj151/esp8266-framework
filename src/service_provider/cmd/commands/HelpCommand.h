@@ -32,7 +32,7 @@ struct HelpCommand : public CommandBase {
 		return RODT_ATTR("help  list every registered command with a one-line usage");
 	}
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		if(nullptr != m_terminal){
 			m_terminal->putln();
@@ -73,7 +73,7 @@ struct HelpCommand : public CommandBase {
 			}
 		}
 
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

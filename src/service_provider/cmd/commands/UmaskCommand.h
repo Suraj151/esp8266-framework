@@ -45,15 +45,15 @@ struct UmaskCommand : public CommandBase {
 	bool needauth() override { return true; }
 #endif
 
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		if( needauth() && !__auth_service.getAuthorized() ){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
-		if( nullptr == m_terminal ) return CMD_RESULT_FAILED;
+		if( nullptr == m_terminal ) return CMD_ERROR_FAILED;
 
 		CommandOption *mopt = &m_options[0];
 		if( nullptr != mopt && nullptr != mopt->optionval && mopt->optionvalsize > 0 ){
@@ -71,7 +71,7 @@ struct UmaskCommand : public CommandBase {
 		m_terminal->writeln();
 		m_terminal->writeln(buf);
 
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

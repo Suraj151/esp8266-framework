@@ -310,3 +310,97 @@ TEST(stringops, snprintf_truncates_within_buffer)
     ASSERT_EQ(strlen(buf), (size_t)7);
     ASSERT_EQ(buf[7], '\0');
 }
+
+TEST(stringops, strstr_unquoted_skips_a_double_quoted_run)
+{
+    // the separator inside the quotes belongs to the value, not to the scan
+    ASSERT_EQ(__strstr_unquoted("\"a,b\",i=3", ","), 5);
+}
+
+TEST(stringops, strstr_unquoted_skips_a_single_quoted_run)
+{
+    ASSERT_EQ(__strstr_unquoted("'a,b',i=3", ","), 5);
+}
+
+TEST(stringops, strstr_unquoted_finds_an_unquoted_separator)
+{
+    ASSERT_EQ(__strstr_unquoted("a,b", ","), 1);
+}
+
+TEST(stringops, strstr_unquoted_reports_a_fully_quoted_run_as_missing)
+{
+    ASSERT_EQ(__strstr_unquoted("\"a,b\"", ","), -1);
+}
+
+TEST(stringops, strstr_unquoted_does_not_end_a_run_on_the_other_quote)
+{
+    // a quote of the other kind is text inside the run
+    ASSERT_EQ(__strstr_unquoted("\"a'b,c\",d", ","), 7);
+}
+
+TEST(stringops, append_padded_fills_out_to_the_column)
+{
+    pdiutil::string out;
+    __append_padded(out, "ab", 5);
+    ASSERT_TRUE(out == pdiutil::string("ab   "));
+}
+
+TEST(stringops, append_padded_can_right_align)
+{
+    pdiutil::string out;
+    __append_padded(out, "ab", 5, true);
+    ASSERT_TRUE(out == pdiutil::string("   ab"));
+}
+
+TEST(stringops, append_padded_truncates_an_overlong_field)
+{
+    // the property that keeps a table lined up, and the one that silently
+    // clipped a proc key when its column was left too narrow
+    pdiutil::string out;
+    __append_padded(out, "MemMaxBlock:", 10);
+    ASSERT_TRUE(out == pdiutil::string("MemMaxBloc"));
+    ASSERT_EQ((int)out.length(), 10);
+}
+
+TEST(stringops, append_padded_takes_the_whole_field_at_exactly_the_column)
+{
+    pdiutil::string out;
+    __append_padded(out, "abcde", 5);
+    ASSERT_TRUE(out == pdiutil::string("abcde"));
+}
+
+TEST(stringops, append_padded_treats_null_as_an_empty_column)
+{
+    pdiutil::string out;
+    __append_padded(out, nullptr, 3);
+    ASSERT_TRUE(out == pdiutil::string("   "));
+}
+
+TEST(stringops, append_padded_uses_the_given_pad_character)
+{
+    pdiutil::string out;
+    __append_padded(out, "7", 4, true, '0');
+    ASSERT_TRUE(out == pdiutil::string("0007"));
+}
+
+TEST(stringops, append_padded_num_writes_a_number_in_the_column)
+{
+    pdiutil::string out;
+    __append_padded_num(out, 42, 5);
+    ASSERT_TRUE(out == pdiutil::string("42   "));
+}
+
+TEST(stringops, append_padded_num_carries_a_negative_value)
+{
+    pdiutil::string out;
+    __append_padded_num(out, -7, 5);
+    ASSERT_TRUE(out == pdiutil::string("-7   "));
+}
+
+TEST(stringops, append_padded_appends_rather_than_replacing)
+{
+    pdiutil::string out = "x";
+    __append_padded(out, "y", 3);
+    __append_padded(out, "z", 2);
+    ASSERT_TRUE(out == pdiutil::string("xy  z "));
+}

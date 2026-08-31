@@ -271,6 +271,7 @@ uint16_t TaskScheduler::sendSignalByName(const char* _name, signal_t _sig, uint8
         // PROGMEM/flash string. m_name is the RO one; user-supplied _name is RAM.
         if (0 != strncmp_ro(_name, t.m_name, match_len)) continue;
         if (!_is_root && t.m_owner != _requester_sid) continue;
+        if ((SIG_STOP == _sig || SIG_CONT == _sig) && !t.m_stoppable) continue;
         CRITICAL_SECTION_ENTER
         t.m_pending_sig = (uint8_t)_sig;
         CRITICAL_SECTION_EXIT

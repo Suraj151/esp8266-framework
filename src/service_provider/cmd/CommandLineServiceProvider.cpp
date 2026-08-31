@@ -150,6 +150,10 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   DateCommand::RegisterCommand();
   TimedatectlCommand::RegisterCommand();
 
+  #ifdef ENABLE_PROGRAM_EXEC
+  ExecCommand::RegisterCommand();
+  #endif
+
   CommandBase::SetCommandExecutionInterface(this);
 }
 
@@ -196,12 +200,12 @@ bool CommandLineServiceProvider::initService(void *arg)
  * @param iTerminalInterface* terminal
  * @return Command result if valid command provided in terminal
  */
-cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *terminal)
+pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *terminal)
 {
-    if( nullptr == terminal ) return CMD_RESULT_TERMINAL_ERR;
+    if( nullptr == terminal ) return CMD_ERROR_NOTTY;
 
     session_t *session = SessionManager::findByTerminal(terminal);
-    if( nullptr == session ) return CMD_RESULT_TERMINAL_ERR;
+    if( nullptr == session ) return CMD_ERROR_NOTTY;
 
     SessionManager::setCurrent(session);
     setTerminal(terminal);
@@ -471,7 +475,7 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
       session->m_historyIdx = -1;
 #endif
       session->m_autoCompleteIdx = -1;
-      return CMD_RESULT_INCOMPLETE;
+      return CMD_ERROR_AGAIN;
     }
 
     if(
@@ -482,7 +486,7 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
       session->m_cursor = 0;
     }
 
-    cmd_result_t result = executeCommand(&session->m_linebuf, inseq);
+    pdi_err_t result = executeCommand(&session->m_linebuf, inseq);
 
     // A waiting command (e.g. the fedit line editor) can manage the line
     // buffer itself; don't wipe its preloaded content between inputs.
@@ -494,7 +498,7 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
     }
 
     // flush stored string
-    if( result == CMD_RESULT_TERMINAL_HOLD_BUFFER || preserveLineBuf ){
+    if( result == CMD_ERROR_HOLD_BUFFER || preserveLineBuf ){
 
     }else{
 
@@ -503,7 +507,7 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
     }
 
     // flush terminal if command has been processed
-    if( CMD_RESULT_NOT_FOUND != result && CMD_RESULT_MAX != result ){
+    if( CMD_ERROR_NOENT != result && CMD_ERROR_UNSET != result ){
       terminal->flush();
     }
 
@@ -515,20 +519,24 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
  *
  * @param pdiutil::string* cmd
  * @param cmd_term_inseq_t inseq
- * @return cmd_result_t command result status
+ * @return pdi_err_t command result status
  */
-cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_term_inseq_t inseq)
+pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_term_inseq_t inseq)
 {
   if( nullptr == m_terminal ){
-    return CMD_RESULT_TERMINAL_ERR;
+    return CMD_ERROR_NOTTY;
   }
 
   session_t *session = SessionManager::current();
-  if( nullptr == session ) return CMD_RESULT_TERMINAL_ERR;
+  if( nullptr == session ) return CMD_ERROR_NOTTY;
 
-  cmd_result_t res = CMD_RESULT_NOT_FOUND;
+  pdi_err_t res = CMD_ERROR_NOENT;
   int16_t waitingCmdIndex = getCommandWaitingForUserInput();
   bool is_executing_lastcommand = (waitingCmdIndex != -1);
+
+  // the pipeline path names the segment it could not find, so the whole line
+  // is not named a second time on its behalf
+  bool reported_noent = false;
 
   // process the known inseq 
   // no command is waiting for user input
@@ -577,7 +585,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
       }
       #endif
 
-      return CMD_RESULT_TERMINAL_HOLD_BUFFER;
+      return CMD_ERROR_HOLD_BUFFER;
     }else{
 
       // auto complete command
@@ -662,7 +670,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
             #endif
           }
 
-          return CMD_RESULT_TERMINAL_HOLD_BUFFER;
+          return CMD_ERROR_HOLD_BUFFER;
         }else{
 
           session->m_autoCompleteIdx = -1;
@@ -680,7 +688,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
       // was nothing typed to match, so the line is left exactly as it is
       // instead of falling through and being executed.
       if( inseq == CMD_TERM_INSEQ_TAB ){
-        return CMD_RESULT_TERMINAL_HOLD_BUFFER;
+        return CMD_ERROR_HOLD_BUFFER;
       }
     }
   }else{
@@ -705,24 +713,44 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
     }else{
 
       #if defined(ENABLE_STORAGE_SERVICE)
-      ShellParser::Line parsed = ShellParser::parse(cmd->c_str(), cmd->size());
+      ShellParser::Line parsed = ShellParser::parse(cmd->c_str(), (int16_t)cmd->size());
 
       if( parsed.m_malformed ){
 
         m_terminal->writeln();
         m_terminal->writeln_ro(RODT_ATTR("syntax error"));
-        res = CMD_RESULT_ARGS_ERROR;
-      }else if( parsed.isPlain() ){
+        res = CMD_ERROR_INVAL;
+      }else if( parsed.isPlain() && !ShellParser::expandable(cmd->c_str(), (int16_t)cmd->size()) ){
 
+        // one command, nothing to wire up and nothing to expand, so run it
+        // where it lies rather than copying the line
         cmd_t* cmd_to_exec = getCommandToExecute(cmd->c_str());
 
-        if(nullptr != cmd_to_exec){
-
-          res = cmd_to_exec->executeCommand((char*)cmd->c_str(), cmd->size());
-        }
+        res = ( nullptr != cmd_to_exec ) ?
+              cmd_to_exec->executeCommand((char*)cmd->c_str(), cmd->size()) :
+              (pdi_err_t)CMD_ERROR_NOENT;
       }else{
 
-        res = runPipeline(cmd->c_str(), parsed);
+        for( uint16_t p = 0; p < parsed.m_pipelines.size(); p++ ){
+
+          if( !ShellParser::shouldRun(parsed.m_pipelines[p].m_join, res) ){
+            continue;
+          }
+
+          res = runPipeline(cmd->c_str(), parsed, p);
+
+          // a command that stopped for input owns the terminal, so what
+          // follows on the line cannot run behind it
+          if( CMD_ERROR_AGAIN == res || CMD_ERROR_HOLD_BUFFER == res ){
+            break;
+          }
+
+          // $? is the status of the last command that finished, so a segment
+          // later on the same line has to see this one
+          SessionManager::setLastExit(res);
+        }
+
+        reported_noent = true;
       }
       #else
       cmd_t* cmd_to_exec = getCommandToExecute(cmd->c_str());
@@ -740,7 +768,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
 
     //     res = m_cmdlist[i]->executeCommand((char*)cmd->c_str(), cmd->size());
 
-    //     // if( CMD_RESULT_OK == res ){
+    //     // if( PDI_OK == res ){
     //       break;
     //     // }
     //   }
@@ -796,28 +824,28 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
     #endif
 
     // if command is incomplete then we are in continue execution mode
-    if (CMD_RESULT_INCOMPLETE == res){
+    if (CMD_ERROR_AGAIN == res){
       is_executing_lastcommand = true;
     }
   }else{
 
-    res = CMD_RESULT_MAX;
+    res = CMD_ERROR_UNSET;
 
     // Ctrl+C / Ctrl+Z at an idle prompt aborts anything running in the
     // background but MUST NOT drop the session. Transport layers close the
-    // channel only on CMD_RESULT_TERMINAL_ABORTED (logout / EOF).
+    // channel only on CMD_ERROR_INTR (logout / EOF).
     if(
       inseq == CMD_TERM_INSEQ_CTRL_C ||
       inseq == CMD_TERM_INSEQ_CTRL_Z
     ){
-      res = CMD_RESULT_ABORTED;
+      res = CMD_ERROR_CANCELED;
     }
 
     // check if any command is waiting for user input
     // if any command is waiting for user input then we are in continue execution mode
     if(is_executing_lastcommand){
 
-      res = CMD_RESULT_INCOMPLETE;
+      res = CMD_ERROR_AGAIN;
 
       /* Perform terminal input actions if any */
       if( inseq > CMD_TERM_INSEQ_NONE && inseq < CMD_TERM_INSEQ_MAX ){
@@ -828,7 +856,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
 
   // if command aborted then stop every background-running command owned by
   // the current session
-  if( CMD_RESULT_ABORTED == res || CMD_RESULT_TERMINAL_ABORTED == res ){
+  if( CMD_ERROR_CANCELED == res || CMD_ERROR_INTR == res ){
     session_t *cur = SessionManager::current();
     for (int16_t i = 0; i < m_cmdlist.size(); i++){
       if( nullptr != m_cmdlist[i] && m_cmdlist[i]->m_owner == cur && m_cmdlist[i]->isRunningInBackground() ){
@@ -847,28 +875,23 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
   }
   #endif
 
-  if( CMD_RESULT_NOT_FOUND == res && nullptr != cmd && cmd->size() ){
+  if( CMD_ERROR_NOENT == res && !reported_noent && nullptr != cmd && cmd->size() ){
 
-    uint16_t namelen = 0;
-    while( namelen < cmd->size() && (*cmd)[namelen] != ' ' ) namelen++;
-
-    m_terminal->writeln();
-    m_terminal->write(cmd->c_str(), namelen);
-    m_terminal->writeln_ro(RODT_ATTR(": command not found"));
+    reportUnknownCommand(cmd->c_str(), (uint16_t)cmd->size());
   }
 
   if(
     !is_executing_lastcommand ||
-    CMD_RESULT_OK == res ||
-    CMD_RESULT_ABORTED == res ||
-    CMD_RESULT_FAILED == res
+    PDI_OK == res ||
+    CMD_ERROR_CANCELED == res ||
+    CMD_ERROR_FAILED == res
     #ifdef ENABLE_AUTH_SERVICE
-    || (isWaitingForUserAuth && res == CMD_RESULT_WRONG_CREDENTIAL)
+    || (isWaitingForUserAuth && res == CMD_ERROR_ACCES)
     #endif
     || (
-      CMD_RESULT_INCOMPLETE != res &&
-      CMD_RESULT_TERMINAL_HOLD_BUFFER != res &&
-      CMD_RESULT_TERMINAL_ABORTED != res
+      CMD_ERROR_AGAIN != res &&
+      CMD_ERROR_HOLD_BUFFER != res &&
+      CMD_ERROR_INTR != res
     )
   ){
     // start new interaction
@@ -884,6 +907,9 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
       m_cmdlist.erase(m_cmdlist.begin() + i);
     }
   }
+
+  // the line is answered, so this is what the session last exited with
+  SessionManager::setLastExit(res);
 
   return res;
 }
@@ -1122,35 +1148,61 @@ bool CommandLineServiceProvider::openSource(const pdiutil::string &source){
 }
 
 /**
- * Runs every stage in turn, carrying each one's output into the next through
- * a pipe and sending the last one to the target or the terminal.
+ * Runs every command of one pipeline in turn, carrying each one's output into
+ * the next through a pipe and honouring the redirections each one carries.
  */
-cmd_result_t CommandLineServiceProvider::runPipeline(const char *line, const ShellParser::Line &parsed){
+pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellParser::Line &parsed, uint16_t index){
 
-  cmd_result_t res = CMD_RESULT_MAX;
+  if( index >= parsed.m_pipelines.size() ){
+    return CMD_ERROR_INVAL;
+  }
+
+  const ShellParser::Pipeline &pipeline = parsed.m_pipelines[index];
+
+  pdi_err_t res = CMD_ERROR_UNSET;
   PipeStream *carry = nullptr;
-  bool redirected = false;
-  uint16_t last = (uint16_t)(parsed.m_stages.size() - 1);
+  pdiutil::string outpath;
+  int16_t first = pipeline.m_command_start;
+  int16_t last = (int16_t)(first + pipeline.m_command_count - 1);
 
-  for( uint16_t i = 0; i < parsed.m_stages.size(); i++ ){
+  for( int16_t c = first; c <= last; c++ ){
 
     SessionManager::closeFd(PDI_FD_STDIN);
     SessionManager::closeFd(PDI_FD_STDOUT);
 
+    // input comes from the pipe when there is one, otherwise from whatever
+    // this command names for itself
+    const ShellParser::Redirect *in = parsed.findRedirect(c, ShellParser::REDIRECT_IN);
+
     if( nullptr != carry ){
       SessionManager::setFd(PDI_FD_STDIN, carry, false);
-    }else if( 0 == i && parsed.m_sourced && !openSource(parsed.m_inpath) ){
+    }else if( nullptr != in ){
 
-      m_terminal->writeln();
-      m_terminal->write_ro(RODT_ATTR("cannot open "));
-      m_terminal->writeln(parsed.m_inpath.c_str());
-      SessionManager::resetStdio();
-      return CMD_RESULT_ARGS_ERROR;
+      pdiutil::string inpath;
+      ShellParser::expand(line + in->m_start, in->m_len, SessionManager::getLastExit(), inpath, true);
+
+      if( !openSource(inpath) ){
+
+        m_terminal->writeln();
+        m_terminal->write_ro(RODT_ATTR("cannot open "));
+        m_terminal->writeln(inpath.c_str());
+        SessionManager::resetStdio();
+        return CMD_ERROR_INVAL;
+      }
+    }
+
+    const ShellParser::Redirect *out = parsed.findRedirect(c, ShellParser::REDIRECT_OUT);
+    bool append = false;
+
+    if( nullptr == out ){
+      out = parsed.findRedirect(c, ShellParser::REDIRECT_APPEND);
+      append = ( nullptr != out );
     }
 
     PipeStream *outpipe = nullptr;
+    bool redirected = false;
 
-    if( i < last ){
+    if( c < last ){
 
       outpipe = pdiutil::safe_new<PipeStream>();
 
@@ -1160,60 +1212,79 @@ cmd_result_t CommandLineServiceProvider::runPipeline(const char *line, const She
         m_terminal->writeln();
         m_terminal->writeln_ro(RODT_ATTR("cannot open pipe"));
         SessionManager::resetStdio();
-        return CMD_RESULT_FAILED;
+        return CMD_ERROR_FAILED;
       }
 
-      SessionManager::setFd(PDI_FD_STDOUT, outpipe, false);
-    }else if( parsed.m_redirected ){
+      // the pipe still carries to the next command, but a redirect this
+      // command names for itself is applied after it and takes the output
+      if( nullptr == out ){
+        SessionManager::setFd(PDI_FD_STDOUT, outpipe, false);
+      }
+    }
 
-      if( !openRedirect(parsed.m_outpath, parsed.m_append) ){
+    if( nullptr != out ){
 
+      outpath.clear();
+      ShellParser::expand(line + out->m_start, out->m_len, SessionManager::getLastExit(), outpath, true);
+
+      if( !openRedirect(outpath, append) ){
+
+        pdiutil::safe_delete(outpipe);
         pdiutil::safe_delete(carry);
         m_terminal->writeln();
         m_terminal->write_ro(RODT_ATTR("cannot open "));
-        m_terminal->writeln(parsed.m_outpath.c_str());
+        m_terminal->writeln(outpath.c_str());
         SessionManager::resetStdio();
-        return CMD_RESULT_ARGS_ERROR;
+        return CMD_ERROR_INVAL;
       }
 
       redirected = true;
     }
 
-    const char *stage = line + parsed.m_stages[i].m_start;
-    cmd_t* cmd_to_exec = getCommandToExecute(stage);
+    pdiutil::string text;
+    if( !parsed.commandText(line, c, text, SessionManager::getLastExit()) ){
+      pdiutil::safe_delete(carry);
+      SessionManager::resetStdio();
+      return CMD_ERROR_INVAL;
+    }
 
-    res = CMD_RESULT_MAX;
-    if( nullptr != cmd_to_exec ){
-      res = cmd_to_exec->executeCommand((char*)stage, parsed.m_stages[i].m_len);
+    cmd_t* cmd_to_exec = getCommandToExecute(text.c_str());
+
+    if( nullptr == cmd_to_exec ){
+      reportUnknownCommand(text.c_str(), (uint16_t)text.size());
+    }
+
+    res = ( nullptr != cmd_to_exec ) ?
+          cmd_to_exec->executeCommand((char*)text.c_str(), text.size()) :
+          (pdi_err_t)CMD_ERROR_NOENT;
+
+    // storage says whether it took the write only when the last block is
+    // committed, so the target is closed here rather than left to the reset,
+    // which has nowhere to report a refusal
+    if( redirected ){
+
+      iTerminalInterface *sink = SessionManager::getFd(PDI_FD_STDOUT);
+
+      if( nullptr != sink && sink->disconnect() < 0 ){
+
+        m_terminal->writeln();
+        m_terminal->write_ro(RODT_ATTR("cannot write "));
+        m_terminal->writeln(outpath.c_str());
+        res = CMD_ERROR_FAILED;
+      }
     }
 
     pdiutil::safe_delete(carry);
     carry = outpipe;
 
-    // a stage that stopped early leaves the rest of the pipeline nothing
+    // a command that stopped early leaves the rest of the pipeline nothing
     // worth running
-    if( CMD_RESULT_INCOMPLETE == res ){
+    if( CMD_ERROR_AGAIN == res ){
       break;
     }
   }
 
   pdiutil::safe_delete(carry);
-
-  // storage says whether it took the write only when the last block is
-  // committed, so the target is closed here rather than left to the reset,
-  // which has nowhere to report a refusal
-  if( redirected ){
-
-    iTerminalInterface *sink = SessionManager::getFd(PDI_FD_STDOUT);
-
-    if( nullptr != sink && sink->disconnect() < 0 ){
-
-      m_terminal->writeln();
-      m_terminal->write_ro(RODT_ATTR("cannot write "));
-      m_terminal->writeln(parsed.m_outpath.c_str());
-      res = CMD_RESULT_FAILED;
-    }
-  }
 
   SessionManager::resetStdio();
   return res;
@@ -1223,6 +1294,23 @@ cmd_result_t CommandLineServiceProvider::runPipeline(const char *line, const She
 /**
  * @brief Mark command to be execute and add it in cmdlist for further operations
  */
+/**
+ * @brief Report a command name the registry does not hold.
+ */
+void CommandLineServiceProvider::reportUnknownCommand(const char *text, uint16_t len){
+
+  if( nullptr == text || 0 == len ){
+    return;
+  }
+
+  uint16_t namelen = 0;
+  while( namelen < len && text[namelen] != ' ' ) namelen++;
+
+  m_terminal->writeln();
+  m_terminal->write(text, namelen);
+  m_terminal->writeln_ro(RODT_ATTR(": command not found"));
+}
+
 cmd_t* CommandLineServiceProvider::getCommandToExecute(const char *cmdname){
 
   cmd_t* cmd_to_exec = CommandBase::GetCommand(cmdname);

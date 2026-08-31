@@ -98,6 +98,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_HOST			    "host"
 #define CMD_NAME_PING			    "ping"
 #define CMD_NAME_DB				    "db"
+#define CMD_NAME_EXEC			    "exec"
 
 #ifdef ENABLE_STORAGE_SERVICE
 /**

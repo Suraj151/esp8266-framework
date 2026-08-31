@@ -124,6 +124,10 @@ typedef enum http_method http_method_t;
 #define HTTP_UPLOAD_READ_BLOCK_SIZE 2048
 #endif
 
+#ifndef HTTP_MAX_BODY_SIZE
+#define HTTP_MAX_BODY_SIZE 4096
+#endif
+
 #define HTTP_HEADER_KEY_HOST            "Host"
 #define HTTP_HEADER_KEY_USER_AGENT      "User-Agent"
 #define HTTP_HEADER_KEY_ACCEPT_ENCODING "Accept-Encoding"

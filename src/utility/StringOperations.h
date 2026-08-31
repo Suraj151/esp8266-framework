@@ -29,6 +29,17 @@ Created Date    : 1st June 2019
 int __strstr(const char *str, const char *substr, int _len = 300);
 
 /**
+ * @brief Finds the first occurrence of a substring that is not inside quotes.
+ * A quoted run is text, so a separator within one belongs to the value rather
+ * than to whatever is scanning for it.
+ * @param str The main string to search in.
+ * @param substr The substring to search for.
+ * @param _len The maximum length to search (default is 300).
+ * @return The index of the first unquoted occurrence, or -1 if not found.
+ */
+int __strstr_unquoted(const char *str, const char *substr, int _len = 300);
+
+/**
  * @brief Finds the first occurrence of a substring in a length delimited buffer.
  * Unlike the null terminated variant this one is binary safe, it never stops
  * on a null byte and searches the whole given length.
@@ -40,6 +51,17 @@ int __strstr(const char *str, const char *substr, int _len = 300);
  * @return The index of the first occurrence of the substring, or -1 if not found.
  */
 int32_t __strstr(const char *str, uint32_t _strlen, const char *substr, uint32_t _substrlen, uint32_t _from = 0);
+
+/**
+ * Appends text as one fixed width column, padding it out or truncating it to
+ * the width, the way iTerminalInterface::write_pad writes one.
+ */
+void __append_padded(pdiutil::string &_out, const char *_str, uint32_t _width, bool _prepad = false, char _pad = ' ');
+
+/**
+ * Appends a number as one fixed width column.
+ */
+void __append_padded_num(pdiutil::string &_out, int64_t _value, uint32_t _width, bool _prepad = false, char _pad = ' ');
 
 /**
  * @brief Trims leading and trailing whitespace from a string.

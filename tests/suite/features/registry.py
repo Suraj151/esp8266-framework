@@ -460,6 +460,14 @@ def run_interleaved(lanes, only=None, verbose=False):
             print("%s%s declined %d test(s); another transport ran them%s"
                   % (YELLOW, lane.label, declined[lane.label], RESET))
 
+    # a byte that is not text can corrupt a read without failing anything, so
+    # say so even on a green run rather than losing it to the transcript
+    for lane in lanes:
+        seen = getattr(lane.target.shell, "raw_anomalies", None)
+        if seen:
+            print("%s%s read %d chunk(s) that were not text: %s%s"
+                  % (YELLOW, lane.label, len(seen), ", ".join(seen[:4]), RESET))
+
     print("----------------------------------------------------------")
     total = passed + len(failed) + len(skipped)
     if failed:
@@ -617,6 +625,12 @@ def run(shell, caps, username, password, only=None, verbose=False, timeout=20.0,
     if aborted is not None:
         print("%sthe target closed the connection: %s%s" % (RED, aborted[0], RESET))
         print("%sstopped here; %d further tests were not run%s" % (DIM, aborted[1], RESET))
+
+    seen = getattr(target.shell, "raw_anomalies", None)
+    if seen:
+        print("%sread %d chunk(s) that were not text: %s%s"
+              % (YELLOW, len(seen), ", ".join(seen[:4]), RESET))
+
     print("----------------------------------------------------------")
     total = passed + len(failed) + len(skipped)
     if failed:

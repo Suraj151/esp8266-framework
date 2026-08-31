@@ -61,6 +61,26 @@ created Date    : 20th July 2026
 #define TMP_MOUNT_PREFIX "/tmp"
 #endif
 
+// Files one backend can keep open at once. An open file on the root filesystem
+// costs an lfs_file_t plus one cache_size buffer, so lower this on tight-RAM
+// ports rather than raising it by habit.
+#ifndef VFS_MAX_OPEN_FILES
+#define VFS_MAX_OPEN_FILES 4
+#endif
+
+// A handle returned by the dispatcher carries the mount it belongs to in its
+// top byte, so routing a read or a close back to the right backend needs no
+// table. The remaining 24 bits are the backend's own handle. The stored mount
+// id is the index plus one, and stays under 0x80 so the handle never goes
+// negative and collides with an error code.
+#define VFS_HANDLE_MOUNT_SHIFT 24
+#define VFS_HANDLE_BACKEND_MASK 0x00FFFFFF
+#define VFS_HANDLE_MOUNT_MAX 0x7F
+
+#if VFS_MAX_MOUNTS >= VFS_HANDLE_MOUNT_MAX
+#error "VFS_MAX_MOUNTS does not fit in the mount byte of a positive pdi_fhandle_t"
+#endif
+
 // Byte count an unbounded devfs node (/dev/zero, /dev/random, /dev/urandom)
 // yields per read call. MCU-safe cap so `cat /dev/zero` cannot spin forever.
 #ifndef DEVFS_STREAM_READ_MAX

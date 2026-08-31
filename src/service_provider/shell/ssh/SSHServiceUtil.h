@@ -159,7 +159,7 @@ struct LWSSHSession {
         m_state(SESSION_STATE_WAITING_FOR_CLIENT),
         m_server_version("SSH-2.0-LWSSH_0.1"), // Default server version
         m_server_kex_init_sent(0),
-        m_last_recv_timestamp(0),
+        m_last_recv_timestamp(__i_dvc_ctrl.millis_now()), // the idle clock starts when the client arrives
         m_session_timeout(SSH_HANDSHAKE_IDLE_MS), // Default session timeout in milliseconds
         packets_seq_num_ctos(0),
         packets_seq_num_stoc(0)
@@ -247,7 +247,7 @@ struct LWSSHSession {
 int parse_received_packet(LWSSHSession* session, ssh_packet& packet);
 int parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet);
 bool parse_userauth_request(const pdiutil::vector<uint8_t>& payload, SSHUserAuthRequest& req);
-void load_ssh_config(ssh_config_t& config);
+void load_ssh_config(const char* cfgfile, ssh_config_t& config);
 
 void build_key_path(char* out, uint16_t outsize, const char* dir, const char* algo, const char* suffix);
 bool generate_ed25519_key(const char* dir);

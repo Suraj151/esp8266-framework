@@ -68,7 +68,7 @@ TEST(cmdnet, host_reports_a_name_it_cannot_resolve)
 
     std::string out = shell.run("host no.such.name.invalid");
     ASSERT_FALSE(saw(out, "192.168"));
-    ASSERT_EQ(shell.result(), CMD_RESULT_OK);
+    ASSERT_EQ(shell.result(), PDI_OK);
 }
 
 TEST(cmdnet, host_without_a_name_asks_for_one)
@@ -77,7 +77,7 @@ TEST(cmdnet, host_without_a_name_asks_for_one)
     networked(shell);
 
     shell.run("host");
-    ASSERT_NE(shell.result(), CMD_RESULT_OK);
+    ASSERT_NE(shell.result(), PDI_OK);
 }
 
 /* ------------------------------------------------------------------- ping */
@@ -180,7 +180,7 @@ TEST(cmdnet, net_ip_reports_the_addresses)
 
     std::string out = shell.run("net ip");
     ASSERT_TRUE(out.length() > 0);
-    ASSERT_EQ(shell.result(), CMD_RESULT_OK);
+    ASSERT_EQ(shell.result(), PDI_OK);
 }
 
 TEST(cmdnet, net_scansta_lists_the_staged_networks)
@@ -201,7 +201,7 @@ TEST(cmdnet, net_without_a_subcommand_is_not_accepted)
     networked(shell);
 
     shell.run("net");
-    ASSERT_NE(shell.result(), CMD_RESULT_OK);
+    ASSERT_NE(shell.result(), PDI_OK);
 }
 
 /* ------------------------------------------------------------ date, tdctl */
@@ -214,7 +214,7 @@ TEST(cmdnet, date_prints_a_time)
 
     std::string out = shell.run("date");
     ASSERT_TRUE(out.length() > 0);
-    ASSERT_EQ(shell.result(), CMD_RESULT_OK);
+    ASSERT_EQ(shell.result(), PDI_OK);
 }
 
 TEST(cmdnet, date_sets_the_clock_from_an_epoch)
@@ -247,5 +247,5 @@ TEST(cmdnet, tdctl_reports_the_clock_status)
 
     std::string out = shell.run("tdctl");
     ASSERT_TRUE(out.length() > 0);
-    ASSERT_EQ(shell.result(), CMD_RESULT_OK);
+    ASSERT_EQ(shell.result(), PDI_OK);
 }

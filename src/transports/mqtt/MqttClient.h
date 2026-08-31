@@ -144,6 +144,12 @@ public:
 	void add_to_subscribed_topics(char *_topic, uint8_t _qos);
 	bool remove_from_subscribed_topics(char *_topic);
 
+	/**
+	 * Queue one packet for sending, refusing rather than making room. A caller
+	 * that is told no has not sent anything and must not record that it did.
+	 */
+	bool queue_packet(uint8_t *_data, uint16_t _len);
+
 	MQTT_Client m_mqttClient;
 	uint32_t *m_mqttDataCallbackArgs;
 

@@ -34,7 +34,7 @@ struct TestCommand : public cmd_t
         }
     }
 
-    cmd_result_t execute(cmd_term_inseq_t terminputaction) override
+    pdi_err_t execute(cmd_term_inseq_t terminputaction) override
     {
         ran = true;
         for (uint8_t i = 0; i < CMD_OPTION_MAX; i++)
@@ -53,7 +53,7 @@ struct TestCommand : public cmd_t
                 seen[i][len] = '\0';
             }
         }
-        return CMD_RESULT_OK;
+        return PDI_OK;
     }
 
     /**
@@ -91,7 +91,7 @@ static void makeCommand(cmd_t &command, const char *name, const char *optn1 = nu
 /**
  * executeCommand parses in place, so the line has to be a writable copy.
  */
-static cmd_result_t parse(cmd_t &command, const char *line, char *scratch, size_t scratchsize)
+static pdi_err_t parse(cmd_t &command, const char *line, char *scratch, size_t scratchsize)
 {
     memset(scratch, 0, scratchsize);
     strcpy(scratch, line);
@@ -180,7 +180,7 @@ TEST(cmdbase, parses_a_bare_command)
     char scratch[64];
     makeCommand(command, "pwd");
 
-    ASSERT_EQ(parse(command, "pwd", scratch, sizeof(scratch)), CMD_RESULT_OK);
+    ASSERT_EQ(parse(command, "pwd", scratch, sizeof(scratch)), PDI_OK);
 }
 
 TEST(cmdbase, rejects_a_line_for_another_command)
@@ -189,7 +189,7 @@ TEST(cmdbase, rejects_a_line_for_another_command)
     char scratch[64];
     makeCommand(command, "pwd");
 
-    ASSERT_EQ(parse(command, "cat", scratch, sizeof(scratch)), CMD_RESULT_INVALID);
+    ASSERT_EQ(parse(command, "cat", scratch, sizeof(scratch)), CMD_ERROR_INVALID);
 }
 
 TEST(cmdbase, parses_a_named_option)
@@ -198,7 +198,7 @@ TEST(cmdbase, parses_a_named_option)
     char scratch[64];
     makeCommand(command, "ssh", "t");
 
-    ASSERT_EQ(parse(command, "ssh t=2", scratch, sizeof(scratch)), CMD_RESULT_OK);
+    ASSERT_EQ(parse(command, "ssh t=2", scratch, sizeof(scratch)), PDI_OK);
     ASSERT_TRUE(command.ran);
     ASSERT_STREQ(command.valueOf("t"), "2");
 }
@@ -209,7 +209,7 @@ TEST(cmdbase, parses_two_named_options)
     char scratch[64];
     makeCommand(command, "sshkgen", "t", "f");
 
-    ASSERT_EQ(parse(command, "sshkgen t=1,f=2", scratch, sizeof(scratch)), CMD_RESULT_OK);
+    ASSERT_EQ(parse(command, "sshkgen t=1,f=2", scratch, sizeof(scratch)), PDI_OK);
     ASSERT_STREQ(command.valueOf("t"), "1");
     ASSERT_STREQ(command.valueOf("f"), "2");
 }
@@ -220,7 +220,7 @@ TEST(cmdbase, parses_a_multi_character_option_value)
     char scratch[64];
     makeCommand(command, "tls", "n");
 
-    ASSERT_EQ(parse(command, "tls n=device.local", scratch, sizeof(scratch)), CMD_RESULT_OK);
+    ASSERT_EQ(parse(command, "tls n=device.local", scratch, sizeof(scratch)), PDI_OK);
     ASSERT_STREQ(command.valueOf("n"), "device.local");
 }
 
@@ -240,7 +240,7 @@ TEST(cmdbase, reports_an_unknown_named_option)
     char scratch[64];
     makeCommand(command, "ssh", "t");
 
-    ASSERT_EQ(parse(command, "ssh q=9", scratch, sizeof(scratch)), CMD_RESULT_INVALID_OPTION);
+    ASSERT_EQ(parse(command, "ssh q=9", scratch, sizeof(scratch)), CMD_ERROR_OPT);
 }
 
 TEST(cmdbase, retrieve_option_returns_null_for_an_unset_option)
@@ -267,7 +267,7 @@ TEST(cmdbase, parses_a_positional_argument)
     makeCommand(command, "cat", "a");
     command.setAcceptArgsOptions(true);
 
-    ASSERT_EQ(parse(command, "cat /etc/passwd", scratch, sizeof(scratch)), CMD_RESULT_OK);
+    ASSERT_EQ(parse(command, "cat /etc/passwd", scratch, sizeof(scratch)), PDI_OK);
     ASSERT_TRUE(command.present[0]);
     ASSERT_STREQ(command.seen[0], "/etc/passwd");
 }
@@ -279,7 +279,7 @@ TEST(cmdbase, trims_whitespace_around_a_positional_argument)
     makeCommand(command, "cat", "a");
     command.setAcceptArgsOptions(true);
 
-    ASSERT_EQ(parse(command, "cat   /etc/hosts   ", scratch, sizeof(scratch)), CMD_RESULT_OK);
+    ASSERT_EQ(parse(command, "cat   /etc/hosts   ", scratch, sizeof(scratch)), PDI_OK);
     ASSERT_TRUE(command.present[0]);
     ASSERT_STREQ(command.seen[0], "/etc/hosts");
 }
@@ -292,9 +292,54 @@ TEST(cmdbase, parses_two_positional_arguments)
     command.setAcceptArgsOptions(true);
     command.setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 
-    ASSERT_EQ(parse(command, "ping example.com 3", scratch, sizeof(scratch)), CMD_RESULT_OK);
+    ASSERT_EQ(parse(command, "ping example.com 3", scratch, sizeof(scratch)), PDI_OK);
     ASSERT_STREQ(command.seen[0], "example.com");
     ASSERT_STREQ(command.seen[1], "3");
+}
+
+TEST(cmdbase, a_quoted_value_keeps_the_separator_inside_it)
+{
+    TestCommand command;
+    char scratch[96];
+    makeCommand(command, "watch", "c", "i");
+    command.setCmdOptionSeparator(CMD_OPTION_SEPERATOR_COMMA);
+
+    ASSERT_EQ(parse(command, "watch c=\"login u=a,p=b\",i=300", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_STREQ(command.seen[0], "login u=a,p=b");
+    ASSERT_STREQ(command.seen[1], "300");
+}
+
+TEST(cmdbase, quotes_are_removed_from_the_middle_of_a_value)
+{
+    TestCommand command;
+    char scratch[64];
+    makeCommand(command, "echo", "a");
+    command.setAcceptArgsOptions(true);
+
+    ASSERT_EQ(parse(command, "echo a\"b\"c", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_STREQ(command.seen[0], "abc");
+}
+
+TEST(cmdbase, a_single_quoted_run_keeps_a_double_quote_as_text)
+{
+    TestCommand command;
+    char scratch[64];
+    makeCommand(command, "echo", "a");
+    command.setAcceptArgsOptions(true);
+
+    ASSERT_EQ(parse(command, "echo \'a\"b\'", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_STREQ(command.seen[0], "a\"b");
+}
+
+TEST(cmdbase, a_backslash_escapes_a_quote_in_a_value)
+{
+    TestCommand command;
+    char scratch[64];
+    makeCommand(command, "echo", "a");
+    command.setAcceptArgsOptions(true);
+
+    ASSERT_EQ(parse(command, "echo a\\\"b", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_STREQ(command.seen[0], "a\"b");
 }
 
 TEST(cmdbase, clear_resets_the_command_name)

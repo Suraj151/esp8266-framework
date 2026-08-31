@@ -184,9 +184,12 @@ int PROTO_Add(uint8_t *buf, const uint8_t *packet, int bufSize)
  */
 int PROTO_AddRb(RINGBUF *rb, const uint8_t *packet, int len)
 {
+    uint8_t *rollback_w = rb->p_w;
+    size_t rollback_fill = rb->fill_cnt;
     uint16_t i = 2;
+
     if (RINGBUF_Put(rb, 0x7E) == -1) // Start of packet
-        return -1;
+        goto nospace;
     while (len--)
     {
         switch (*packet)
@@ -195,20 +198,25 @@ int PROTO_AddRb(RINGBUF *rb, const uint8_t *packet, int len)
         case 0x7E:
         case 0x7F:
             if (RINGBUF_Put(rb, 0x7D) == -1) // Escape character
-                return -1;
+                goto nospace;
             if (RINGBUF_Put(rb, *packet++ ^ 0x20) == -1) // Escaped value
-                return -1;
+                goto nospace;
             i += 2;
             break;
         default:
             if (RINGBUF_Put(rb, *packet++) == -1)
-                return -1;
+                goto nospace;
             i++;
             break;
         }
     }
     if (RINGBUF_Put(rb, 0x7F) == -1) // End of packet
-        return -1;
+        goto nospace;
 
     return i;
+
+nospace:
+    rb->p_w = rollback_w;
+    rb->fill_cnt = rollback_fill;
+    return -1;
 }

@@ -46,7 +46,10 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define PDI_MAX_SESSIONS            7
 #define SSH_MAX_SESSIONS            4
 #define TELNET_MAX_SESSIONS         2
+#define MAX_SERVICE_TASKS           12
 #define TCP_WRITE_DRAIN_TIMEOUT_MS  (MILLISECOND_DURATION_1000/2)
+
+#define PDI_NET_STACK_LWIP
 
 /**
  * gpio pin counts - per esp32 variant
@@ -101,6 +104,8 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define DEVICE_SUPPORTS_PROGRAM_EXEC
 // device yield is valid from any task, so blocking network calls may run off the main loop
 #define DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK
+
+#define PROGRAM_EXEC_STACK_SIZE     (8 * 1024)
 
 /**
  * enable/disable ota upgrade strategies

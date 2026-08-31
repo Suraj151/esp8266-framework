@@ -20,7 +20,8 @@ created Date    : 26th Aug 2026
  * invalid rather than empty, so the caller can tell the two apart.
  */
 FileReadStream::FileReadStream(const char *path) :
-  m_buffer(nullptr), m_fill(0), m_take(0), m_offset(0), m_size(-1), m_consumed(0) {
+  m_buffer(nullptr), m_fill(0), m_take(0), m_offset(0), m_size(-1), m_consumed(0),
+  m_handle(-1) {
 
   if (nullptr != path) {
     m_path = path;
@@ -30,11 +31,15 @@ FileReadStream::FileReadStream(const char *path) :
     m_size = __i_fs.getFileSize(m_path.c_str());
     if (m_size >= 0) {
       m_buffer = pdiutil::safe_new_array<uint8_t>(PDI_FILE_STREAM_BUFFER);
+      m_handle = __i_fs.openFile(m_path.c_str(), FILE_OPEN_READ);
     }
   }
 }
 
 FileReadStream::~FileReadStream() {
+  if (m_handle >= 0) {
+    __i_fs.closeFile(m_handle);
+  }
   pdiutil::safe_delete_array(m_buffer);
 }
 
@@ -49,6 +54,15 @@ bool FileReadStream::refill() {
 
   m_fill = 0;
   m_take = 0;
+
+  if (m_handle >= 0) {
+    int got = __i_fs.readFileHandle(m_handle, (char *)m_buffer, PDI_FILE_STREAM_BUFFER);
+    if (got > 0) {
+      m_fill = (uint16_t)got;
+    }
+    m_offset += m_fill;
+    return m_fill > 0;
+  }
 
   __i_fs.readFile(m_path.c_str(), PDI_FILE_STREAM_BUFFER, [&](char *data, uint32_t size) -> bool {
 

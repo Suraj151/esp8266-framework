@@ -34,6 +34,9 @@ LittleFSWrapper::LittleFSWrapper(iStorageInterface& storage, bool defaultConfig)
     : iFileSystemInterface(storage), m_mounted(false) {
     memset(&m_lfs, 0, sizeof(m_lfs));
     memset(&m_lfscfg, 0, sizeof(m_lfscfg));
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; i++) {
+        m_openfiles[i] = nullptr;
+    }
     if (defaultConfig) {
         initLFSConfig();
     }
@@ -43,6 +46,14 @@ LittleFSWrapper::LittleFSWrapper(iStorageInterface& storage, bool defaultConfig)
  * @brief Destructor to unmount the LittleFS file system.
  */
 LittleFSWrapper::~LittleFSWrapper() {
+    // closed directly rather than through closeFile, because the stamp it does
+    // on a written file reaches virtuals the derived layer no longer provides
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; i++) {
+        if (nullptr != m_openfiles[i]) {
+            lfs_file_close(&m_lfs, &m_openfiles[i]->m_file);
+            pdiutil::safe_delete(m_openfiles[i]);
+        }
+    }
     if (m_mounted) {
         lfs_unmount(&m_lfs);
         m_mounted = false;
@@ -360,6 +371,188 @@ int LittleFSWrapper::setFileOwner(const char *path, uint16_t uid, uint16_t gid){
     int r1 = lfs_setattr(&m_lfs, path, FILE_ATTR_UID, &uid, sizeof(uid));
     int r2 = lfs_setattr(&m_lfs, path, FILE_ATTR_GID, &gid, sizeof(gid));
     return (r1 < 0) ? r1 : r2;
+}
+
+LittleFSWrapper::lfs_open_file_t *LittleFSWrapper::openSlot(pdi_fhandle_t handle) {
+    if (handle < 0 || handle >= (pdi_fhandle_t)VFS_MAX_OPEN_FILES) {
+        return nullptr;
+    }
+    return m_openfiles[handle];
+}
+
+/**
+ * @brief Opens a file and returns a handle backed by a real lfs file.
+ * @param path The path of the file to open.
+ * @param flags Combination of file_open_flag_t values.
+ * @return A handle of 0 or above, or a negative error code on failure.
+ */
+pdi_fhandle_t LittleFSWrapper::openFile(const char *path, uint8_t flags) {
+
+    if (nullptr == path || '\0' == path[0]) {
+        return (pdi_fhandle_t)STORAGE_ERROR_BAD_PATH;
+    }
+
+    int8_t slot = -1;
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; i++) {
+        if (nullptr == m_openfiles[i]) {
+            slot = (int8_t)i;
+            break;
+        }
+    }
+
+    if (slot < 0) {
+        return (pdi_fhandle_t)STORAGE_ERROR_NODE_LIMIT;
+    }
+
+    int lfsflags = 0;
+    if ((flags & FILE_OPEN_READ) && (flags & FILE_OPEN_WRITE)) {
+        lfsflags = LFS_O_RDWR;
+    } else if (flags & FILE_OPEN_WRITE) {
+        lfsflags = LFS_O_WRONLY;
+    } else {
+        lfsflags = LFS_O_RDONLY;
+    }
+
+    if (flags & FILE_OPEN_CREATE) lfsflags |= LFS_O_CREAT;
+    if (flags & FILE_OPEN_TRUNCATE) lfsflags |= LFS_O_TRUNC;
+    if (flags & FILE_OPEN_APPEND) lfsflags |= LFS_O_APPEND;
+
+    bool preExisted = isFileExist(path);
+
+    lfs_open_file_t *entry = pdiutil::safe_new<lfs_open_file_t>();
+    if (nullptr == entry) {
+        return (pdi_fhandle_t)PDI_ERR_NO_MEM;
+    }
+
+    int okOrErr = lfs_file_open(&m_lfs, &entry->m_file, path, lfsflags);
+    if (okOrErr < 0) {
+        pdiutil::safe_delete(entry);
+        return (pdi_fhandle_t)lfsToPdiErr(okOrErr);
+    }
+
+    entry->m_path = path;
+    entry->m_created = !preExisted;
+    entry->m_wrote = false;
+
+    m_openfiles[slot] = entry;
+    return (pdi_fhandle_t)slot;
+}
+
+/**
+ * @brief Reads from an open handle, advancing its position.
+ * @param handle Handle returned by openFile.
+ * @param buffer Destination for the bytes read.
+ * @param size Capacity of the buffer in bytes.
+ * @return The number of bytes read, 0 at end of file, or a negative error code.
+ */
+int LittleFSWrapper::readFileHandle(pdi_fhandle_t handle, char *buffer, uint32_t size) {
+
+    lfs_open_file_t *entry = openSlot(handle);
+    if (nullptr == entry || nullptr == buffer) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    if (0 == size) {
+        return 0;
+    }
+
+    return lfsToPdiErr(lfs_file_read(&m_lfs, &entry->m_file, buffer, size));
+}
+
+/**
+ * @brief Writes to an open handle, advancing its position.
+ * @param handle Handle returned by openFile.
+ * @param content The bytes to write.
+ * @param size The number of bytes to write.
+ * @return The number of bytes written, or a negative error code on failure.
+ */
+int LittleFSWrapper::writeFileHandle(pdi_fhandle_t handle, const char *content, uint32_t size) {
+
+    lfs_open_file_t *entry = openSlot(handle);
+    if (nullptr == entry || nullptr == content) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    if (0 == size) {
+        return 0;
+    }
+
+    int written = lfs_file_write(&m_lfs, &entry->m_file, content, size);
+    if (written >= 0) {
+        entry->m_wrote = true;
+    }
+
+    return lfsToPdiErr(written);
+}
+
+/**
+ * @brief Moves the position of an open handle.
+ * @param handle Handle returned by openFile.
+ * @param offset Offset to move by, relative to whence.
+ * @param whence Reference point for the offset.
+ * @return The new position, or a negative error code on failure.
+ */
+int64_t LittleFSWrapper::seekFile(pdi_fhandle_t handle, int64_t offset, file_seek_t whence) {
+
+    lfs_open_file_t *entry = openSlot(handle);
+    if (nullptr == entry) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    int lfswhence = LFS_SEEK_SET;
+    if (FILE_SEEK_CUR == whence) {
+        lfswhence = LFS_SEEK_CUR;
+    } else if (FILE_SEEK_END == whence) {
+        lfswhence = LFS_SEEK_END;
+    }
+
+    return lfsToPdiErr(lfs_file_seek(&m_lfs, &entry->m_file, (lfs_soff_t)offset, lfswhence));
+}
+
+/**
+ * @brief Pushes anything the open file still holds out to storage, leaving the
+ *        handle open.
+ * @param handle Handle returned by openFile.
+ * @return 0 on success, or a negative error code on failure.
+ */
+pdi_err_t LittleFSWrapper::syncFile(pdi_fhandle_t handle) {
+
+    lfs_open_file_t *entry = openSlot(handle);
+    if (nullptr == entry) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    return (pdi_err_t)lfsToPdiErr(lfs_file_sync(&m_lfs, &entry->m_file));
+}
+
+/**
+ * @brief Closes an open handle, flushing the file and stamping it when it was
+ *        written to.
+ * @param handle Handle returned by openFile.
+ * @return 0 on success, or a negative error code on failure.
+ */
+pdi_err_t LittleFSWrapper::closeFile(pdi_fhandle_t handle) {
+
+    lfs_open_file_t *entry = openSlot(handle);
+    if (nullptr == entry) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    int okOrErr = lfs_file_close(&m_lfs, &entry->m_file);
+
+    // stamping reopens the entry by path, so it has to wait for the close
+    if (okOrErr >= 0 && entry->m_wrote) {
+        if (entry->m_created) {
+            stampCreate(entry->m_path.c_str(), false);
+        } else {
+            stampModify(entry->m_path.c_str());
+        }
+    }
+
+    m_openfiles[handle] = nullptr;
+    pdiutil::safe_delete(entry);
+
+    return (pdi_err_t)lfsToPdiErr(okOrErr);
 }
 
 void LittleFSWrapper::stampCreate(const char *path, bool isDir){

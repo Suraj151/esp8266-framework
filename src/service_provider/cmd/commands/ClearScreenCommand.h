@@ -41,9 +41,9 @@ struct ClearScreenCommand : public CommandBase {
 	}
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
-		cmd_result_t result = CMD_RESULT_OK;
+		pdi_err_t result = PDI_OK;
 
 		if(nullptr != m_terminal){
 

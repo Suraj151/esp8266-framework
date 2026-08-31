@@ -161,7 +161,7 @@ public:
    * @brief Writes a newline character.
    * @return Number of bytes written.
    */
-  virtual int32_t putln() { return write("\r\n"); }
+  virtual int32_t putln() { return write(TERMINAL_NEW_LINE); }
 
   /**
    * @brief Writes a character followed by a newline.

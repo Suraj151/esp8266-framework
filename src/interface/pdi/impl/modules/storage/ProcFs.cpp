@@ -57,11 +57,20 @@ const uint8_t s_proc_task_file_count = sizeof(s_proc_task_files) / sizeof(s_proc
 #ifdef ENABLE_NETWORK_SERVICE
 const char* const s_proc_net_files[] = {
     "route",
-    "dev"
+    "dev",
+    "tcp"
 };
 
 const uint8_t s_proc_net_file_count = sizeof(s_proc_net_files) / sizeof(s_proc_net_files[0]);
 #endif
+
+const uint8_t PROC_COL_KEY = 14;
+const uint8_t PROC_COL_STATKEY = 15;
+const uint8_t PROC_COL_MOUNT = 10;
+const uint8_t PROC_COL_IFACE = 8;
+const uint8_t PROC_COL_ADDR = 16;
+const uint8_t PROC_COL_COUNT = 12;
+const uint8_t PROC_COL_ENDPOINT = 22;
 
 /**
  * Append a decimal number, which every field of a task node is built from.
@@ -73,14 +82,72 @@ void appendNumber(pdiutil::string& out, int64_t value) {
 }
 
 /**
+ * Append a key padded to the key column, so the values below line up whatever
+ * the keys are named.
+ */
+void appendKey(pdiutil::string& out, const char* key) {
+    pdiutil::string text = CHARPTR_WRAP_RO(key);
+    text += ":";
+    __append_padded(out, text.c_str(), PROC_COL_KEY);
+}
+
+/**
  * Append a keyed byte count, the shape every memory line is built from.
  */
 void appendMemLine(pdiutil::string& out, const char* key, uint32_t bytes) {
-    out += CHARPTR_WRAP_RO(key);
-    out += ":\t";
+    appendKey(out, key);
     appendNumber(out, (int64_t)bytes);
-    out += " B\n";
+    out += " B" TERMINAL_NEW_LINE;
 }
+
+#ifdef ENABLE_NETWORK_SERVICE
+/**
+ * The name TCP itself gives a state.
+ */
+void appendSockState(pdiutil::string& out, net_sock_state_t state) {
+    switch (state) {
+        case NET_SOCK_LISTEN:      out += CHARPTR_WRAP("LISTEN"); break;
+        case NET_SOCK_SYN_SENT:    out += CHARPTR_WRAP("SYN_SENT"); break;
+        case NET_SOCK_SYN_RCVD:    out += CHARPTR_WRAP("SYN_RECV"); break;
+        case NET_SOCK_ESTABLISHED: out += CHARPTR_WRAP("ESTABLISHED"); break;
+        case NET_SOCK_FIN_WAIT_1:  out += CHARPTR_WRAP("FIN_WAIT1"); break;
+        case NET_SOCK_FIN_WAIT_2:  out += CHARPTR_WRAP("FIN_WAIT2"); break;
+        case NET_SOCK_CLOSE_WAIT:  out += CHARPTR_WRAP("CLOSE_WAIT"); break;
+        case NET_SOCK_CLOSING:     out += CHARPTR_WRAP("CLOSING"); break;
+        case NET_SOCK_LAST_ACK:    out += CHARPTR_WRAP("LAST_ACK"); break;
+        case NET_SOCK_TIME_WAIT:   out += CHARPTR_WRAP("TIME_WAIT"); break;
+        default:                   out += CHARPTR_WRAP("CLOSED"); break;
+    }
+}
+
+/**
+ * Append an address and port as one padded column.
+ */
+void appendEndpoint(pdiutil::string& out, const ipaddress_t& ip, uint16_t port) {
+    pdiutil::string text = ip;
+    char portbuf[8];
+
+    Int32ToString((int32_t)port, portbuf, sizeof(portbuf), 0);
+    text += ":";
+    text += portbuf;
+
+    __append_padded(out, text.c_str(), PROC_COL_ENDPOINT);
+}
+
+/**
+ * One endpoint as a row, appended straight into the file being built.
+ */
+void appendSocketRow(const net_socket_t& sock, void* arg) {
+    if (nullptr == arg) return;
+
+    pdiutil::string& out = *(pdiutil::string*)arg;
+
+    appendEndpoint(out, sock.m_localip, sock.m_localport);
+    appendEndpoint(out, sock.m_remoteip, sock.m_remoteport);
+    appendSockState(out, sock.m_state);
+    out += TERMINAL_NEW_LINE;
+}
+#endif
 
 }
 
@@ -178,7 +245,7 @@ pdiutil::string ProcFs::render(const char* path) {
             uint32_t ms = __i_dvc_ctrl.millis_now();
             uint32_t sec = ms / 1000UL;
             uint32_t frac = (ms % 1000UL) / 10;
-            pdiutil::string fmt = CHARPTR_WRAP("%u.%02u %u.%02u\n");
+            pdiutil::string fmt = CHARPTR_WRAP("%u.%02u %u.%02u" TERMINAL_NEW_LINE);
             __snprintf(buf, sizeof(buf), fmt.c_str(), sec, frac, sec, frac);
             return pdiutil::string(buf);
         }
@@ -198,7 +265,7 @@ pdiutil::string ProcFs::render(const char* path) {
         // RELEASE / CONFIG_VERSION land in IROM on esp8266; __vsnprintf's %s
         // reads char-by-char with plain *p and faults there. Marshal to RAM
         // first via CHARPTR_WRAP (same trick already used for format strings).
-        pdiutil::string fmt = CHARPTR_WRAP("PDI Stack version %s (%s)\n");
+        pdiutil::string fmt = CHARPTR_WRAP("PDI Stack version %s (%s)" TERMINAL_NEW_LINE);
         pdiutil::string rel = CHARPTR_WRAP(RELEASE);
         pdiutil::string cfg = CHARPTR_WRAP(CONFIG_VERSION);
         __snprintf(buf, sizeof(buf), fmt.c_str(), rel.c_str(), cfg.c_str());
@@ -207,7 +274,8 @@ pdiutil::string ProcFs::render(const char* path) {
 
 #ifdef ENABLE_NETWORK_SERVICE
     if (PROC_NETFILE == node) {
-        return (0 == leaf) ? renderNetRoute() : renderNetDev();
+        if (0 == leaf) return renderNetRoute();
+        return (1 == leaf) ? renderNetDev() : renderNetTcp();
     }
 #endif
 
@@ -220,7 +288,7 @@ pdiutil::string ProcFs::render(const char* path) {
 
     if (1 == leaf) {
         out += taskDisplayName(task);
-        out += "\n";
+        out += TERMINAL_NEW_LINE;
         return out;
     }
 
@@ -236,29 +304,39 @@ pdiutil::string ProcFs::render(const char* path) {
     taskStatField(line, 10, policy);
     taskStatField(line, 11, mode);
 
-    out += CHARPTR_WRAP("Name:\t");
+    appendKey(out, CHARPTR_WRAP("Name"));
     out += taskDisplayName(task);
-    out += CHARPTR_WRAP("\nPid:\t");
+    out += TERMINAL_NEW_LINE;
+    appendKey(out, CHARPTR_WRAP("Pid"));
     appendNumber(out, task->m_task_id);
-    out += CHARPTR_WRAP("\nState:\t");
+    out += TERMINAL_NEW_LINE;
+    appendKey(out, CHARPTR_WRAP("State"));
     out += state;
-    out += CHARPTR_WRAP("\nOwner:\t");
+    out += TERMINAL_NEW_LINE;
+    appendKey(out, CHARPTR_WRAP("Owner"));
     appendNumber(out, task->m_owner);
-    out += CHARPTR_WRAP("\nPrio:\t");
+    out += TERMINAL_NEW_LINE;
+    appendKey(out, CHARPTR_WRAP("Prio"));
     appendNumber(out, task->m_task_priority);
-    out += CHARPTR_WRAP("\nNice:\t");
+    out += TERMINAL_NEW_LINE;
+    appendKey(out, CHARPTR_WRAP("Nice"));
     appendNumber(out, task->m_nice);
-    out += CHARPTR_WRAP("\nPolicy:\t");
+    out += TERMINAL_NEW_LINE;
+    appendKey(out, CHARPTR_WRAP("Policy"));
     out += policy;
-    out += CHARPTR_WRAP("\nMode:\t");
+    out += TERMINAL_NEW_LINE;
+    appendKey(out, CHARPTR_WRAP("Mode"));
     out += mode;
-    out += CHARPTR_WRAP("\nRuns:\t");
+    out += TERMINAL_NEW_LINE;
+    appendKey(out, CHARPTR_WRAP("Runs"));
     appendNumber(out, (int64_t)task->m_run_count);
-    out += CHARPTR_WRAP("\nExecUs:\t");
+    out += TERMINAL_NEW_LINE;
+    appendKey(out, CHARPTR_WRAP("ExecUs"));
     appendNumber(out, (int64_t)task->m_total_exec_us);
-    out += CHARPTR_WRAP("\nIntvlMs:\t");
+    out += TERMINAL_NEW_LINE;
+    appendKey(out, CHARPTR_WRAP("IntvlMs"));
     appendNumber(out, (int64_t)task->m_duration);
-    out += "\n";
+    out += TERMINAL_NEW_LINE;
 
     return out;
 }
@@ -284,12 +362,10 @@ pdiutil::string ProcFs::renderMounts() {
         const vfs_mount_t* mount = __i_fs.getMount(i);
         if (nullptr == mount) continue;
 
-        out += mount->m_name;
-        out += " ";
-        out += mount->m_prefix;
-        out += " ";
-        out += CHARPTR_WRAP_RO(VfsTypeToString(mount->m_type));
-        out += CHARPTR_WRAP(" rw 0 0\n");
+        __append_padded(out, mount->m_name, PROC_COL_MOUNT);
+        __append_padded(out, mount->m_prefix, PROC_COL_MOUNT);
+        __append_padded(out, CHARPTR_WRAP_RO(VfsTypeToString(mount->m_type)), PROC_COL_MOUNT);
+        out += CHARPTR_WRAP("rw 0 0" TERMINAL_NEW_LINE);
     }
 
     return out;
@@ -317,17 +393,29 @@ pdiutil::string ProcFs::renderStat() {
     uint64_t elapsed = (uint64_t)__i_dvc_ctrl.micros_now();
     uint64_t idle = (elapsed > busy) ? (elapsed - busy) : 0;
 
-    pdiutil::string out = CHARPTR_WRAP("cpu 0 0 ");
+    pdiutil::string out;
+
+    __append_padded(out, CHARPTR_WRAP("cpu"), PROC_COL_STATKEY);
+    out += CHARPTR_WRAP("0 0 ");
     appendNumber(out, (int64_t)busy);
     out += " ";
     appendNumber(out, (int64_t)idle);
-    out += CHARPTR_WRAP("\nctxt ");
+    out += TERMINAL_NEW_LINE;
+
+    __append_padded(out, CHARPTR_WRAP("ctxt"), PROC_COL_STATKEY);
     appendNumber(out, (int64_t)switches);
-    out += CHARPTR_WRAP("\nprocesses ");
+    out += TERMINAL_NEW_LINE;
+
+    __append_padded(out, CHARPTR_WRAP("processes"), PROC_COL_STATKEY);
     appendNumber(out, (int64_t)tasks);
-    out += CHARPTR_WRAP("\nprocs_running ");
+    out += TERMINAL_NEW_LINE;
+
+    __append_padded(out, CHARPTR_WRAP("procs_running"), PROC_COL_STATKEY);
     appendNumber(out, (int64_t)running);
-    out += CHARPTR_WRAP("\nbtime 0\n");
+    out += TERMINAL_NEW_LINE;
+
+    __append_padded(out, CHARPTR_WRAP("btime"), PROC_COL_STATKEY);
+    out += CHARPTR_WRAP("0" TERMINAL_NEW_LINE);
 
     return out;
 }
@@ -337,7 +425,12 @@ pdiutil::string ProcFs::renderStat() {
  * The gateway each registered interface routes through.
  */
 pdiutil::string ProcFs::renderNetRoute() {
-    pdiutil::string out = CHARPTR_WRAP("Iface\tDestination\tGateway\tMask\n");
+    pdiutil::string out;
+
+    __append_padded(out, CHARPTR_WRAP("Iface"), PROC_COL_IFACE);
+    __append_padded(out, CHARPTR_WRAP("Destination"), PROC_COL_ADDR);
+    __append_padded(out, CHARPTR_WRAP("Gateway"), PROC_COL_ADDR);
+    out += CHARPTR_WRAP("Mask" TERMINAL_NEW_LINE);
 
     for (uint8_t i = 0; i < __netif_registry.count(); ++i) {
         iNetifInterface* netif = __netif_registry.at(i);
@@ -346,12 +439,11 @@ pdiutil::string ProcFs::renderNetRoute() {
         netif_info_t info;
         if (!netif->getInfo(info) || !info.m_up) continue;
 
-        out += CHARPTR_WRAP_RO(netif->name());
-        out += CHARPTR_WRAP("\t0.0.0.0\t");
-        out += pdiutil::string(info.m_gateway);
-        out += "\t";
+        __append_padded(out, netif->name(), PROC_COL_IFACE);
+        __append_padded(out, CHARPTR_WRAP("0.0.0.0"), PROC_COL_ADDR);
+        __append_padded(out, pdiutil::string(info.m_gateway).c_str(), PROC_COL_ADDR);
         out += pdiutil::string(info.m_netmask);
-        out += "\n";
+        out += TERMINAL_NEW_LINE;
     }
 
     return out;
@@ -361,31 +453,49 @@ pdiutil::string ProcFs::renderNetRoute() {
  * Per interface traffic, for the interfaces that can count it.
  */
 pdiutil::string ProcFs::renderNetDev() {
-    pdiutil::string out = CHARPTR_WRAP("Iface\tRxBytes\tRxPackets\tRxErrs\tTxBytes\tTxPackets\tTxErrs\n");
+    pdiutil::string out;
+
+    __append_padded(out, CHARPTR_WRAP("Iface"), PROC_COL_IFACE);
+    __append_padded(out, CHARPTR_WRAP("RxBytes"), PROC_COL_COUNT);
+    __append_padded(out, CHARPTR_WRAP("RxPackets"), PROC_COL_COUNT);
+    __append_padded(out, CHARPTR_WRAP("RxErrs"), PROC_COL_COUNT);
+    __append_padded(out, CHARPTR_WRAP("TxBytes"), PROC_COL_COUNT);
+    __append_padded(out, CHARPTR_WRAP("TxPackets"), PROC_COL_COUNT);
+    out += CHARPTR_WRAP("TxErrs" TERMINAL_NEW_LINE);
 
     for (uint8_t i = 0; i < __netif_registry.count(); ++i) {
         iNetifInterface* netif = __netif_registry.at(i);
         if (nullptr == netif) continue;
 
-        // an interface that cannot count is left out rather than listed with
-        // zeroes, which would read as an idle link
         netif_counters_t counters;
         if (!netif->getCounters(counters)) continue;
 
-        out += CHARPTR_WRAP_RO(netif->name());
-        out += "\t";
-        appendNumber(out, (int64_t)counters.m_rx_bytes);
-        out += "\t";
-        appendNumber(out, (int64_t)counters.m_rx_packets);
-        out += "\t";
-        appendNumber(out, (int64_t)counters.m_rx_errors);
-        out += "\t";
-        appendNumber(out, (int64_t)counters.m_tx_bytes);
-        out += "\t";
-        appendNumber(out, (int64_t)counters.m_tx_packets);
-        out += "\t";
+        __append_padded(out, netif->name(), PROC_COL_IFACE);
+        __append_padded_num(out, (int64_t)counters.m_rx_bytes, PROC_COL_COUNT);
+        __append_padded_num(out, (int64_t)counters.m_rx_packets, PROC_COL_COUNT);
+        __append_padded_num(out, (int64_t)counters.m_rx_errors, PROC_COL_COUNT);
+        __append_padded_num(out, (int64_t)counters.m_tx_bytes, PROC_COL_COUNT);
+        __append_padded_num(out, (int64_t)counters.m_tx_packets, PROC_COL_COUNT);
         appendNumber(out, (int64_t)counters.m_tx_errors);
-        out += "\n";
+        out += TERMINAL_NEW_LINE;
+    }
+
+    return out;
+}
+
+/**
+ * Every TCP endpoint the stack holds, when the port can enumerate them.
+ */
+pdiutil::string ProcFs::renderNetTcp() {
+    pdiutil::string out;
+
+    __append_padded(out, CHARPTR_WRAP("Local"), PROC_COL_ENDPOINT);
+    __append_padded(out, CHARPTR_WRAP("Remote"), PROC_COL_ENDPOINT);
+    out += CHARPTR_WRAP("State" TERMINAL_NEW_LINE);
+
+    iNetStackInterface* stack = __netif_registry.stack();
+    if (nullptr != stack) {
+        stack->eachTcpSocket(appendSocketRow, &out);
     }
 
     return out;

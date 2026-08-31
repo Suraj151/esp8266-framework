@@ -50,24 +50,24 @@ struct EchoCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		if( nullptr == m_terminal ){
-			return CMD_RESULT_TERMINAL_ERR;
+			return CMD_ERROR_NOTTY;
 		}
 
 		CommandOption *cmdoptn = &m_options[0];
 		// absent positional arg — parser leaves size -1; print a blank line
 		if( nullptr == cmdoptn->optionval || 0 >= cmdoptn->optionvalsize ){
 			m_terminal->writeln();
-			return CMD_RESULT_OK;
+			return PDI_OK;
 		}
 
 		const char* blob = cmdoptn->optionval;
@@ -79,7 +79,7 @@ struct EchoCommand : public CommandBase {
 		m_terminal->putln();
 		m_terminal->write(blob, bloblen);
 		m_terminal->writeln();
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

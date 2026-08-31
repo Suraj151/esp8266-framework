@@ -46,7 +46,7 @@ TEST(termedit, a_line_is_held_until_enter)
 
     shell.type("pwd");
     ASSERT_STREQ(shell.lineBuffer().c_str(), "pwd");
-    ASSERT_EQ(shell.result(), CMD_RESULT_INCOMPLETE);
+    ASSERT_EQ(shell.result(), CMD_ERROR_AGAIN);
 
     std::string out = shell.type(KEY_ENTER);
     ASSERT_TRUE(saw(out, "/"));
@@ -288,7 +288,7 @@ TEST(termedit, tab_on_a_prefix_that_matches_nothing_leaves_the_line_alone)
     shell.terminal().forget();
     shell.type(KEY_TAB);
 
-    ASSERT_EQ(shell.result(), CMD_RESULT_TERMINAL_HOLD_BUFFER);
+    ASSERT_EQ(shell.result(), CMD_ERROR_HOLD_BUFFER);
     ASSERT_STREQ(shell.lineBuffer().c_str(), "zzz");
     ASSERT_EQ(shell.terminal().captured().length(), 0u);
 
@@ -302,7 +302,7 @@ TEST(termedit, tab_on_an_empty_line_does_nothing)
 
     shell.type(KEY_TAB);
 
-    ASSERT_EQ(shell.result(), CMD_RESULT_TERMINAL_HOLD_BUFFER);
+    ASSERT_EQ(shell.result(), CMD_ERROR_HOLD_BUFFER);
     ASSERT_EQ(shell.lineBuffer().length(), 0u);
     ASSERT_EQ(shell.terminal().captured().length(), 0u);
 }
@@ -331,7 +331,7 @@ TEST(termedit, tab_still_reaches_a_command_that_is_waiting)
     shell.terminal().forget();
     shell.type(KEY_TAB);
 
-    ASSERT_EQ(shell.result(), CMD_RESULT_INCOMPLETE);
+    ASSERT_EQ(shell.result(), CMD_ERROR_AGAIN);
     ASSERT_TRUE(saw(shell.terminal().captured(), "user"));
 
     shell.type(KEY_CTRL_C);

@@ -16,7 +16,7 @@ created Date    : 1st June 2019
 /**
  * watch command
  * 
- * e.g. watch c=<command to execute with its options periodically>; i=<interval in milliseconds>; n=<number of iterations>
+ * e.g. watch c=<command to execute with its options periodically>,i=<interval in milliseconds>,n=<number of iterations>
  */
 struct WatchCommand : public CommandBase {
 
@@ -31,7 +31,7 @@ struct WatchCommand : public CommandBase {
 		AddOption(CMD_OPTION_NAME_C);
 		AddOption(CMD_OPTION_NAME_I);
 		AddOption(CMD_OPTION_NAME_N);
-		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SEMICOLON);
+		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_COMMA);
 	}
 
 	/* Destructor */
@@ -49,7 +49,7 @@ struct WatchCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("watch c=<cmd>; i=<ms>; n=<iters>  re-run a command periodically; Ctrl+C to stop");
+		return RODT_ATTR("watch c=<cmd>,i=<ms>,n=<iters>  re-run a command periodically; Ctrl+C to stop");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -66,16 +66,16 @@ struct WatchCommand : public CommandBase {
     }
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
-		cmd_result_t result = CMD_RESULT_OK;
+		pdi_err_t result = PDI_OK;
 		uint32_t interval = 1000; // default 1 second
 		int32_t numberofiterations = -1; // default infinite
 
@@ -88,7 +88,7 @@ struct WatchCommand : public CommandBase {
 		bool isNumberOfIterationsProvided = ( nullptr != numberofiterationscmdoptn && nullptr != numberofiterationscmdoptn->optionval && numberofiterationscmdoptn->optionvalsize );
 
 		if( !isCommandProvided ){
-			return CMD_RESULT_ARGS_MISSING;
+			return CMD_ERROR_ARGS_MISSING;
 		}
 
 		m_commandtoexec = pdiutil::string(commandcmdoptn->optionval, commandcmdoptn->optionvalsize);
@@ -129,9 +129,9 @@ struct WatchCommand : public CommandBase {
 						return;
 					}
 
-					cmd_result_t cmdres = m_cmdexecinterface->executeCommand(&m_commandtoexec);
+					pdi_err_t cmdres = m_cmdexecinterface->executeCommand(&m_commandtoexec);
 
-					if( cmdres != CMD_RESULT_OK ){
+					if( cmdres != PDI_OK ){
 						m_terminal->writeln();
 						m_terminal->write_ro(RODT_ATTR("CmdErr : "));
 						m_terminal->writeln((int32_t)cmdres);
@@ -145,7 +145,7 @@ struct WatchCommand : public CommandBase {
 			}, interval, 0, __i_dvc_ctrl.millis_now(), numberofiterations, CMD_NAME_WATCH );
 
 			if( m_watchtaskid < 0 ){
-				result = CMD_RESULT_FAILED;
+				result = CMD_ERROR_FAILED;
 			}else{
 				m_runinbackground = true;
 			}

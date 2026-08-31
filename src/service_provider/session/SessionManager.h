@@ -46,6 +46,16 @@ public:
 
 #ifdef ENABLE_CMD_SERVICE
   /**
+   * Result of the last command the current session ran to completion.
+   */
+  static pdi_err_t getLastExit();
+
+  /**
+   * Records a finished command's result; a still running one is ignored.
+   */
+  static void setLastExit(pdi_err_t status);
+
+  /**
    * Descriptor table of the given session, or of the current one when null.
    * An owned stream is deleted when the slot is reassigned or released.
    */

@@ -98,6 +98,11 @@ int32_t SSHClientInterface::write(const uint8_t* c_str, uint32_t size){
                     this->commit();
                     m_writeCommitTaskId = -1;
                 }, 1, __i_dvc_ctrl.millis_now() );
+
+                ServiceProvider *sshsvc = ServiceProvider::getService(SERVICE_SSH);
+                if( nullptr != sshsvc ){
+                    sshsvc->trackServiceTask(m_writeCommitTaskId);
+                }
             }
 
             return size;

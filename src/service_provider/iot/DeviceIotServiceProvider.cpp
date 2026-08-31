@@ -137,7 +137,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
           _found_reconfig != pdiutil::string::npos &&
           _found_otp != pdiutil::string::npos)
       {
-        __task_scheduler.setTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
+        this->serviceSetTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
       }
     }else{
 
@@ -255,7 +255,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigResponse( Http_Client *clien
             ( __i_dvc_ctrl.millis_now() + MQTT_INITIALIZE_DURATION )
           );
 #if defined(ENABLE_MQTT_SERVICE)
-          __task_scheduler.setTimeout( [&]() { this->configureMQTT(); }, 1, __i_dvc_ctrl.millis_now() );
+          this->serviceSetTimeout( [&]() { this->configureMQTT(); }, 1, __i_dvc_ctrl.millis_now() );
 #endif
           this->m_token_validity = true;
 
@@ -335,7 +335,7 @@ void DeviceIotServiceProvider::configureMQTT(){
 
   __mqtt_service.setMqttSubscribeDataCallback(DeviceIotServiceProvider::handleSubscribeCallback);
 
-  __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttConfigChange(); }, 1, __i_dvc_ctrl.millis_now() );
+  this->serviceSetTimeout( [&]() { __mqtt_service.handleMqttConfigChange(); }, 1, __i_dvc_ctrl.millis_now() );
 }
 
 /**
@@ -370,7 +370,7 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
 
   // handle channel write action as soon as possible to reflect applied json payload
   __device_iot_service.m_handle_channel_write_asap = true;
-  __task_scheduler.setTimeout( [&]() { __device_iot_service.handleSensorData(); }, 1, __i_dvc_ctrl.millis_now() );
+  this->serviceSetTimeout( [&]() { __device_iot_service.handleSensorData(); }, 1, __i_dvc_ctrl.millis_now() );
 
   // handle reconfiguration request
   char *_value_buff = pdiutil::safe_new_array<char>(50);
@@ -380,7 +380,7 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
     uint16_t reconfigure = StringToUint16( _value_buff, 6 );
     if( _json_result && reconfigure == 1 ){
       LogI("Reconfiguring...\n");
-      __task_scheduler.setTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
+      this->serviceSetTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
     }
   }
 
@@ -686,7 +686,7 @@ void DeviceIotServiceProvider::handleSensorData(){
     if( this->m_server_configurable_interface_read.size() > 0 || this->m_server_configurable_interface_write.size() > 0 ){
 
 #if defined(ENABLE_MQTT_SERVICE)
-      __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(true); }, 1, __i_dvc_ctrl.millis_now(), DEFAULT_TASK_PRIORITY+1 );
+      this->serviceSetTimeout( [&]() { __mqtt_service.handleMqttPublish(true); }, 1, __i_dvc_ctrl.millis_now(), DEFAULT_TASK_PRIORITY+1 );
       __task_scheduler.rebaseAndRestartPrioTasks();
 
       memset( __mqtt_service.m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
@@ -701,7 +701,7 @@ void DeviceIotServiceProvider::handleSensorData(){
 
       // Considering server not provided any interface to operate on. So closing the current mqtt 
       // and will retry soon to get Updated config from server
-      __task_scheduler.setTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
+      this->serviceSetTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
     }
   }else{
     this->m_sample_index++;

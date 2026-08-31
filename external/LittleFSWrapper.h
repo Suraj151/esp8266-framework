@@ -12,6 +12,10 @@ created Date    : 6th Apr 2025
 
 #include "interface/pdi/modules/storage/iFileSystemInterface.h"
 
+// pulled in directly because Config.h only reaches the vfs settings when the
+// storage service is enabled, and this header is parsed either way
+#include "config/VfsConfig.h"
+
 // Include the LittleFS library.
 #define LFS_NAME_MAX FILE_NAME_MAX_SIZE
 #define LFS_NO_DEBUG
@@ -291,6 +295,59 @@ public:
 
     int setFileOwner(const char *path, uint16_t uid, uint16_t gid) override;
 
+    /**
+     * @brief Opens a file and returns a handle backed by a real lfs file, so a
+     *        caller reading or writing block by block pays one open instead of
+     *        one open per block.
+     * @param path The path of the file to open.
+     * @param flags Combination of file_open_flag_t values.
+     * @return A handle of 0 or above, or a negative error code on failure.
+     */
+    pdi_fhandle_t openFile(const char* path, uint8_t flags) override;
+
+    /**
+     * @brief Reads from an open handle, advancing its position.
+     * @param handle Handle returned by openFile.
+     * @param buffer Destination for the bytes read.
+     * @param size Capacity of the buffer in bytes.
+     * @return The number of bytes read, 0 at end of file, or a negative error code.
+     */
+    int readFileHandle(pdi_fhandle_t handle, char* buffer, uint32_t size) override;
+
+    /**
+     * @brief Writes to an open handle, advancing its position.
+     * @param handle Handle returned by openFile.
+     * @param content The bytes to write.
+     * @param size The number of bytes to write.
+     * @return The number of bytes written, or a negative error code on failure.
+     */
+    int writeFileHandle(pdi_fhandle_t handle, const char* content, uint32_t size) override;
+
+    /**
+     * @brief Moves the position of an open handle.
+     * @param handle Handle returned by openFile.
+     * @param offset Offset to move by, relative to whence.
+     * @param whence Reference point for the offset.
+     * @return The new position, or a negative error code on failure.
+     */
+    int64_t seekFile(pdi_fhandle_t handle, int64_t offset, file_seek_t whence) override;
+
+    /**
+     * @brief Pushes anything the open file still holds out to storage, leaving
+     *        the handle open.
+     * @param handle Handle returned by openFile.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    pdi_err_t syncFile(pdi_fhandle_t handle) override;
+
+    /**
+     * @brief Closes an open handle, flushing the file and stamping it when it
+     *        was written to.
+     * @param handle Handle returned by openFile.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    pdi_err_t closeFile(pdi_fhandle_t handle) override;
+
 protected:
     // Stamp ctime + mtime + perms + uid/gid on a freshly created entry. Uses
     // nowEpoch() + currentOwner() (implemented by the policy layer).
@@ -303,8 +360,29 @@ private:
     lfs_t m_lfs;
     lfs_config m_lfscfg;
 
-    // set once a mount succeeds. 
+    // set once a mount succeeds.
     bool m_mounted;
+
+    // One open handle. Allocated on open and released on close, so an idle
+    // table costs one pointer per slot. The path is kept because the close
+    // stamp is path based.
+    struct lfs_open_file_t {
+        lfs_file_t m_file;
+        pdiutil::string m_path;
+        bool m_created;
+        bool m_wrote;
+    };
+
+    // The handle is the index into this table, so a slot keeps its position for
+    // as long as it is open.
+    lfs_open_file_t *m_openfiles[VFS_MAX_OPEN_FILES];
+
+    /**
+     * @brief Resolve a handle to its open slot.
+     * @param handle Handle returned by openFile.
+     * @return The slot, or nullptr when the handle is not open.
+     */
+    lfs_open_file_t *openSlot(pdi_fhandle_t handle);
 
     /**
      * @brief Callback for reading data from storage.

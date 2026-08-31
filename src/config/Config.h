@@ -13,6 +13,7 @@ created Date    : 1st June 2019
 #include "Common.h"
 #include "GlobalConfig.h"
 #include "DatabaseConfig.h"
+#include "ServiceConfig.h"
 #include "SessionConfig.h"
 
 #ifdef ENABLE_WIFI_SERVICE

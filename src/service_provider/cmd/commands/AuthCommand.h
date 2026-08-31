@@ -46,9 +46,9 @@ struct LoginCommand : public CommandBase {
 	bool wantsMaskedInput() override { return isWaitingForOption(CMD_OPTION_NAME_P); }
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
-		cmd_result_t result = CMD_RESULT_OK;
+		pdi_err_t result = PDI_OK;
 
 		if( !__auth_service.getAuthorized() ){
 
@@ -73,11 +73,11 @@ struct LoginCommand : public CommandBase {
 			}else{
 				setWaitingForOption(CMD_OPTION_NAME_U);
 				if( nullptr != m_terminal ){
-					m_terminal->write_ro(RODT_ATTR("\n"));
+					m_terminal->putln();
       				m_terminal->write(CMD_NAME_LOGIN);
 					m_terminal->write_ro(RODT_ATTR(": "));
 				}
-				return CMD_RESULT_INCOMPLETE;
+				return CMD_ERROR_AGAIN;
 			}
 
 			bool isPasswordAnswered = isWaitingForOption(CMD_OPTION_NAME_P) &&
@@ -91,15 +91,16 @@ struct LoginCommand : public CommandBase {
 				if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
 					terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
 					setWaitingForOption(CMD_OPTION_NAME_U);
-					return CMD_RESULT_ABORTED;
+					return CMD_ERROR_CANCELED;
 				}
 
 				if( !isPasswordAnswered ){
 					setWaitingForOption(CMD_OPTION_NAME_P);
 					if( nullptr != m_terminal ){
-						m_terminal->write_ro(RODT_ATTR("\nPass : "));
+						m_terminal->putln();
+						m_terminal->write_ro(RODT_ATTR("Pass : "));
 					}
-					return CMD_RESULT_INCOMPLETE;
+					return CMD_ERROR_AGAIN;
 				}
 			}
 
@@ -107,7 +108,7 @@ struct LoginCommand : public CommandBase {
 				__auth_service.setAuthorized(true);
 			}else{
 
-				result = CMD_RESULT_WRONG_CREDENTIAL;
+				result = CMD_ERROR_ACCES;
 				ResultToTerminal(result);
 				setWaitingForOption(CMD_OPTION_NAME_U);
 			}
@@ -143,7 +144,7 @@ struct LogoutCommand : public CommandBase {
 	}
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		__auth_service.setAuthorized(false);
 
@@ -154,10 +155,10 @@ struct LogoutCommand : public CommandBase {
 		if( nullptr != m_terminal ){
 			terminal_types_t t = m_terminal->get_terminal_type();
 			if( TERMINAL_TYPE_TELNET == t || TERMINAL_TYPE_SSH == t ){
-				return CMD_RESULT_TERMINAL_ABORTED;
+				return CMD_ERROR_INTR;
 			}
 		}
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 };
 

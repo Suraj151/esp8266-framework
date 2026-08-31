@@ -49,16 +49,16 @@ struct FileReadCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
-		cmd_result_t result = CMD_RESULT_OK;
+		pdi_err_t result = PDI_OK;
 
 		if(nullptr != m_terminal){
 			// Get first option which must be the filename to read
@@ -74,7 +74,7 @@ struct FileReadCommand : public CommandBase {
 				}, 10);
 
 				if (iStatus < 0) {
-					result = CMD_RESULT_FAILED;
+					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
 					m_terminal->write_ro(RODT_ATTR("Failed : "));
 					m_terminal->write(filename.c_str());
@@ -82,7 +82,7 @@ struct FileReadCommand : public CommandBase {
 					m_terminal->write((int32_t)iStatus);
 				}
 			}else{
-				result = CMD_RESULT_ARGS_ERROR;
+				result = CMD_ERROR_INVAL;
 			}
 		}
 
@@ -160,23 +160,23 @@ struct FileEditCommand : public CommandBase {
 	bool managesLineRender() override { return m_editing && !m_escMenu; }
 
 	/* editor drives everything from execute(); keep this a pass-through */
-	cmd_result_t executeTermInputAction(cmd_term_inseq_t terminputaction) override{
+	pdi_err_t executeTermInputAction(cmd_term_inseq_t terminputaction) override{
 		return m_result;
 	}
 
 	/* execute command with provided options */
-	cmd_result_t execute(cmd_term_inseq_t terminputaction){
+	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_RESULT_NEED_AUTH;
+			return CMD_ERROR_PERM;
 		}
 #endif
 
 		session_t *s = SessionManager::current();
 		if( nullptr == m_terminal || nullptr == s ){
-			return CMD_RESULT_TERMINAL_ERR;
+			return CMD_ERROR_NOTTY;
 		}
 
 		// First phase: resolve the positional filename and open the editor
@@ -188,20 +188,20 @@ struct FileEditCommand : public CommandBase {
 				setWaitingForOption((int8_t)0);
 				m_terminal->putln();
 				m_terminal->write_ro(RODT_ATTR("Enter Filename : "));
-				return CMD_RESULT_INCOMPLETE;
+				return CMD_ERROR_AGAIN;
 			}
 
 			pdiutil::string filepath = resolveArgPath(fopt);
 			if( filepath.empty() ){
-				return CMD_RESULT_ARGS_ERROR;
+				return CMD_ERROR_INVAL;
 			}
 
 			if( !openEditor(filepath, s) ){
-				return CMD_RESULT_FAILED;
+				return CMD_ERROR_FAILED;
 			}
 
 			setWaitingForOption((int8_t)0);
-			return CMD_RESULT_INCOMPLETE;
+			return CMD_ERROR_AGAIN;
 		}
 
 		// ESC menu: interpret the typed token on ENTER
@@ -222,7 +222,7 @@ struct FileEditCommand : public CommandBase {
 				}
 			}
 			setWaitingForOption((int8_t)0);
-			return CMD_RESULT_INCOMPLETE;
+			return CMD_ERROR_AGAIN;
 		}
 
 		// Editing mode: act on navigation / structural keys
@@ -237,7 +237,7 @@ struct FileEditCommand : public CommandBase {
 		}
 
 		setWaitingForOption((int8_t)0);
-		return CMD_RESULT_INCOMPLETE;
+		return CMD_ERROR_AGAIN;
 	}
 
 	/* Open the editor: create a working copy and preload line 0 */
@@ -527,7 +527,7 @@ struct FileEditCommand : public CommandBase {
 	/* Persist the working copy over the original and close the editor.
 	   The active line was already committed when the ESC menu opened; the
 	   buffer now holds the "!w" token, so must not be committed again. */
-	cmd_result_t finalizeSave(session_t *s){
+	pdi_err_t finalizeSave(session_t *s){
 		pdi_err_t ret = PDI_OK;
 		pdiutil::string retstr = CHARPTR_WRAP("saved");
 		if( __i_fs.isFileExist(m_origpath.c_str()) ){
@@ -562,7 +562,7 @@ struct FileEditCommand : public CommandBase {
 	}
 
 	/* Discard the working copy and close the editor */
-	cmd_result_t cancelEdit(session_t *s){
+	pdi_err_t cancelEdit(session_t *s){
 		pdiutil::string retstr = CHARPTR_WRAP("cancelled");
 		if( __i_fs.isFileExist(m_tmppath.c_str()) ){
 			__i_fs.deleteFile(m_tmppath.c_str());
@@ -571,7 +571,7 @@ struct FileEditCommand : public CommandBase {
 	}
 
 	/* Tear down editor state and hand the terminal back to the shell */
-	cmd_result_t closeEditor(session_t *s, const char *msg){
+	pdi_err_t closeEditor(session_t *s, const char *msg){
 		m_editing = false;
 		m_escMenu = false;
 		setWaitingForOption((int8_t)-1);
@@ -582,7 +582,7 @@ struct FileEditCommand : public CommandBase {
 		m_terminal->write(msg);
 		s->m_linebuf.clear();
 		s->m_cursor = 0;
-		return CMD_RESULT_OK;
+		return PDI_OK;
 	}
 
 	/* Repaint the viewport and place the cursor on the active line */
