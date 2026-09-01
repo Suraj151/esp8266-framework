@@ -28,10 +28,8 @@ created Date    : 1st Aug 2026
 // Random byte source supplied by the caller (device-agnostic).
 typedef void (*bn_rng_fn)(uint8_t *buf, size_t len);
 
-// Optional cooperative yield, invoked inside long inner loops so the caller can
-// service the watchdog. Device-agnostic: pass nullptr to disable.
-typedef void (*bn_yield_fn)(void);
-void bn_set_yield_hook(bn_yield_fn fn);
+// The long inner loops yield through crypto_set_yield_hook, which every
+// asymmetric primitive here shares.
 
 struct bignum {
     uint32_t w[BN_MAX_WORDS];

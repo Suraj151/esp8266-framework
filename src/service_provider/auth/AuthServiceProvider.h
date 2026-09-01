@@ -32,6 +32,17 @@ public:
 	~AuthServiceProvider();
 
 	bool initService(void *arg = nullptr) override;
+
+/**
+ * Needs the stored credentials it authenticates against before it can
+ * come up.
+ */
+uint8_t getServiceDependencies(service_t *_out, uint8_t _max) const override {
+  uint8_t _n = 0;
+  if( _max > _n ) _out[_n++] = SERVICE_DATABASE;
+  return _n;
+}
+
 	bool isEssentialService() const override { return true; }
 	bool isAuthorized(const char *username, const char *password);
 

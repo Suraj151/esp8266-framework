@@ -126,11 +126,18 @@ bool MdnsServiceProvider::stopService() {
     pdiutil::safe_delete(m_udp);
     m_udp = nullptr;
   }
+  return ServiceProvider::stopService();
+}
+
+/**
+ * Forget that a certificate job is outstanding, since the stop drops the task
+ * that would have run it.
+ */
+void MdnsServiceProvider::resetServiceState() {
+
 #ifdef ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
-  // the base impl drops every tracked task, including a queued cert generation
   m_cert_task_pending = false;
 #endif
-  return ServiceProvider::stopService();
 }
 
 bool MdnsServiceProvider::addService(const char *type, const char *proto, uint16_t port) {

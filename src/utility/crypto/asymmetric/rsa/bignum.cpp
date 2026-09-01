@@ -10,13 +10,10 @@ created Date    : 1st Aug 2026
 
 #include "bignum.h"
 #include <utility/SafeAlloc.h>
-
-static bn_yield_fn s_yield_hook = nullptr;
-
-void bn_set_yield_hook(bn_yield_fn fn) { s_yield_hook = fn; }
+#include <utility/crypto/crypto_yield.h>
 
 static inline void s_yield() {
-    if (s_yield_hook) s_yield_hook();
+    crypto_yield();
 }
 
 static inline uint32_t word_at(const bignum *a, int32_t i) {

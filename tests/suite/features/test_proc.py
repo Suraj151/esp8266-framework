@@ -144,32 +144,32 @@ def kill_absent(t):
     expect_any(("no such", "not found", "CmdErr", "failed"), out, "kill of an absent pid")
 
 
-@test("srvc list names the running services", needs=("srvc",))
-def srvc_list(t):
-    out = t.run("srvc list")
-    expect_in("SERVICE", out, "srvc header")
-    expect_in("STATE", out, "srvc header")
+@test("service list names the running services", needs=("service",))
+def service_list(t):
+    out = t.run("service list")
+    expect_in("SERVICE", out, "service header")
+    expect_in("STATE", out, "service header")
 
     if not t.caps.services:
-        raise AssertionError("srvc listed no services:\n%s" % out)
+        raise AssertionError("service listed no services:\n%s" % out)
 
 
-@test("srvc status describes one service", needs=("srvc",))
-def srvc_status(t):
+@test("service status describes one service", needs=("service",))
+def service_status(t):
     name = next(iter(sorted(t.caps.services)), None)
     if name is None:
         raise Skip("no services listed on this target")
 
-    out = t.run("srvc status %s" % name)
-    expect_in("service", out, "srvc status")
+    out = t.run("service status %s" % name)
+    expect_in("service", out, "service status")
     expect_in(name, out, "the service it was asked about")
-    expect_in("state", out, "srvc status")
+    expect_in("state", out, "service status")
 
 
-@test("srvc status of an unknown service is refused", needs=("srvc",))
-def srvc_unknown(t):
-    expect_any(("no such service", "CmdErr"), t.run("srvc status nosuchsvc"),
-               "srvc status of a name that is not there")
+@test("service status of an unknown service is refused", needs=("service",))
+def service_unknown(t):
+    expect_any(("no such service", "CmdErr"), t.run("service status nosuchsvc"),
+               "service status of a name that is not there")
 
 
 @test("uptime reports a duration", needs=("uptime",))
@@ -427,10 +427,10 @@ def syslog_writes_to_file(t):
         raise AssertionError("syslog files exist but are all empty:\n%s" % "\n".join(logs))
 
 
-@test("srvc restarts a service and it stays active", needs=("srvc",), slow=True)
-def srvc_restart(t):
+@test("service restarts a service and it stays active", needs=("service",), slow=True)
+def service_restart(t):
     service = None
-    for line in t.run("srvc list").splitlines():
+    for line in t.run("service list").splitlines():
         parts = line.split()
         if len(parts) >= 2 and parts[0] in SAFE_SERVICES and parts[1] == "active":
             service = parts[0]
@@ -438,10 +438,10 @@ def srvc_restart(t):
     if service is None:
         raise Skip("no service safe to restart is active")
 
-    expect_in("restart", t.run("srvc restart %s" % service, timeout=15).lower(),
-              "srvc restart reports it acted")
+    expect_in("restart", t.run("service restart %s" % service, timeout=15).lower(),
+              "service restart reports it acted")
     time.sleep(1.5)
-    expect_in("active", t.run("srvc status %s" % service, timeout=10),
+    expect_in("active", t.run("service status %s" % service, timeout=10),
               "the service is active again after a restart")
 
 

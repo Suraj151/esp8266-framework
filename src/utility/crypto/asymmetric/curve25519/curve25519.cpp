@@ -7,6 +7,7 @@ Derived from public domain code by D. J. Bernstein.
 
 #include "curve25519.h"
 #include <utility/Base64.h>
+#include <utility/crypto/crypto_yield.h>
 
 static const unsigned char base[32] = {9};
 
@@ -172,6 +173,8 @@ void crypto_scalarmult(unsigned char *out, const unsigned char *scalar, const un
   a[0] = d[0] = 1;
   for (i = 254; i >= 0; --i)
   {
+    if ((i & 0x1F) == 0) crypto_yield();
+
     bit = (clamped[i >> 3] >> (i & 7)) & 1;
     swap25519(a, b, bit);
     swap25519(c, d, bit);

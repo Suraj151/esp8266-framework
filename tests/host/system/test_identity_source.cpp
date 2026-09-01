@@ -132,7 +132,7 @@ TEST(identity, a_plain_user_is_refused_the_root_only_commands)
     pditest::Shell shell;
     shell.run("su plainacct plainpw");
 
-    // srvc guards the same way, but it resolves the service name first, so it
+    // service guards the same way, but it resolves the service name first, so it
     // needs a service the build actually linked and is covered with the rest of
     // the process commands
     ASSERT_TRUE(saw(shell.run("useradd u=nope p=x"), "root required"));

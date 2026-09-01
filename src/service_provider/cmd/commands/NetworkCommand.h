@@ -75,11 +75,11 @@ struct NetworkCommand : public CommandBase {
 				cmdoptn1->optionvalsize == (sizeof(NETWORK_CMD_OPTION_IP)-1) && 
 				0 == strncmp(cmdoptn1->optionval, NETWORK_CMD_OPTION_IP, strlen(NETWORK_CMD_OPTION_IP)) 
 			){
-				ServiceProvider *srvc = ServiceProvider::getService(SERVICE_WIFI);
+				ServiceProvider *service = ServiceProvider::getService(SERVICE_WIFI);
 
-				if(nullptr != srvc){
+				if(nullptr != service){
 					
-					srvc->printStatusToTerminal(m_terminal);
+					service->printStatusToTerminal(m_terminal);
 				}
 			}else if( 
 				cmdoptn1->optionvalsize == (sizeof(NETWORK_CMD_OPTION_SCANSTA)-1) && 
@@ -144,7 +144,7 @@ struct NetworkCommand : public CommandBase {
 
 				__database_service.set_wifi_config_table( &_wifi_credentials );
 				__wifi_service.stopService();
-				__wifi_service.initService(&__i_wifi);
+				__wifi_service.startService(&__i_wifi);
 
 				m_terminal->writeln_ro(RODT_ATTR("Check Station Status after 10 second using 'net ip' command"));
 			}else{

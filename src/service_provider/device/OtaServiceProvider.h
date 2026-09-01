@@ -44,6 +44,20 @@ class OtaServiceProvider : public ServiceProvider{
     ~OtaServiceProvider();
 
     bool initService(void *arg = nullptr) override;
+
+    /**
+     * Needs its configuration, and the network it fetches over, before it can
+     * come up.
+     */
+    uint8_t getServiceDependencies(service_t *_out, uint8_t _max) const override {
+      uint8_t _n = 0;
+      if( _max > _n ) _out[_n++] = SERVICE_DATABASE;
+    #ifdef ENABLE_WIFI_SERVICE
+      if( _max > _n ) _out[_n++] = SERVICE_WIFI;
+    #endif
+      return _n;
+    }
+
     void handleOta();
     void handleOtaVersionRequest();
     void handleOtaVersionResponse( Http_Client *client );

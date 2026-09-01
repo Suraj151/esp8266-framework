@@ -34,6 +34,13 @@ public:
 
   bool initService(void *arg = nullptr) override;
   bool stopService() override;
+
+  /**
+   * Forget the resolved collector address, so a restart looks it up again
+   * rather than trusting what the last run found.
+   */
+  void resetServiceState() override;
+
   void printStatusToTerminal(iTerminalInterface *terminal) override;
 
   /* persist one assembled syslog line to file (and forward it when enabled) */

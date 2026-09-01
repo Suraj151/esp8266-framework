@@ -5,7 +5,7 @@ This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
 Covers the invariant service control rests on: a task a service owns is registered
-through the service task API, so srvc start/stop/disable reaches it. A task
+through the service task API, so service start/stop/disable reaches it. A task
 registered straight on the scheduler still runs, and would silently be beyond the
 reach of every one of those commands.
 

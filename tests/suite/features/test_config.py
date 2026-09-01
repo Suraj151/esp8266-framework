@@ -5,7 +5,7 @@ The /etc config surface and runtime service enable, on a real board.
 
 These cover what the host suite cannot: that a config file written by the device
 comes back off it intact, that a rewrite keeps the rest of the file, and that
-`srvc enable/disable` persists somewhere `cat` can see.
+`service enable/disable` persists somewhere `cat` can see.
 
 The service these act on is chosen at run time and is never one the session is
 arriving over, never an essential one, and is put back the way it was found. A
@@ -24,7 +24,7 @@ ESSENTIAL_CANDIDATES = ("CMD", "DB", "Serial", "Auth", "UserStore", "FactoryRese
 
 
 def _service_rows(text):
-    """`srvc list` rows as columns, header and blank lines dropped."""
+    """`service list` rows as columns, header and blank lines dropped."""
     rows = []
     for line in text.splitlines():
         parts = line.split()
@@ -35,9 +35,9 @@ def _service_rows(text):
 
 
 def _listed(t):
-    out = t.run("srvc list")
+    out = t.run("service list")
     if "SERVICE" not in out:
-        raise Skip("this build has no srvc list")
+        raise Skip("this build has no service list")
     return out
 
 
@@ -51,7 +51,7 @@ def _pick(t, candidates):
 
 
 def _status(t, name):
-    return t.run("srvc status %s" % name)
+    return t.run("service status %s" % name)
 
 
 def _field(text, key):
@@ -106,24 +106,24 @@ def ssh_conf_is_stable(t):
                              % (first, second))
 
 
-# --------------------------------------------------------------- srvc listing
+# --------------------------------------------------------------- service listing
 
-@test("the service listing carries an enabled column", needs=("srvc",))
-def srvc_list_has_enabled(t):
+@test("the service listing carries an enabled column", needs=("service",))
+def service_list_has_enabled(t):
     out = _listed(t)
-    expect_in("ENABLED", out, "srvc list has an ENABLED column")
+    expect_in("ENABLED", out, "service list has an ENABLED column")
 
     rows = _service_rows(out)
     if not rows:
-        raise AssertionError("srvc list showed no services:\n%s" % out)
+        raise AssertionError("service list showed no services:\n%s" % out)
 
     for parts in rows:
         if parts[2] not in ("yes", "no"):
             raise AssertionError("a service's enabled column is %r:\n%s" % (parts[2], out))
 
 
-@test("the service listing columns line up", needs=("srvc",))
-def srvc_list_columns_align(t):
+@test("the service listing columns line up", needs=("service",))
+def service_list_columns_align(t):
     """
     Fixed width columns, not tabs: every row must start its STATE column at the
     same offset, which is what a tab stop cannot guarantee once a name is long.
@@ -136,7 +136,7 @@ def srvc_list_columns_align(t):
             header = line
             break
     if header is None:
-        raise Skip("srvc list printed no header")
+        raise Skip("service list printed no header")
 
     at = header.index("STATE")
     for line in lines:
@@ -150,15 +150,15 @@ def srvc_list_columns_align(t):
                                  % (line.index(parts[1]), at, out))
 
 
-@test("a service reports the file it reads its options from", needs=("srvc",))
-def srvc_status_names_config(t):
+@test("a service reports the file it reads its options from", needs=("service",))
+def service_status_names_config(t):
     name = _pick(t, TOGGLE_CANDIDATES) or _pick(t, ESSENTIAL_CANDIDATES)
     if name is None:
         raise Skip("no service to ask about")
 
     out = _status(t, name)
     if "enabled" not in out:
-        raise Skip("this build's srvc status does not report enabled")
+        raise Skip("this build's service status does not report enabled")
 
     path = _field(out, "config")
     if path is None or not path.startswith("/etc/"):
@@ -168,7 +168,7 @@ def srvc_status_names_config(t):
 # ------------------------------------------------------------ enable/disable
 
 @test("disabling a service persists into its config file",
-      needs=("srvc", "cat"))
+      needs=("service", "cat"))
 def disable_persists(t):
     name = _pick(t, TOGGLE_CANDIDATES)
     if name is None:
@@ -176,11 +176,11 @@ def disable_persists(t):
 
     before = _status(t, name)
     if "enabled" not in before:
-        raise Skip("this build's srvc status does not report enabled")
+        raise Skip("this build's service status does not report enabled")
     path = _field(before, "config")
     was = _field(before, "enabled")
 
-    out = t.run("srvc disable %s" % name)
+    out = t.run("service disable %s" % name)
     if "root required" in out:
         raise Skip("this session is not root")
 
@@ -190,7 +190,7 @@ def disable_persists(t):
         after = _status(t, name)
         conf = t.run("cat %s" % path)
     finally:
-        t.run("srvc %s %s" % ("enable" if was != "no" else "disable", name))
+        t.run("service %s %s" % ("enable" if was != "no" else "disable", name))
 
     if _field(after, "enabled") != "no":
         raise AssertionError("%s still reports enabled after disable:\n%s" % (name, after))
@@ -200,7 +200,7 @@ def disable_persists(t):
         raise AssertionError("%s says enabled but not no:\n%s" % (path, conf))
 
 
-@test("enabling a service again puts it back", needs=("srvc", "cat"))
+@test("enabling a service again puts it back", needs=("service", "cat"))
 def enable_restores(t):
     name = _pick(t, TOGGLE_CANDIDATES)
     if name is None:
@@ -208,28 +208,28 @@ def enable_restores(t):
 
     before = _status(t, name)
     if "enabled" not in before:
-        raise Skip("this build's srvc status does not report enabled")
+        raise Skip("this build's service status does not report enabled")
     was = _field(before, "enabled")
 
-    out = t.run("srvc disable %s" % name)
+    out = t.run("service disable %s" % name)
     if "root required" in out:
         raise Skip("this session is not root")
 
-    t.run("srvc enable %s" % name)
+    t.run("service enable %s" % name)
     if was == "no":
-        t.at_exit(lambda: t.run("srvc disable %s" % name))
+        t.at_exit(lambda: t.run("service disable %s" % name))
     after = _status(t, name)
     if _field(after, "enabled") != "yes":
         raise AssertionError("%s did not come back enabled:\n%s" % (name, after))
 
 
-@test("a service the device needs refuses to be disabled", needs=("srvc",))
+@test("a service the device needs refuses to be disabled", needs=("service",))
 def essential_refuses_disable(t):
     name = _pick(t, ESSENTIAL_CANDIDATES)
     if name is None:
         raise Skip("this build lists no essential service")
 
-    out = t.run("srvc disable %s" % name)
+    out = t.run("service disable %s" % name)
     if "root required" in out:
         raise Skip("this session is not root")
 
@@ -240,13 +240,13 @@ def essential_refuses_disable(t):
         raise AssertionError("%s came back disabled and should not have:\n%s" % (name, after))
 
 
-@test("the shell survives an essential service being asked to stop", needs=("srvc", "pwd"))
+@test("the shell survives an essential service being asked to stop", needs=("service", "pwd"))
 def shell_survives_refusal(t):
     name = _pick(t, ESSENTIAL_CANDIDATES)
     if name is None:
         raise Skip("this build lists no essential service")
 
-    t.run("srvc disable %s" % name)
+    t.run("service disable %s" % name)
     out = t.run("pwd")
     if "/" not in out:
         raise AssertionError("the shell stopped answering after the refusal:\n%s" % out)
@@ -254,7 +254,7 @@ def shell_survives_refusal(t):
 
 # ------------------------------------------------------- service task tracking
 
-@test("a service's background tasks are attributed to it", needs=("srvc", "ps"))
+@test("a service's background tasks are attributed to it", needs=("service", "ps"))
 def service_tasks_are_named(t):
     listing = _listed(t)
     rows = _service_rows(listing)
@@ -268,12 +268,12 @@ def service_tasks_are_named(t):
 
     named = [name for name in owning if name in ps]
     if not named:
-        raise AssertionError("no service that claims tasks appears in ps:\nsrvc:\n%s\nps:\n%s"
+        raise AssertionError("no service that claims tasks appears in ps:\nservice:\n%s\nps:\n%s"
                              % (listing, ps))
 
 
 @test("the task count a service claims is the number ps shows for it",
-      needs=("srvc", "ps"))
+      needs=("service", "ps"))
 def service_task_count_agrees_with_ps(t):
     listing = _listed(t)
     ps = t.run("ps")
@@ -292,5 +292,5 @@ def service_task_count_agrees_with_ps(t):
             continue
         seen = ps_names.count(name)
         if seen == 0:
-            raise AssertionError("%s claims %s task(s) and ps shows none:\nsrvc:\n%s\nps:\n%s"
+            raise AssertionError("%s claims %s task(s) and ps shows none:\nservice:\n%s\nps:\n%s"
                                  % (name, claimed, listing, ps))

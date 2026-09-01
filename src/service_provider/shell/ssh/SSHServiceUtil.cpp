@@ -22,8 +22,11 @@ created Date    : 6th Apr 2025
 #include <utility/crypto/hmac/hmac_sha1.h>
 #include <utility/crypto/hmac/hmac_sha256.h>
 #include <utility/crypto/asymmetric/ed25519/ed25519.h>
+#include <utility/crypto/crypto_yield.h>
 
 using namespace LWSSH;
+
+static void ssh_bn_yield() { __i_dvc_ctrl.yield(); }
 
 static void compute_ssh_mac(uint8_t mac_len, const uint8_t *key, const uint8_t *data, uint32_t data_len, uint8_t *out){
     if (mac_len == 32) {
@@ -854,12 +857,14 @@ bool LWSSH::prepare_server_ecdh_reply(LWSSHSession* session,
         return false; // No active session or client
     }
 
-    // disable watchdog as key operations may take time
-    __i_dvc_ctrl.disableWdt();
+    // keep the watchdog fed through the long key operations by yielding from
+    // inside them; disabling it would stop the hardware feed as well
+    crypto_set_yield_hook(ssh_bn_yield);
 
     // 1. Generate ephemeral Curve25519 key pair for server
-    if (!create_server_ephemeral_keys(session->m_server_ephermeral_pubkey, 
+    if (!create_server_ephemeral_keys(session->m_server_ephermeral_pubkey,
         session->m_server_ephermeral_privkey, (pdiutil::vector<uint8_t>*)&server_host_privkey)) {
+        crypto_set_yield_hook(nullptr);
         return false; // Key generation failed
     }
 
@@ -896,8 +901,7 @@ bool LWSSH::prepare_server_ecdh_reply(LWSSHSession* session,
     ed25519_sign(signature.data(), session->m_exchange_hash_h, 32,
                  server_host_pubkey.data(), server_host_privkey.data());
 
-    // enable watchdog once time operations done
-    __i_dvc_ctrl.enableWdt();
+    crypto_set_yield_hook(nullptr);
     __i_dvc_ctrl.yield();
 
     // 5. Build SSH_MSG_KEX_ECDH_REPLY payload
@@ -919,8 +923,6 @@ bool LWSSH::prepare_server_ecdh_reply(LWSSHSession* session,
 
     return true;
 }
-
-static void ssh_bn_yield() { __i_dvc_ctrl.yield(); }
 
 /**
  * @brief Prepare the ECDH reply signed with an RSA host key.
@@ -945,12 +947,12 @@ bool LWSSH::prepare_server_ecdh_reply_rsa(LWSSHSession* session,
     // Route bignum yields through the device so the watchdog stays fed during
     // the long RSA sign. Do NOT disable the WDT: on esp8266 that also stops the
     // hardware-WDT feed, so a multi-second sign would reset the device.
-    bn_set_yield_hook(ssh_bn_yield);
+    crypto_set_yield_hook(ssh_bn_yield);
 
     // 1. Generate ephemeral Curve25519 key pair (random per session)
     if (!create_server_ephemeral_keys(session->m_server_ephermeral_pubkey,
         session->m_server_ephermeral_privkey, nullptr)) {
-        bn_set_yield_hook(nullptr);
+        crypto_set_yield_hook(nullptr);
         return false;
     }
 
@@ -988,7 +990,7 @@ bool LWSSH::prepare_server_ecdh_reply_rsa(LWSSHSession* session,
     size_t siglen = 0;
     bool signed_ok = rsa_sign_pkcs1(&key, hashalg, session->m_exchange_hash_h, 32, sigbuf, &siglen);
 
-    bn_set_yield_hook(nullptr);
+    crypto_set_yield_hook(nullptr);
     __i_dvc_ctrl.yield();
 
     if (!signed_ok) {
@@ -1519,7 +1521,10 @@ bool LWSSH::verify_pubkey_signature(LWSSHSession* session, const SSHUserAuthRequ
         pdiutil::vector<uint8_t> rawkey, rawsig;
         if (!extract_ed25519_blob_field(req.pubkey_blob, rawkey, ED25519_PUBKEY_SIZE)) return false;
         if (!extract_ed25519_blob_field(req.signature, rawsig, SSH_ED25519_SIG_SIZE)) return false;
-        return ed25519_verify(rawsig.data(), signed_data.data(), signed_data.size(), rawkey.data()) != 0;
+        crypto_set_yield_hook(ssh_bn_yield);
+        bool edok = ed25519_verify(rawsig.data(), signed_data.data(), signed_data.size(), rawkey.data()) != 0;
+        crypto_set_yield_hook(nullptr);
+        return edok;
 
     } else if (type == rsa) {
 
@@ -1539,10 +1544,10 @@ bool LWSSH::verify_pubkey_signature(LWSSHSession* session, const SSHUserAuthRequ
         if (ok) {
             // Keep the WDT enabled; the yield hook feeds it (disabling it stops
             // the esp8266 hardware-WDT feed).
-            bn_set_yield_hook(ssh_bn_yield);
+            crypto_set_yield_hook(ssh_bn_yield);
             ok = rsa_verify_pkcs1(key, alg, signed_data.data(), signed_data.size(),
                                   rawsig.data(), rawsig.size());
-            bn_set_yield_hook(nullptr);
+            crypto_set_yield_hook(nullptr);
         }
         pdiutil::safe_delete(key);
         return ok;

@@ -40,6 +40,12 @@ EmailServiceProvider::~EmailServiceProvider()
 bool EmailServiceProvider::initService(void *arg)
 {
   this->m_client = static_cast<iClientInterface*>(arg);
+
+  if (nullptr == this->m_client)
+  {
+    this->m_client = __i_instance.getSharedTcpClientInstance();
+  }
+
   this->m_mail_handler_cb_id = 0;
 
   return ServiceProvider::initService(arg);

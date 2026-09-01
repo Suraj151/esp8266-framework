@@ -51,12 +51,51 @@ DeviceIotServiceProvider::~DeviceIotServiceProvider(){
 }
 
 /**
+ * Drop the registration token, the sampling position and everything the
+ * server last configured, so a restart asks for its config again.
+ */
+void DeviceIotServiceProvider::resetServiceState(){
+
+  this->m_token_validity = false;
+  this->m_sample_index = 0;
+  this->m_handle_channel_write_asap = false;
+
+  this->m_handle_sensor_data_cb_id = 0;
+  this->m_mqtt_connection_check_cb_id = 0;
+  this->m_device_config_request_cb_id = 0;
+
+  this->m_server_configurable_device_id = 0;
+  this->m_server_configurable_sample_per_publish = SENSOR_DATA_SAMPLING_PER_PUBLISH;
+  this->m_server_configurable_sensor_data_publish_freq = SENSOR_DATA_PUBLISH_FREQ;
+  this->m_server_configurable_mqtt_keep_alive = MQTT_DEFAULT_KEEPALIVE;
+  this->m_server_configurable_channel_port = DEVICE_IOT_DEFAULT_CHANNEL_DATA_PORT;
+
+  memset(this->m_server_configurable_channel_host, 0, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE);
+  memset(this->m_server_configurable_channel_write, 0, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE);
+  memset(this->m_server_configurable_channel_read, 0, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE);
+  memset(this->m_server_configurable_channel_token, 0, DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE);
+
+  this->m_server_configurable_interface_read.clear();
+  this->m_server_configurable_interface_write.clear();
+}
+
+/**
  * start device registration services if enabled
  */
 bool DeviceIotServiceProvider::initService( void *arg ){
 
+  iClientInterface *_client = reinterpret_cast<iClientInterface*>(arg);
+
+  if( nullptr == _client ){
+#ifdef ENABLE_TLS_SERVICE
+    _client = __i_instance.getSharedTlsClientInstance();
+#else
+    _client = __i_instance.getSharedTcpClientInstance();
+#endif
+  }
+
   if( nullptr != this->m_http_client ){
-    this->m_http_client->SetClient(reinterpret_cast<iClientInterface*>(arg));
+    this->m_http_client->SetClient(_client);
   }
 
   // __task_scheduler.setInterval( [&]() { this->handleDeviceIotConfigRequest(); }, HTTP_REQUEST_DURATION, __i_dvc_ctrl.millis_now() );
@@ -370,7 +409,7 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
 
   // handle channel write action as soon as possible to reflect applied json payload
   __device_iot_service.m_handle_channel_write_asap = true;
-  this->serviceSetTimeout( [&]() { __device_iot_service.handleSensorData(); }, 1, __i_dvc_ctrl.millis_now() );
+  __device_iot_service.serviceSetTimeout( [&]() { __device_iot_service.handleSensorData(); }, 1, __i_dvc_ctrl.millis_now() );
 
   // handle reconfiguration request
   char *_value_buff = pdiutil::safe_new_array<char>(50);
@@ -380,7 +419,7 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
     uint16_t reconfigure = StringToUint16( _value_buff, 6 );
     if( _json_result && reconfigure == 1 ){
       LogI("Reconfiguring...\n");
-      this->serviceSetTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
+      __device_iot_service.serviceSetTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
     }
   }
 
@@ -689,13 +728,7 @@ void DeviceIotServiceProvider::handleSensorData(){
       this->serviceSetTimeout( [&]() { __mqtt_service.handleMqttPublish(true); }, 1, __i_dvc_ctrl.millis_now(), DEFAULT_TASK_PRIORITY+1 );
       __task_scheduler.rebaseAndRestartPrioTasks();
 
-      memset( __mqtt_service.m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
-      if( _payload.size()+1 < MQTT_PAYLOAD_BUF_SIZE ){
-        // _payload.toCharArray( __mqtt_service.m_mqtt_payload, _payload.size()+1);
-        strncpy(__mqtt_service.m_mqtt_payload, _payload.c_str(), _payload.size()); 
-      }else{
-        strcat( __mqtt_service.m_mqtt_payload, RODT_ATTR("mqtt data is too big to fit in buffer !"));
-      }
+      __mqtt_service.setMqttPayload( _payload.c_str(), _payload.size() );
 #endif
     }else{
 

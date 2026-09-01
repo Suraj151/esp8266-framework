@@ -70,9 +70,19 @@ bool SyslogServiceProvider::stopService() {
     pdiutil::safe_delete(m_udp);
     m_udp = nullptr;
   }
-  m_resolved = false;
 #endif
   return ServiceProvider::stopService();
+}
+
+/**
+ * Forget the resolved collector address, so a restart looks it up again rather
+ * than trusting what the last run found.
+ */
+void SyslogServiceProvider::resetServiceState() {
+
+#ifdef ENABLE_SYSLOG_FORWARD
+  m_resolved = false;
+#endif
 }
 
 void SyslogServiceProvider::sink(logger_type_t log_type, const char *line, uint16_t len) {

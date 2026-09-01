@@ -80,6 +80,23 @@ class HttpServer : public ServiceProvider{
     bool initService(void *arg = nullptr) override;
 
     /**
+     * Needs the network it serves on before it can come up.
+     */
+    uint8_t getServiceDependencies(service_t *_out, uint8_t _max) const override {
+      uint8_t _n = 0;
+    #ifdef ENABLE_WIFI_SERVICE
+      if( _max > _n ) _out[_n++] = SERVICE_WIFI;
+    #endif
+      return _n;
+    }
+
+    /**
+     * Closes the listener, so a stopped http service refuses a request rather
+     * than holding the browser open on a port nothing is serving.
+     */
+    bool stopService() override;
+
+    /**
      * @brief Handles incoming client requests.
      *
      * This method processes client requests and routes them to the appropriate

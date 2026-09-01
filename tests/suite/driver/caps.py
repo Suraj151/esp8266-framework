@@ -5,7 +5,7 @@ What the target in front of us can actually do.
 
 A board is built with a subset of the services and commands, and which subset
 is a compile time decision the test suite has no way to know in advance. So it
-asks: `help` for the commands, `mount` and `df` for the filesystems, `srvc
+asks: `help` for the commands, `mount` and `df` for the filesystems, `service
 list` for the services. A test that names something absent is skipped with the
 reason, which is very different from failing.
 """
@@ -19,7 +19,7 @@ HELP_HEADER = re.compile(r"Registered commands \((\d+)\)")
 # `mount` prints PREFIX / TYPE / NAME, `df` prints MOUNT / NAME / sizes
 PATH_ROW = re.compile(r"^\s*(/\S*)\s+(\S+)")
 
-# `srvc list` prints SERVICE / STATE / TASKS / R/S/Z
+# `service list` prints SERVICE / STATE / TASKS / R/S/Z
 SERVICE_ROW = re.compile(r"^\s*(\S+)\s+(inactive|active|stopped|dead)\b")
 
 
@@ -41,7 +41,7 @@ class Capabilities(object):
             caps._probe_mounts(shell)
         if "df" in caps.commands:
             caps._probe_filesystems(shell)
-        if "srvc" in caps.commands:
+        if "service" in caps.commands:
             caps._probe_services(shell)
 
         return caps
@@ -75,7 +75,7 @@ class Capabilities(object):
                 self.filesystems.add(found.group(2))
 
     def _probe_services(self, shell):
-        for line in self._safe(shell, "srvc list").splitlines():
+        for line in self._safe(shell, "service list").splitlines():
             found = SERVICE_ROW.match(line)
             if found:
                 self.services[found.group(1)] = found.group(2)

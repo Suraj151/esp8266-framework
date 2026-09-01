@@ -32,6 +32,7 @@ public:
 
 	bool initService(void *arg = nullptr) override;
 	bool isEssentialService() const override { return true; }
+	terminal_types_t getServiceTerminalType() const override { return TERMINAL_TYPE_SERIAL; }
 	void processSerial(serial_event_t *se);
 
 	void appendSerialJsonPayload(pdiutil::string &_payload, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);

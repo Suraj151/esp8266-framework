@@ -59,12 +59,30 @@ GpioServiceProvider::~GpioServiceProvider(){
 }
 
 /**
+ * Forget the http post task id and ask for the pin table to be reloaded, the
+ * way a service that has never run yet asks for it.
+ */
+void GpioServiceProvider::resetServiceState(){
+
+  this->m_gpio_http_request_cb_id = 0;
+  this->m_update_gpio_table_from_copy = true;
+}
+
+/**
  * Init gpio services if enabled
  */
 bool GpioServiceProvider::initService(void *arg){
 
 #ifdef ENABLE_HTTP_CLIENT
   iClientInterface* _client = static_cast<iClientInterface*>(arg);
+
+  if( nullptr == _client ){
+#ifdef ENABLE_TLS_SERVICE
+    _client = __i_instance.getSharedTlsClientInstance();
+#else
+    _client = __i_instance.getSharedTcpClientInstance();
+#endif
+  }
 
   if( nullptr == _client ){
     return false;

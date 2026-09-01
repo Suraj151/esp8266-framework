@@ -39,6 +39,22 @@ public:
   ~GpioServiceProvider();
 
   bool initService(void *arg = nullptr) override;
+
+  /**
+   * Forget the http post task id and ask for the pin table to be reloaded, the
+   * way a service that has never run yet asks for it.
+   */
+  void resetServiceState() override;
+
+  /**
+   * Needs its pin configuration before it can come up.
+   */
+  uint8_t getServiceDependencies(service_t *_out, uint8_t _max) const override {
+    uint8_t _n = 0;
+    if( _max > _n ) _out[_n++] = SERVICE_DATABASE;
+    return _n;
+  }
+
   void enable_update_gpio_table_from_copy(void);
   bool isAllowedGpioPin(uint8_t _pin, pdiutil::vector<pdiutil::string> *allowedlist);
   void appendGpioJsonPayload(pdiutil::string &_payload, bool isEventPost = false, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
@@ -58,7 +74,6 @@ public:
   bool handleGpioHttpRequest(bool isEventPost = false);
 #endif
   void printConfigToTerminal(iTerminalInterface *terminal) override;
-
 
   /**
    * @var gpio_config_table m_gpio_config_copy

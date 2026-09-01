@@ -14,13 +14,13 @@ What comes out of the box is closer to a small system than to a sketch template:
 
 **It runs on your laptop too.** One of those adapters targets plain POSIX, so the same firmware builds as a host process you can ssh into, copy files to and open the portal on. That is how the test suite exercises the framework before a board is involved — see [§17](#17-test-suite).
 
-**Services.** WiFi with captive portal, HTTP/HTTPS web portal, MQTT client, OTA updates, SSH server, Telnet server, SFTP subsystem, SMTP client, GPIO control (locally and over MQTT/HTTP), an NVM-backed configuration database, TLS via BearSSL or mbedTLS, ESPNOW mesh, authentication, and a device-IoT hook for your own cloud. Each one is a `ServiceProvider` with the same lifecycle, and `srvc list / status / start / stop / restart` drives them at runtime the way systemd drives units.
+**Services.** WiFi with captive portal, HTTP/HTTPS web portal, MQTT client, OTA updates, SSH server, Telnet server, SFTP subsystem, SMTP client, GPIO control (locally and over MQTT/HTTP), an NVM-backed configuration database, TLS via BearSSL or mbedTLS, an mDNS/DNS-SD responder, syslog, ESPNOW mesh, authentication with a user store, and a device-IoT hook for your own cloud. Each is a `ServiceProvider` with the same lifecycle, and `service` drives them the way `systemctl` drives units: `list`, `status`, `start`, `stop`, `restart`, `enable`, `disable`. `stop` releases what the service holds, so `service stop SSH` gives up port 22 rather than parking it, and nothing lets you stop the service carrying the session you are typing on.
 
-**A real shell.** The same fifty-odd commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `net`, `host`, `ping`, `date`, `useradd`, `passwd`, `watch` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
+**A real shell.** The same fifty-odd commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `fedit`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `service`, `exec`, `net`, `host`, `ping`, `date`, `uptime`, `useradd`, `su`, `passwd`, `db`, `sshkgen`, `watch` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
 
 **Commands join up.** Output pipes from one command into the next and redirects to and from files, so `ps | grep ssh`, `cat /proc/meminfo > /tmp/mem.txt` and `wc < /home/notes.txt` all mean what they mean on a desktop — see [§7.7](#77-pipes-and-redirection).
 
-**A filesystem with users.** Several backends mount into one tree and are routed by longest prefix: LittleFS at the root, a read-only `/proc` of live system nodes, a writable `/sys` where GPIO pins are files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with `null`/`zero`/`random`, and a RAM-backed `/tmp`. Permissions, ownership and per-session umask are enforced in the VFS layer, so `/etc/passwd` and `/etc/shadow` mean what they say and two logged-in users genuinely see different access.
+**A filesystem with users.** Several backends mount into one tree and are routed by longest prefix: LittleFS at the root, a read-only `/proc` of live system nodes covering memory, mounts, a directory per running task and the network under `/proc/net`, a writable `/sys` where GPIO pins and network interfaces are files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with `null`/`zero`/`random`, and a RAM-backed `/tmp`. Permissions, ownership and per-session umask are enforced in the VFS layer, so `/etc/passwd` and `/etc/shadow` mean what they say and two logged-in users genuinely see different access.
 
 **Scheduling that scales down and up.** Tasks run inline, cooperatively, or preemptively on a hardware tick, with priorities, POSIX nice values and per-task signals. Where the port supplies a loader, an external program image can be loaded from the filesystem and launched as a background process — `exec <path>` returns a pid you can `ps` and `kill`, no reflash involved.
 
@@ -57,7 +57,7 @@ Not every board exposes every capability. An Arduino UNO has no WiFi, so the web
 
 ## What's Inside
 
-**Services** — WiFi · HTTP/S server · MQTT · OTA · SSH · Telnet · SFTP · SMTP · GPIO · Serial · Terminal · Database · TLS · ESPNOW · Auth · Device-IoT.
+**Services** — WiFi · HTTP/S server · MQTT · OTA · SSH · Telnet · SFTP · SMTP · GPIO · Serial · Terminal · Database · User store · Auth · TLS · mDNS · Syslog · ESPNOW · Factory reset · Device-IoT.
 Per-service reference in [§6 Service Providers](#6-service-providers).
 
 **Utilities** — task scheduler, event bus, queues, string helpers, data converters, crypto, PdiSTL, factory reset.
@@ -191,7 +191,9 @@ ServiceProvider(service_t st, const char *_svc_name)
 }
 ```
 
-The base class fixes the lifecycle. `initService` is the required override and runs once from `PDIStack::initialize`. `stopService` tears down. `printConfigToTerminal` and `printStatusToTerminal` are what the `srvc` command prints. A static `getService(st)` lets one service find another without include cycles. Because the shape is uniform, `srvc` can enumerate, start, stop and inspect anything without knowing what it is.
+The base class fixes the lifecycle. `initService` is the required override, and callers never reach for it directly — `startService` wraps it and records what it returned, which is the state both `PDIStack::initialize` and the `service` command read. `stopService` tears down and records its own; an override calls the base to clear the tracked tasks. `getServiceDependencies` names what the service `Requires`, `printConfigToTerminal` and `printStatusToTerminal` supply what `service status` prints, and a static `getService(st)` lets one service find another without include cycles.
+
+Because the shape is uniform, `service` can enumerate, start, stop and inspect anything without knowing what it is.
 
 Start reading at [src/service_provider/ServiceProvider.h](src/service_provider/ServiceProvider.h).
 
@@ -242,8 +244,7 @@ boot
  │
  ├─ static init of the PdiStack global
  │     ├─ event bus starts
- │     ├─ scheduler gets its utility interface
- │     └─ (WiFi builds) a TCP or TLS client instance is created
+ │     └─ scheduler gets its utility interface
  │
 setup()
  │
@@ -277,7 +278,7 @@ A small set of well-known globals, all prefixed `__`, so any of them can be foun
 | `__i_cooperative_scheduler`, `__i_preemptive_scheduler` | threading port | the contextual lanes |
 | `PdiStack` | orchestrator | the single application-facing facade |
 
-Services reach each other by global symbol when the dependency is fixed, and through `ServiceProvider::getService(st)` when the lookup has to stay generic — which is exactly what `srvc` does.
+Services reach each other by global symbol when the dependency is fixed, and through `ServiceProvider::getService(st)` when the lookup has to stay generic — which is exactly what `service` does.
 
 ---
 ## 2. Build & Toolchain
@@ -404,7 +405,7 @@ The responder is written from scratch on raw lwIP UDP — `udp_*` plus `igmp_joi
                 └─ SRV / TXT            →  port + metadata, bundled with A
 ```
 
-It advertises what the build is actually listening on: `_http._tcp` or `_https._tcp`, `_ssh._tcp`, `_sftp-ssh._tcp`, `_telnet._tcp`. Outbound clients such as MQTT and OTA listen for nothing, so nothing is advertised for them. `cat /etc/hostname` shows the name, `ping pdi-<xxxxxx>.local` proves it resolves, and `srvc status MDNS` lists the address and the advertised set. Service types, TTLs and the multicast group live in [src/config/MdnsConfig.h](src/config/MdnsConfig.h).
+It advertises what the build is actually listening on: `_http._tcp` or `_https._tcp`, `_ssh._tcp`, `_sftp-ssh._tcp`, `_telnet._tcp`. Outbound clients such as MQTT and OTA listen for nothing, so nothing is advertised for them. `cat /etc/hostname` shows the name, `ping pdi-<xxxxxx>.local` proves it resolves, and `service status MDNS` lists the address and the advertised set. Service types, TTLs and the multicast group live in [src/config/MdnsConfig.h](src/config/MdnsConfig.h).
 
 With runtime certificate generation on, the responder is also what provisions the HTTPS certificate. It is the one place holding both the address and the name, so the certificate it asks for carries `<hostname>.local` as a DNS subject alt name alongside the IP, and `https://pdi-<xxxxxx>.local/` matches it. Key generation wants several kB of stack and runs for seconds, so the responder queues it on the scheduler instead of doing the work in the event callback.
 
@@ -657,10 +658,11 @@ Values are written with CRLF, the same line ending `fedit` writes and `putln()` 
 **Runtime service enable.** Every service reads `enabled yes|no` from its own conf file at boot, so what runs stops being a compile-time decision:
 
 ```
-srvc list                # SERVICE  STATE  ENABLED  TASKS  R/S/Z
-srvc status MQTT         # state, enabled, and the file it came from
-srvc disable MQTT        # persists, and stops it now
-srvc enable MQTT         # persists; starts on the next boot
+service list                # SERVICE  STATE  ENABLED  TASKS  R/S/Z
+service status MQTT         # state, enabled, and the file it came from
+service disable MQTT        # persists; takes effect on the next boot
+service enable MQTT         # persists; starts on the next boot
+service stop MQTT           # tears it down immediately, leaving the conf file alone
 ```
 
 Both are root-only. A service the device cannot be recovered without — the database, the command line, the serial console, auth, the user store and factory reset — reports `enabled yes` and refuses to be turned off, from the command *and* from a hand-edited conf file. On a board with one console there is no equivalent of walking to the machine.
@@ -747,7 +749,7 @@ Every registration call takes a trailing name and owner. Fill them in — that i
 | attach an owning session | `setTaskOwner(id, sid)` |
 | change nice, -20..19 | `setTaskNice(id, nice)`, then rebase for an immediate re-sort |
 | queue a signal on one task | `sendSignal(id, sig)` |
-| signal every task with a name | `sendSignalByName(name, sig, requester, is_root)` — this is what `pkill` and `srvc stop` use |
+| signal every task with a name | `sendSignalByName(name, sig, requester, is_root)` — this is what `pkill` and `killall` use |
 | promote a task to a lane | `scheduleUnderExecSched(sched, id, mode, stack)` |
 
 ### 4.5 What happens on a tick
@@ -859,18 +861,20 @@ Root may signal any task; anyone else only tasks owned by their own session. All
 Services are driven the same way, one level up:
 
 ```
-  srvc list             every service: state, enabled, and task count
-  srvc status <name>    that service's state, config file and the pids it owns
-  srvc start <name>     CONT every task the service owns
-  srvc stop <name>      STOP every task the service owns   (a freeze, not a teardown)
-  srvc restart <name>   stop, then start
-  srvc enable <name>    persist "enabled yes" in the service's own conf file
-  srvc disable <name>   persist "enabled no", and stop it now
+  service list             every service: state, enabled, and task count
+  service status <name>    that service's state, config file and the pids it owns
+  service start <name>     bring it up from cold
+  service stop <name>      real teardown: listener, connections and every tracked task
+  service restart <name>   stop, then start
+  service enable <name>    persist "enabled yes" in the service's own conf file
+  service disable <name>   persist "enabled no"
 ```
 
-All of these except `list` and `status` need root. Ownership is tracked per service rather than per task name, so renaming a task never breaks service control.
+All of these except `list` and `status` need root. Ownership is tracked per service rather than per task name, so renaming a task never breaks service control. None of the verbs signal a task: `stop` releases what the service holds, so `service stop SSH` gives up port 22 and closes its sessions.
 
-`start`/`stop` are a freeze and a thaw of the current run; `enable`/`disable` decide what happens on the next boot, and are the ones that survive a restart — see [§3.10](#310-the-etc-config-surface).
+`stop` and `restart` refuse two services: an essential one, and the service carrying the session the command is typed on — otherwise `service stop SSH` over SSH would drop the connection mid-command. `start` and `restart` refuse while a service the target `Requires` is inactive, and name it.
+
+Each service's own start and stop record its state: `active` once its init reports success, `failed` when that init says it did not come up, `inactive` before the first start and after a stop. A service that merely holds a task does not count as running. `enable`/`disable` decide what happens on the next boot and are the pair that survives a restart — see [§3.10](#310-the-etc-config-surface).
 
 ---
 ## 5. Database Layer
@@ -917,7 +921,7 @@ A device with storage runs on a container file and keeps the eeprom as the defau
 
 `resolve_tiers()` prefers the container and falls back to running directly on the eeprom when there is no storage service or the container cannot be opened. A container that never existed, or one that was wiped, is rebuilt from the eeprom defaults on the next boot.
 
-The eeprom is opened only for the length of a defaults copy, so on a device running the container tier it holds no RAM at all — on esp8266 that is 4 KB that used to be a permanent shadow buffer.
+The eeprom is opened only for the length of a defaults copy, so on a device running the container tier it holds no RAM at all — 4 KB on esp8266 that stays available to everything else.
 
 A single container file is used rather than one file per table: LittleFS runs a 4096-byte block and a 64-byte inline limit, so most tables would each claim a whole block. One container costs one block, and every write is an in-place `editFile()` at its offset, which keeps the mode and owner the file was created with.
 
@@ -1063,7 +1067,7 @@ public:
 extern XServiceProvider __x_service;
 ```
 
-The global is `__<name>_service`. The constructor hands the base a `service_t` value and a flash-resident name, and the base registers it so `srvc` can find it without knowing what it is.
+The global is `__<name>_service`. The constructor hands the base a `service_t` value and a flash-resident name, and the base registers it so `service` can find it without knowing what it is.
 
 Background work goes through the base's scheduling wrappers rather than the scheduler directly:
 
@@ -1076,16 +1080,16 @@ Background work goes through the base's scheduling wrappers rather than the sche
             and the returned id recorded in m_service_task_ids[]
                   │
                   └─▶ that list is what makes `ps` show a sensible name,
-                      `pkill <Service>` work, and `srvc stop` freeze the right tasks
+                      `pkill <Service>` work, and `service stop` reap the right tasks
 ```
 
 The tracked list is fixed-size — six slots by default. `stopService` in the base reaps every one of them, so an override is only needed when you also have sockets or buffers to release; call the base at the end when you do write one. If you ever register a task straight on the scheduler, hand its id to `trackServiceTask(id)` so it is not orphaned on stop.
 
 Persisted configuration always goes through the database service accessors, never `__i_db`. Cross-service reactions go through `__utl_event`, never direct calls — that is what keeps the dependency graph one-directional.
 
-The base also offers `signalAllServiceTasks(sig)`, `countServiceTasks(...)` and the task-id iterators; those are what the `srvc` command renders.
+The base also offers `signalAllServiceTasks(sig)`, `countServiceTasks(...)` and the task-id iterators; those are what the `service` command renders.
 
-A new service is runtime-toggleable for free. The base reads `enabled` from `/etc/x/x.conf` before anything starts and `PDIStack::initialize` gates the `initService` call on `isServiceEnabled()`. Override `getServiceConfigPath` only if the feature genuinely cannot use the derived path. Override `isEssentialService()` to return true only if the device genuinely cannot be recovered without the service; that puts it beyond the reach of `srvc disable` *and* of a hand-edited conf file.
+A new service is runtime-toggleable for free. The base reads `enabled` from `/etc/x/x.conf` before anything starts and `PDIStack::initialize` gates the `startService` call on `isServiceEnabled()`. Override `getServiceConfigPath` only if the feature genuinely cannot use the derived path. Override `isEssentialService()` to return true only if the device genuinely cannot be recovered without the service; that puts it beyond the reach of `service disable` *and* of a hand-edited conf file.
 
 ### 6.2 Service reference
 
@@ -1261,7 +1265,7 @@ The most expensive service in the framework, and the most capable: a full SSH se
 ```
   version exchange
         │
-  KEXINIT ──▶ pick host-key algorithm from what we actually hold
+  KEXINIT ──▶ pick host-key algorithm from the keys the device holds
         │     curve25519-sha256 · aes128-ctr · hmac-sha2-256 or hmac-sha1
         │
   KEXDH ────▶ sign the exchange hash with the host key
@@ -1290,7 +1294,7 @@ Up to `PDI_MAX_SESSIONS` sessions run at once across serial, telnet and SSH, eac
 
 #### 6.2.16 TLS (no provider; transport hookup + cert provisioning)
 
-TLS has no service class either — it lives at the interface and port level, and anything that asks the instance factory for a client gets a TLS one when the flag is on. That single substitution is what puts OTA, MQTT, email, IoT and GPIO posting on TLS without any of them knowing.
+TLS has no service class either — it lives at the interface and port level. `iInstanceInterface` hands out the one outbound client the services share, built on first call and kept: `getSharedTcpClientInstance()` and, in a TLS build, `getSharedTlsClientInstance()`. Two literal accessors rather than one that quietly returns whichever is compiled in, so a caller picks its transport and the call site says which. OTA, device-IoT and GPIO posting take the TLS client where the flag is on and the TCP one otherwise. **Email is TCP only** — the SMTP path carries no TLS support. MQTT builds a client of its own instead of sharing.
 
 BearSSL backs the ESP8266 port and mbedTLS the ESP32 one. Certificates and keys are read from the filesystem at runtime, defaulting to `/etc/http/server.crt`, `/etc/http/server.key`, `/etc/http/client-ca.crt` and `/etc/ssl/ca-bundle.crt`.
 
@@ -1311,7 +1315,7 @@ The user directory, in two files:
 
 The API is what you'd expect — look up by name or uid, add a user (writing both files, rolling the passwd row back if the shadow write fails), remove a user, verify a password with a constant-time compare, set a password.
 
-On first start, if `/etc/passwd` is absent, it seeds root from the bootstrap credential row and hashes that password into shadow. The seeding is idempotent, and every boot re-stamps shadow as `0600` in case an older build left it readable.
+On first start, if `/etc/passwd` is absent, it seeds root from the bootstrap credential row and hashes that password into shadow. The seeding is idempotent, and every boot re-stamps shadow as `0600`, so a file that turns up readable is corrected rather than trusted.
 
 Verifying or changing a password has to read shadow on behalf of a non-root session, so those two methods — and only those two — bracket the access in the privileged scope described in [§6.2.11](#6211-storage-interface-init-no-provider). `useradd` gives each user their own group by setting gid to uid.
 
@@ -1336,7 +1340,7 @@ SSH attaches its session as soon as user auth succeeds, so authorisation state i
 
 #### 6.2.19 `MdnsServiceProvider` — `__mdns_service`
 
-The responder from [§2.4.2](#242-mdns-and-dns-sd), running as an ordinary service on raw lwIP UDP. It derives the hostname from the MAC, writes `/etc/hostname`, joins the multicast group when the station gets an IP, and advertises whichever servers this build is running. Responses bundle PTR, SRV, TXT and A so a single query gets everything it needs. `srvc status MDNS` shows what it is announcing.
+The responder from [§2.4.2](#242-mdns-and-dns-sd), running as an ordinary service on raw lwIP UDP. It derives the hostname from the MAC, writes `/etc/hostname`, joins the multicast group when the station gets an IP, and advertises whichever servers this build is running. Responses bundle PTR, SRV, TXT and A so a single query gets everything it needs. `service status MDNS` shows what it is announcing.
 
 Holding both the address and the name also makes it the right owner of HTTPS certificate provisioning: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` it schedules `ensureServerCert` for `<hostname>.local` plus the IP, one queued job at a time, dropped again if the service stops ([§6.2.16](#6216-tls-no-provider-transport-hookup--cert-provisioning)).
 
@@ -1358,7 +1362,7 @@ The orchestrator starts services in a deliberate order:
   11  storage         filesystem up — SSH depends on it
   12  web server      needs auth and storage
   13  telnet, ssh     need network, storage and the CLI
-  14  cmd             last, so `srvc` sees a complete list
+  14  cmd             last, so `service` sees a complete list
 ```
 
 Two things follow from that. A service started later may call into one started earlier; the reverse is not defined. And a service that needs another one in its *constructor* is relying on static-init order — move the lookup into `initService`.
@@ -1397,9 +1401,9 @@ Say you want a metrics service.
        return ServiceProvider::initService(arg);
    }
    ```
-   That alone makes it visible in `ps`, killable with `pkill Metrics`, and controllable with `srvc stop Metrics`.
+   That alone makes it visible in `ps`, killable with `pkill Metrics`, and controllable with `service stop Metrics`.
 4. Include it and call its `initService` from the orchestrator, in the right slot per [§6.3](#63-init-order).
-5. Implement the two print hooks so `srvc` has something to show, and add a command or a web page if it deserves one.
+5. Implement the two print hooks so `service` has something to show, and add a command or a web page if it deserves one.
 6. React to other services through events rather than by calling them.
 
 Two habits keep services well-behaved. Do the real work in `initService`, not in the constructor — at construction time the device globals do not exist yet. And prefer value members or static buffers to heap allocation, since these devices stay up for months at a time.
@@ -1603,7 +1607,7 @@ Not implemented yet: `;`, `&&` and `||`. They need a per-command exit status, wh
 | passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c | Change your own password; prompts in three echo-suppressed phases when arguments are omitted. |
 | useradd u=\<user> p=\<pass> | u, p | Root only. Next free uid, gid equal to uid, home `/`. Writes both user files. |
 | userdel u=\<user> | u | Root only. Removes from both files; refuses root and self. |
-| srvc list \| status \| start \| stop \| restart | positional | Service supervisor. `list` shows state per service, `status <name>` adds tracked pids and that service's own detail, and start/stop/restart signal every task it owns. Root for the last three. e.g. **srvc status MDNS** |
+| service list \| status \| start \| stop \| restart \| enable \| disable | positional | Service control. `list` shows state, enabled and task count per service; `status <name>` adds tracked pids and that service's own detail; `start`/`stop`/`restart` bring a service up from cold and tear it down for real; `enable`/`disable` persist `enabled` for the next boot. Root for all but the first two. e.g. **service status MDNS** |
 | ps [\<sid>] | | Tasks with owner, state, %CPU, run count, interval and name, read from `/proc`; optional owner filter. |
 | top | i=, n=, u= | The `ps` view on a repeating tick — interval, iteration bound, owner filter. Ctrl+C stops it. |
 | kill [\<sig>] \<pid> | | Signal a task: 9 KILL, 15 TERM, 18 CONT, 19 STOP. One argument is a pid, two are signal then pid. |
@@ -2126,7 +2130,7 @@ Files split by level, because level is the only identity a line carries. Each fi
 
 Read them like any other file — `cat /var/log/syslog.error`, `tail /var/log/syslog.info 20`, `grep MQTT /var/log/syslog.info`.
 
-Remote forwarding builds the datagram directly on the UDP interface, with no vendor syslog library: `<PRI>timestamp hostname pdi: message`, where PRI comes from the level under the `local0` facility, the timestamp comes from NTP once synced, and the hostname is the device address. The collector host is resolved through the name resolver once the station has an IP, and `srvc status syslog` shows the target, whether it resolved, and the socket state. File writing and forwarding are independent — files work with no network at all, and forwarding rides on top when there is one.
+Remote forwarding builds the datagram directly on the UDP interface, with no vendor syslog library: `<PRI>timestamp hostname pdi: message`, where PRI comes from the level under the `local0` facility, the timestamp comes from NTP once synced, and the hostname is the device address. The collector host is resolved through the name resolver once the station has an IP, and `service status syslog` shows the target, whether it resolved, and the socket state. File writing and forwarding are independent — files work with no network at all, and forwarding rides on top when there is one.
 
 Two things follow from the design. Levels are compile-time, so turning `LogI` back on means a rebuild. And the logger shares the serial terminal with the shell, so on a single-UART board their output interleaves — which is exactly what you want while watching a device boot.
 
@@ -2403,7 +2407,7 @@ Two practical notes. Run `DeviceSetup.py` before compiling any of them if you ar
 ---
 ## 12. Memory & Performance Notes
 
-Nothing new here — this collects the constraints that appear piecemeal in earlier sections, so you can size a build before compiling it.
+The constraints scattered through the preceding sections, collected in one place so you can size a build before compiling it.
 
 ### 12.1 Budget per target
 
@@ -2491,7 +2495,6 @@ Loop frequency runs from hundreds of hertz when idle down to around ten during h
 ```
   power-on
     ├─ static init of every global                 10-50 ms
-    ├─ the shared client is constructed             ~1 ms
   setup()
     ├─ database: read every table from NVM        50-200 ms
     ├─ serial and terminal greeting                 ~10 ms
@@ -2517,7 +2520,7 @@ Move firmware over OTA rather than SFTP — file transfer runs at 0.2 to 1 KB/s 
 
 ### 12.8 Looking at a running device
 
-`ps` gives every scheduler task with its rolling CPU share, run count and interval — the fastest way to spot a service hogging the loop. `srvc list` shows service state and task counts, and `srvc status <name>` drills into one, covering database validity, WiFi state, MQTT connection and the rest. A port that implements the optional stack-measurement hook additionally lets you bracket critical work and read back a high-water mark.
+`ps` gives every scheduler task with its rolling CPU share, run count and interval — the fastest way to spot a service hogging the loop. `service list` shows service state and task counts, and `service status <name>` drills into one, covering database validity, WiFi state, MQTT connection and the rest. A port that implements the optional stack-measurement hook also lets you bracket critical work and read back a high-water mark.
 
 Two behaviours to keep in mind while reading those numbers. The scheduler runs one inline task per pass, so twenty tasks at a 100 ms cadence will pace each other if the loop is turning over ten times a second. And a page send is capped per chunk rather than per response, which is why composed pages go out in three calls.
 
@@ -2579,7 +2582,7 @@ Composites are built by multiple inheritance rather than by aggregation, which i
 |---|---|---|---|
 | `iDeviceControlInterface` | device | the orchestrator and every service | device init, reset, restart, erase config, device id and MAC, factory-request check, `getTerminal`, `handleEvents`, plus everything it inherits |
 | `iDatabaseInterface` | device | the database service and every table | begin, clean, validate, report size, and the typed read/write templates |
-| `iInstanceInterface` | device | anything needing a fresh connection | new TCP client and server, new UDP socket, new TLS client and server, filesystem and utility handles |
+| `iInstanceInterface` | device | anything needing a connection | new TCP client and server, new UDP socket, new TLS client and server, the **shared** outbound TCP and TLS clients, filesystem and utility handles |
 | `iUtilityInterface` | inherited through device control | scheduler, event bus, logger, `/dev/random` | `wait`, `millis_now`, `micros_now`, `random_now`, `yield`, `log`, optional stack measurement |
 | `iIOInterface`, `iTerminalInterface` | any stream | logger, shell, web writers | the write family overloaded for every primitive, timestamps, connect and disconnect |
 
@@ -2832,7 +2835,7 @@ Say the board is `myboard`.
 - The bundled example builds with every flag the board can support.
 - Every `__i_*` symbol the flag set implies is defined exactly once.
 - Microsecond time is monotonic across the platform's counter wrap, and `ps` shows non-zero CPU share for tasks with sub-millisecond callbacks after a few ticks.
-- `srvc list` shows every service the build started, and stop and start actually freeze and resume them.
+- `service list` shows every service the build started, and stop and start actually freeze and resume them.
 - Reboot and factory reset both round-trip without losing the database.
 - With storage on, upload and download over SFTP work.
 - With contextual execution on, a task on each lane runs and prints without corrupting a stack.
@@ -2907,7 +2910,9 @@ A small, production-quality kit. Everything is plain functions over fixed-size b
 | key agreement | Curve25519, including the bridge from an Ed25519 private key |
 | signing | Ed25519, and RSA with a portable big-integer layer and PKCS#1 v1.5 |
 
-The Curve25519 and Ed25519 code comes from the standard portable reference. The RSA and big-integer layer is self-contained and device-agnostic — the caller injects the RNG and a watchdog-yield hook, which is what makes on-device keygen survivable. SSH uses all of it: host key generation, the key exchange, host-key signing, public-key authentication, and AES-CTR for transport encryption.
+The Curve25519 and Ed25519 code comes from the standard portable reference. The RSA and big-integer layer is self-contained and device-agnostic, and the caller injects the RNG.
+
+Every long asymmetric operation yields through one shared hook, `crypto_set_yield_hook` — the RSA ladder, the Ed25519 scalar multiplications and the Curve25519 ladder all call it from their inner loops. Install it around the operation and clear it afterwards, including on an early return, or the next caller inherits it. That is what carries on-device keygen and a handshake through without disabling the watchdog, which on ESP8266 stops the hardware feed and defeats the purpose. SSH leans on all of it: host key generation, the key exchange, host-key signing, public-key authentication, and AES-CTR for transport encryption.
 
 One property worth knowing before you rely on it: constant-time behaviour holds only where the upstream implementation provides it. Ed25519 verification is constant-time; the table-based AES and the big-integer path are not hardened against timing observation.
 
@@ -2942,7 +2947,7 @@ Every section above has its own "how do I add one of these" part. This one is th
 | persist something only your sketch cares about | the database escape hatch | [§11.3](#113-addingdatabasetable) |
 | react to another service without coupling to it | the event bus | [§6.4](#64-the-event-bus) |
 | run periodic or long work | the scheduler | [§4](#4-task-scheduler) |
-| encrypt everything outbound | turn on TLS — the orchestrator swaps the shared client and every service follows | [§6.2.16](#6216-tls-no-provider-transport-hookup--cert-provisioning) |
+| encrypt everything outbound | turn on TLS — each outbound service asks `__i_instance` for the shared TLS client instead of the TCP one | [§6.2.16](#6216-tls-no-provider-transport-hookup--cert-provisioning) |
 | serve the portal over HTTPS | turn on HTTPS and drop a cert and key on the filesystem | [§8.7.1](#871-https-wiring-and-certificates) |
 | call a service from a sketch | the global | [§16.9](#169-calling-a-service-from-a-sketch) |
 
@@ -2956,7 +2961,7 @@ Create the folder with its SDK umbrella header, its platform-macro header and th
 
 Pick the group, write the header with pure virtuals plus a forward-declared concrete class and its `extern` singleton, guard it behind the flag that gates its consumers, and add a posix implementation so off-device builds still link. If more than one port would end up writing the same logic, put a default implementation under `impl/` instead.
 
-The bar is that two ports would genuinely implement it differently. One implementation means it belongs in the device folder for now.
+The bar is that two ports would genuinely implement it differently. A single implementation belongs in the device folder instead.
 
 ### 16.4 A new service
 
@@ -2971,7 +2976,7 @@ bool initService(void* arg) override {
 }
 ```
 
-Include it in the orchestrator and call its `initService` in the right slot for the init order. Implement the two print hooks so `srvc` can show it. Add a command, a page or a table if it earns them.
+Include it in the orchestrator and call its `initService` in the right slot for the init order. Implement the two print hooks so `service` can show it. Add a command, a page or a table if it earns them.
 
 ### 16.5 A new transport
 
@@ -3150,7 +3155,7 @@ Short entries; the explanations live in the sections they point at.
 **The build succeeds for ESP8266 or UNO but the device misbehaves.**
 The setup script was never run for that target, so the ESP32 fallback produced an ESP32-shaped binary — right code, wrong table set and flags. Run `python3 DeviceSetup.py -d <board>` and rebuild ([§2.5](#25-how-the-esp32-default-works)).
 
-**The build succeeds but `srvc list` is empty and no access point appears.**
+**The build succeeds but `service list` is empty and no access point appears.**
 Same cause seen from the other end: `devices/DeviceSetup.h` still names the previous board. Re-run the script, or delete the file to fall back to ESP32.
 
 **`multiple definition of __i_<x>`.**
@@ -3188,7 +3193,7 @@ Something is allocating in a hot path. The habits that prevent it are in [§12.4
 ### 18.3 Network and portal
 
 **Cannot join the `pdiStack` access point.**
-The password is `pdiStack@123`, case-sensitive. Confirm the radio is up with `srvc status WiFi` over serial.
+The password is `pdiStack@123`, case-sensitive. Confirm the radio is up with `service status WiFi` over serial.
 
 **Cannot reach `http://192.168.0.1`.**
 With dynamic subnetting on, the access point may have chosen a different subnet — use the `.1` of whatever your client was given.
@@ -3294,12 +3299,12 @@ GitHub: <https://github.com/Suraj151/pdi-framework>.
 
 ```
   1  enable console logging, flash, watch serial at 115200
-  2  srvc list              what actually booted
-  3  srvc status <name>     that service's state and its pids
+  2  service list              what actually booted
+  3  service status <name>     that service's state and its pids
   4  ps                     %CPU finds the hog; OWN ties tasks to sessions
   5  top i=2000,n=10        the same view over time
-  6  srvc stop / start      freeze and resume, and watch the state column flip
-  7  srvc status DB         NVM validity
+  6  service stop / start      freeze and resume, and watch the state column flip
+  7  service status DB         NVM validity
   8  reboot                 explicitly, so you keep the serial output
 ```
 

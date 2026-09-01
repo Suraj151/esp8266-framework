@@ -49,11 +49,11 @@ WiFiServiceProvider::~WiFiServiceProvider(){
  */
 bool WiFiServiceProvider::initService( void *arg ){
 
-  if ( nullptr == arg ) {
-    return false;
-  }
-
   this->m_wifi = reinterpret_cast<iWiFiInterface*>(arg);
+
+  if ( nullptr == this->m_wifi ) {
+    this->m_wifi = &__i_wifi;
+  }
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table( &_wifi_credentials );
 
@@ -88,6 +88,18 @@ bool WiFiServiceProvider::initService( void *arg ){
   this->m_wifi->setSoftAPmacAddress(sta_mac);
 
   return ServiceProvider::initService(arg);
+}
+
+/**
+ * Clear the reconnect backoff and the ping window, so a restart attempts a
+ * connection immediately rather than waiting out the last run's timers.
+ */
+void WiFiServiceProvider::resetServiceState(){
+
+  this->m_disconnect_start_ms = 0;
+  this->m_last_reconnect_attempt_ms = 0;
+  this->m_reconnect_attempt = 0;
+  this->m_ping_busy_since = 0;
 }
 
 /**

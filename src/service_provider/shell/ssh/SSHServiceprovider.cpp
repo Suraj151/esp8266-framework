@@ -160,6 +160,15 @@ void SSHServer::stop() {
 }
 
 /**
+ * Releases the listener and every open session, so a stopped ssh service
+ * refuses a connection rather than accepting one it will never answer.
+ */
+bool SSHServer::stopService() {
+    stop();
+    return ServiceProvider::stopService();
+}
+
+/**
  * @brief close current session.
  */
 void SSHServer::closeSession() {

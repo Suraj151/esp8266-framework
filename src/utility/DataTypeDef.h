@@ -505,6 +505,13 @@ enum TaskState : uint8_t {
 };
 typedef enum TaskState task_state_t;
 
+enum ServiceState : uint8_t {
+    SERVICE_STATE_INACTIVE = 0, ///< Never started, or stopped and released
+    SERVICE_STATE_ACTIVE,       ///< Started and holding whatever it acquired
+    SERVICE_STATE_FAILED        ///< Its own start reported that it did not come up
+};
+typedef enum ServiceState service_state_t;
+
 /**
  * POSIX-style signal numbers delivered to tasks via TaskScheduler::sendSignal.
  * SIG_KILL / SIG_TERM reap the task. SIG_STOP / SIG_CONT suspend and resume it

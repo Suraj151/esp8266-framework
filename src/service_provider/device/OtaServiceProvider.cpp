@@ -42,7 +42,16 @@ OtaServiceProvider::~OtaServiceProvider()
 bool OtaServiceProvider::initService(void *arg)
 {
   iClientInterface* _client = static_cast<iClientInterface*>(arg);
-  
+
+  if (nullptr == _client)
+  {
+#ifdef ENABLE_TLS_SERVICE
+    _client = __i_instance.getSharedTlsClientInstance();
+#else
+    _client = __i_instance.getSharedTcpClientInstance();
+#endif
+  }
+
   if (nullptr == _client)
   {
     return false;

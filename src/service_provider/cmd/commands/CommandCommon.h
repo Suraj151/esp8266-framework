@@ -56,7 +56,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_USERDEL 			"userdel"
 #define CMD_NAME_GROUPS 			"groups"
 #endif
-#define CMD_NAME_SERVICE 			"srvc"
+#define CMD_NAME_SERVICE 			"service"
 #define CMD_NAME_LS 				"ls"
 #define CMD_NAME_CD 				"cd"
 #define CMD_NAME_PWD 				"pwd"

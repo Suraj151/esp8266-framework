@@ -26,8 +26,8 @@ SERVICES_ROW = re.compile(r"services\s*:\s*(.+)")
 
 
 def mdns_status(t):
-    """What `srvc status MDNS` reports, or a skip when the service is absent."""
-    out = t.run("srvc status MDNS", timeout=max(t.timeout, 30))
+    """What `service status MDNS` reports, or a skip when the service is absent."""
+    out = t.run("service status MDNS", timeout=max(t.timeout, 30))
     if "no such service" in out.lower() or "CmdErr" in out:
         raise Skip("no mdns service on this target")
 
@@ -60,7 +60,7 @@ def answered(t, name, qtype, what):
     return records
 
 
-@test("the mdns service advertises a .local hostname", needs=("srvc",))
+@test("the mdns service advertises a .local hostname", needs=("service",))
 def hostname_is_local(t):
     host, _, _ = mdns_status(t)
 
@@ -70,7 +70,7 @@ def hostname_is_local(t):
 
 
 @test("the advertised address is the address the board is using",
-      needs=("srvc", "net"))
+      needs=("service", "net"))
 def advertised_address_matches(t):
     from .test_net import own_address
 
@@ -82,7 +82,7 @@ def advertised_address_matches(t):
               "the address mdns advertises against the station address")
 
 
-@test("the services the build exposes are advertised", needs=("srvc",))
+@test("the services the build exposes are advertised", needs=("service",))
 def services_are_advertised(t):
     """
     Whichever servers are compiled in should be the ones announced. The suite
@@ -100,7 +100,7 @@ def services_are_advertised(t):
                                  % joined)
 
 
-@test("the board answers an A query for its own name", needs=("srvc",), slow=True)
+@test("the board answers an A query for its own name", needs=("service",), slow=True)
 def answers_a_query(t):
     host, _, _ = mdns_status(t)
 
@@ -115,7 +115,7 @@ def answers_a_query(t):
                              % (addresses, host, t.address()))
 
 
-@test("the A record carries the configured time to live", needs=("srvc",), slow=True)
+@test("the A record carries the configured time to live", needs=("service",), slow=True)
 def a_record_ttl(t):
     """
     A record with no useful lifetime makes every client re-query constantly,
@@ -135,7 +135,7 @@ def a_record_ttl(t):
 
 
 @test("service enumeration lists what the board advertises",
-      needs=("srvc",), slow=True)
+      needs=("service",), slow=True)
 def dns_sd_enumeration(t):
     """
     `_services._dns-sd._udp.local` is how a browser asks "what kinds of thing
@@ -153,14 +153,14 @@ def dns_sd_enumeration(t):
         raise AssertionError("enumeration answered without a PTR record: %s" % records)
 
     if len(pointers) != len(services):
-        raise AssertionError("mdns enumerated %d service types but srvc lists %d: "
+        raise AssertionError("mdns enumerated %d service types but service lists %d: "
                              "%s vs %s"
                              % (len(pointers), len(services),
                                 [p.get("target") for p in pointers], services))
 
 
 @test("browsing a service type answers with how to reach it",
-      needs=("srvc",), slow=True)
+      needs=("service",), slow=True)
 def dns_sd_browse(t):
     """
     A browse should come back with the whole bundle a client needs in one go —
@@ -173,7 +173,7 @@ def dns_sd_browse(t):
     if not browsable:
         raise Skip("this build advertises no _tcp service to browse")
 
-    # "_ssh_tcp:22" as srvc prints it -> "_ssh._tcp.local" on the wire
+    # "_ssh_tcp:22" as service prints it -> "_ssh._tcp.local" on the wire
     name, _, port = browsable[0].partition(":")
     query = name.replace("_tcp", "._tcp") + ".local"
 
@@ -188,12 +188,12 @@ def dns_sd_browse(t):
 
     srv = [r for r in records if mdns.TYPE_SRV == r["type"] and "port" in r]
     if srv and port.isdigit() and srv[0]["port"] != int(port):
-        raise AssertionError("mdns advertises port %d for %s, srvc says %s"
+        raise AssertionError("mdns advertises port %d for %s, service says %s"
                              % (srv[0]["port"], name, port))
 
 
 @test("a name the board does not own gets no answer from it",
-      needs=("srvc",), slow=True)
+      needs=("service",), slow=True)
 def unknown_name_is_not_answered(t):
     """
     Answering for names it does not own would poison every cache on the

@@ -234,14 +234,14 @@ def connected(target):
     return state, session
 
 
-@test("the mqtt service is running", needs=("srvc",), services=("MQTT",))
+@test("the mqtt service is running", needs=("service",), services=("MQTT",))
 def service_is_running(t):
-    out = t.run("srvc status MQTT", timeout=max(t.timeout, 30))
+    out = t.run("service status MQTT", timeout=max(t.timeout, 30))
     expect_in("active", out, "the mqtt service state")
 
 
 @test("the board connects to the broker it was configured with",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def connects_to_configured_broker(t):
     _, session = connected(t)
 
@@ -251,7 +251,7 @@ def connects_to_configured_broker(t):
 
 
 @test("the keepalive and clean session flags are the configured ones",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def connect_flags_match_config(t):
     _, session = connected(t)
 
@@ -265,7 +265,7 @@ def connect_flags_match_config(t):
 
 
 @test("the configured credentials are sent at connect",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def credentials_are_sent(t):
     _, session = connected(t)
 
@@ -279,7 +279,7 @@ def credentials_are_sent(t):
 
 
 @test("the last will is registered with the broker at connect",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def will_is_registered(t):
     """
     A will only works if the broker is told about it while the client is still
@@ -306,7 +306,7 @@ def will_is_registered(t):
 
 
 @test("the board publishes on its configured topic",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def publishes_on_configured_topic(t):
     state, _ = connected(t)
 
@@ -320,7 +320,7 @@ def publishes_on_configured_topic(t):
 
 
 @test("a publish carries the configured qos and retain flag",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def publish_honours_qos_and_retain(t):
     state, _ = connected(t)
 
@@ -338,7 +338,7 @@ def publish_honours_qos_and_retain(t):
 
 
 @test("a qos 1 publish is not repeated once it has been acknowledged",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def qos1_publish_settles(t):
     """
     A client that ignores PUBACK keeps retrying the same message forever, which
@@ -365,7 +365,7 @@ def qos1_publish_settles(t):
 
 
 @test("both configured publish topics are used",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def second_publish_topic_is_used(t):
     """The config holds two publish slots; filling only the first is a bug."""
     state, _ = connected(t)
@@ -381,7 +381,7 @@ def second_publish_topic_is_used(t):
 
 
 @test("the board subscribes to its configured topics",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def subscribes_to_configured_topics(t):
     state, _ = connected(t)
 
@@ -395,7 +395,7 @@ def subscribes_to_configured_topics(t):
 
 
 @test("a message from the broker does not disturb the client",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def inbound_message_is_survived(t):
     """
     What the board does with the payload depends on what is compiled in, so
@@ -421,7 +421,7 @@ def inbound_message_is_survived(t):
 
 
 @test("the connection is kept alive across a keepalive period",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def connection_is_kept_alive(t):
     """
     The broker drops a client that says nothing for one keepalive, so something
@@ -444,7 +444,7 @@ def connection_is_kept_alive(t):
                              "period rather than holding the connection open")
 
 
-@test("an idle client sends a keepalive", needs=("srvc",), services=("MQTT",),
+@test("an idle client sends a keepalive", needs=("service",), services=("MQTT",),
       slow=True)
 def idle_client_pings(t):
     """
@@ -477,7 +477,7 @@ def idle_client_pings(t):
 
 
 @test("the will is delivered when the connection drops",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def will_is_delivered_on_drop(t):
     """
     The whole point of a will: the socket dies without a DISCONNECT and the
@@ -504,7 +504,7 @@ def will_is_delivered_on_drop(t):
 
 
 @test("the client comes back after the connection is dropped",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def reconnects_after_drop(t):
     """
     Runs after the will test, which has already dropped the socket, so this is
@@ -522,7 +522,7 @@ def reconnects_after_drop(t):
 
 
 @test("removing a topic from the config unsubscribes it",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def removed_topic_is_unsubscribed(t):
     """
     Changing the pub/sub config must let go of what it dropped. Left
@@ -564,7 +564,7 @@ def removed_topic_is_unsubscribed(t):
 
 
 @test("a placeholder in the client id is substituted before connecting",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def mac_placeholder_is_substituted(t):
     """
     `[mac]` in the client id is how one firmware image gives every board a
@@ -602,7 +602,7 @@ def mac_placeholder_is_substituted(t):
 
 
 @test("clearing one field does not discard the rest of the form",
-      needs=("srvc",), services=("MQTT",), slow=True)
+      needs=("service",), services=("MQTT",), slow=True)
 def clearing_a_field_keeps_the_submission(t):
     """
     A config page has to be able to empty a field, and emptying one must not

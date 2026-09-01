@@ -32,7 +32,24 @@ public:
   ~WiFiServiceProvider();
 
   bool initService(void *arg = nullptr) override;
+
+  /**
+   * Needs its stored credentials before it can come up.
+   */
+  uint8_t getServiceDependencies(service_t *_out, uint8_t _max) const override {
+    uint8_t _n = 0;
+    if( _max > _n ) _out[_n++] = SERVICE_DATABASE;
+    return _n;
+  }
+
   bool stopService() override;
+
+  /**
+   * Clear the reconnect backoff and the ping window, so a restart attempts a
+   * connection immediately rather than waiting out the last run's timers.
+   */
+  void resetServiceState() override;
+
   bool configure_wifi_access_point(wifi_config_table *_wifi_credentials);
   bool configure_wifi_station(wifi_config_table *_wifi_credentials, uint8_t *mac = nullptr);
 
@@ -52,7 +69,6 @@ public:
 
   void printConfigToTerminal(iTerminalInterface *terminal) override;
   void printStatusToTerminal(iTerminalInterface *terminal) override;
-
 
   /**
    * @var	uint8_t  m_wifi_connection_timeout

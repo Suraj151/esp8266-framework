@@ -18,23 +18,35 @@ created Date    : 1st June 2019
 #endif
 
 /**
- * srvc — service supervisor (systemd-lite, step E1).
+ * service — start, stop and report the registered services.
  *
- *   srvc list                 List every registered service with its state.
- *   srvc status <name>        Show config + status + tracked task ids for one.
- *   srvc start <name>         Root-only. SIG_CONT every tracked task of the service.
- *   srvc stop <name>          Root-only. SIG_STOP every tracked task.
- *   srvc restart <name>       Root-only. STOP then CONT.
- *   srvc enable <name>        Root-only. Persist "enabled yes" in the service conf.
- *   srvc disable <name>       Root-only. Persist "enabled no" and stop it now.
+ *   service list             List every registered service with its state.
+ *   service status <name>    Show config + status + tracked task ids for one.
+ *   service start <name>     Root-only. startService() from cold; a no-op with a
+ *                            message when the service is already running.
+ *   service stop <name>      Root-only. Real teardown: stopService() releases the
+ *                            listener, the connections and every tracked task.
+ *   service restart <name>   Root-only. stopService() then startService().
+ *   service enable <name>    Root-only. Persist "enabled yes" in the service conf.
+ *   service disable <name>   Root-only. Persist "enabled no".
  *
- * State column (derived from tracked task states — see ServiceProvider::countServiceTasks):
- *   inactive  no tasks tracked (service never registered anything, or fully reaped)
- *   active    at least one task running (READY/RUNNING/SLEEPING)
- *   stopped   all tasks STOPPED (frozen by SIG_STOP)
- *   dead      tasks tracked but all in ZOMBIE (killed externally)
+ * No verb signals a task any more. enable and disable answer for the next boot
+ * the way a real init system does, and leave what is running to start and stop.
  *
- * Legacy `srvc s=<id> q=<query>` numeric form: removed in E1. Use subverbs.
+ * stop and restart refuse two services: an essential one, and the one carrying
+ * the session the command was typed on — otherwise `service stop SSH` over ssh would
+ * drop the connection mid-command.
+ *
+ * State column, recorded by the service's own start and stop rather than guessed
+ * from what its tasks happen to be doing:
+ *   inactive  never started, or stopped and released
+ *   active    started, holding whatever it acquired
+ *   failed    its own start reported that it did not come up
+ *
+ * The R/S/Z task counts stay beside it as detail. There is no activating or
+ * deactivating: start and stop are synchronous here, so nothing could observe one.
+ *
+ * Legacy `service s=<id> q=<query>` numeric form: removed. Use subverbs.
  */
 struct ServiceCommand : public CommandBase {
 
@@ -63,7 +75,7 @@ struct ServiceCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("srvc list|status|start|stop|restart|enable|disable [<name>]  service supervisor");
+		return RODT_ATTR("service list|status|start|stop|restart|enable|disable [<name>]  service control");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -127,34 +139,146 @@ struct ServiceCommand : public CommandBase {
 			return setEnabled(svc, SVC_VERB_ENABLE == verb);
 		}
 
-		uint16_t hits = 0;
 		switch( verb ){
-			case SVC_VERB_STOP:
-				hits = svc->signalAllServiceTasks(SIG_STOP);
-				m_terminal->putln();
-				m_terminal->write_ro(RODT_ATTR("stopped "));
-				break;
-			case SVC_VERB_START:
-				hits = svc->signalAllServiceTasks(SIG_CONT);
-				m_terminal->putln();
-				m_terminal->write_ro(RODT_ATTR("started "));
-				break;
-			case SVC_VERB_RESTART:
-				svc->signalAllServiceTasks(SIG_STOP);
-				hits = svc->signalAllServiceTasks(SIG_CONT);
-				m_terminal->putln();
-				m_terminal->write_ro(RODT_ATTR("restarted "));
-				break;
+			case SVC_VERB_STOP:    return stopOne(svc);
+			case SVC_VERB_START:   return startOne(svc);
+			case SVC_VERB_RESTART: return restartOne(svc);
 			default: return CMD_ERROR_FAILED;
 		}
+	}
+
+private:
+
+	/**
+	 * Tears the service down for real, refusing when it is the one carrying the
+	 * line this command was typed on.
+	 */
+	pdi_err_t stopOne(ServiceProvider *svc){
+
+		if( svc->isEssentialService() ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("the device cannot be recovered without this service"));
+			return CMD_ERROR_PERM;
+		}
+
+		if( ownsThisSession(svc) ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("this service carries the session you are typing on"));
+			return CMD_ERROR_PERM;
+		}
+
+		uint8_t before = svc->getServiceTaskCount();
+
+		m_terminal->putln();
+		if( !svc->stopService() ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("the service refused to stop"));
+			return CMD_ERROR_FAILED;
+		}
+
+		m_terminal->write_ro(RODT_ATTR("stopped "));
+		m_terminal->write_ro(svc->m_service_name);
+		m_terminal->write_ro(RODT_ATTR(", released "));
 		char buf[8];
-		Int32ToString((int32_t)hits, buf, 8, 0);
+		Int32ToString((int32_t)before, buf, 8, 0);
 		m_terminal->write(buf);
 		m_terminal->writeln_ro(RODT_ATTR(" task(s)"));
 		return PDI_OK;
 	}
 
-private:
+	/**
+	 * Brings the service up from cold, and says so rather than acting when it is
+	 * already running.
+	 */
+	pdi_err_t startOne(ServiceProvider *svc){
+
+		if( SERVICE_STATE_ACTIVE == svc->getServiceState() ){
+			m_terminal->putln();
+			m_terminal->write_ro(svc->m_service_name);
+			m_terminal->writeln_ro(RODT_ATTR(" is already running"));
+			return PDI_OK;
+		}
+
+		ServiceProvider *unmet = svc->findUnmetServiceDependency();
+		if( nullptr != unmet ){
+			m_terminal->putln();
+			m_terminal->write_ro(RODT_ATTR("it needs "));
+			m_terminal->write_ro(unmet->m_service_name);
+			m_terminal->writeln_ro(RODT_ATTR(" running first"));
+			return CMD_ERROR_FAILED;
+		}
+
+		m_terminal->putln();
+		if( !svc->startService() ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("the service did not start"));
+			return CMD_ERROR_FAILED;
+		}
+
+		m_terminal->write_ro(RODT_ATTR("started "));
+		m_terminal->writeln_ro(svc->m_service_name);
+		return PDI_OK;
+	}
+
+	/**
+	 * Stops the service and starts it again, refusing for the same reasons a stop
+	 * refuses since the teardown is the same one.
+	 */
+	pdi_err_t restartOne(ServiceProvider *svc){
+
+		if( svc->isEssentialService() ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("the device cannot be recovered without this service"));
+			return CMD_ERROR_PERM;
+		}
+
+		if( ownsThisSession(svc) ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("this service carries the session you are typing on"));
+			return CMD_ERROR_PERM;
+		}
+
+		m_terminal->putln();
+		svc->stopService();
+
+		ServiceProvider *unmet = svc->findUnmetServiceDependency();
+		if( nullptr != unmet ){
+			m_terminal->putln();
+			m_terminal->write_ro(RODT_ATTR("it needs "));
+			m_terminal->write_ro(unmet->m_service_name);
+			m_terminal->writeln_ro(RODT_ATTR(" running first"));
+			return CMD_ERROR_FAILED;
+		}
+
+		if( !svc->startService() ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("the service stopped but did not start again"));
+			return CMD_ERROR_FAILED;
+		}
+
+		m_terminal->write_ro(RODT_ATTR("restarted "));
+		m_terminal->writeln_ro(svc->m_service_name);
+		return PDI_OK;
+	}
+
+	/**
+	 * Whether the service carries the transport this command arrived on, which
+	 * is the one connection a stop must never take down under itself.
+	 */
+	bool ownsThisSession(ServiceProvider *svc){
+
+		terminal_types_t owned = svc->getServiceTerminalType();
+		if( TERMINAL_TYPE_MAX == owned ){
+			return false;
+		}
+
+		session_t *cur = SessionManager::current();
+		if( nullptr == cur || nullptr == cur->m_terminal ){
+			return false;
+		}
+
+		return owned == cur->m_terminal->get_terminal_type();
+	}
 
 	pdi_err_t setEnabled(ServiceProvider *svc, bool enable){
 
@@ -170,21 +294,12 @@ private:
 			return CMD_ERROR_FAILED;
 		}
 
-		uint16_t hits = 0;
-		if( enable ){
-			hits = svc->signalAllServiceTasks(SIG_CONT);
-		}else{
-			hits = svc->signalAllServiceTasks(SIG_STOP);
-		}
-
+		// enable and disable answer for the next boot, the way they do on a real
+		// init system; what runs right now is what start and stop are for
 		m_terminal->putln();
 		m_terminal->write_ro(enable ? RODT_ATTR("enabled ") : RODT_ATTR("disabled "));
 		m_terminal->write_ro(svc->m_service_name);
-		if( 0 == hits ){
-			m_terminal->writeln_ro(RODT_ATTR(" : takes effect on the next boot"));
-		}else{
-			m_terminal->writeln();
-		}
+		m_terminal->writeln_ro(RODT_ATTR(" : takes effect on the next boot"));
 		return PDI_OK;
 	}
 
@@ -214,14 +329,15 @@ private:
 	}
 
 	/// Returned pointers live in RO/PROGMEM — callers must use write_ro, not write.
-	static const char* stateLabel(uint16_t running, uint16_t stopped, uint16_t zombie){
-		if( 0 == running + stopped + zombie ) return RODT_ATTR("inactive");
-		if( 0 == running && 0 == stopped ) return RODT_ATTR("dead");
-		if( 0 == running && stopped > 0 ) return RODT_ATTR("stopped");
-		return RODT_ATTR("active");
+	static const char* stateLabel(service_state_t state){
+		switch( state ){
+			case SERVICE_STATE_ACTIVE: return RODT_ATTR("active");
+			case SERVICE_STATE_FAILED: return RODT_ATTR("failed");
+			default:                   return RODT_ATTR("inactive");
+		}
 	}
 
-	// Column widths for `srvc list` — kept in one place so header and rows stay in sync.
+	// Column widths for `service list` — kept in one place so header and rows stay in sync.
 	static constexpr uint8_t COL_SERVICE = 15;
 	static constexpr uint8_t COL_STATE   = 10;
 	static constexpr uint8_t COL_ENABLED = 9;
@@ -243,7 +359,7 @@ private:
 			s->countServiceTasks(running, stopped, zombie);
 			const char *svc_name = (s->m_service_name != nullptr) ? s->m_service_name : RODT_ATTR("-");
 			m_terminal->write_pad_ro(svc_name, (uint32_t)strlen_ro(svc_name), COL_SERVICE);
-			const char *state = stateLabel(running, stopped, zombie);
+			const char *state = stateLabel(s->getServiceState());
 			m_terminal->write_pad_ro(state, (uint32_t)strlen_ro(state), COL_STATE);
 			const char *enabled = s->isServiceEnabled() ? RODT_ATTR("yes") : RODT_ATTR("no");
 			m_terminal->write_pad_ro(enabled, (uint32_t)strlen_ro(enabled), COL_ENABLED);
@@ -266,7 +382,7 @@ private:
 		m_terminal->write_ro(svc->m_service_name != nullptr ? svc->m_service_name : "-");
 		m_terminal->writeln();
 		m_terminal->write_ro(RODT_ATTR("state   : "));
-		m_terminal->writeln_ro(stateLabel(running, stopped, zombie));
+		m_terminal->writeln_ro(stateLabel(svc->getServiceState()));
 		m_terminal->write_ro(RODT_ATTR("enabled : "));
 		m_terminal->writeln_ro(svc->isServiceEnabled() ? RODT_ATTR("yes") : RODT_ATTR("no"));
 		m_terminal->write_ro(RODT_ATTR("config  : "));

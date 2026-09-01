@@ -16,6 +16,7 @@ created Date    : 1st June 2019
 #ifdef ENABLE_SSH_SERVICE
 
 #include <utility/crypto/asymmetric/rsa/rsa.h>
+#include <utility/crypto/crypto_yield.h>
 #include <utility/SafeAlloc.h>
 
 // SSH key storage helpers (defined in SSHServiceUtil.cpp)
@@ -125,9 +126,9 @@ struct SSHKeygenCommand : public CommandBase {
 				m_terminal->writeln_ro(RODT_ATTR("Generating RSA key, this may take a while..."));
 				m_terminal->commit();
 
-				bn_set_yield_hook([](){ __i_dvc_ctrl.yield(); });
+				crypto_set_yield_hook([](){ __i_dvc_ctrl.yield(); });
 				bool gen = rsa_generate_keypair(key, SSH_RSA_KEY_BITS, LWSSH::ssh_rng_fill);
-				bn_set_yield_hook(nullptr);
+				crypto_set_yield_hook(nullptr);
 
 				if( gen && LWSSH::save_rsa_key(*key, keydir.c_str()) ){
 					m_terminal->write_ro(RODT_ATTR("SSH keys generated in "));

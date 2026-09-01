@@ -13,6 +13,10 @@ created Date    : 16th Aug 2026
 
 #include <pditest.h>
 #include <utility/crypto/asymmetric/rsa/rsa.h>
+#include <utility/crypto/crypto_yield.h>
+
+static uint32_t s_rsa_yield_calls = 0;
+static void countingRsaYield() { s_rsa_yield_calls++; }
 
 static void testRng(uint8_t *buf, size_t len)
 {
@@ -112,6 +116,25 @@ TEST(rsa, sha256_signature_verifies)
     ASSERT_EQ(siglen, (size_t)64);
     ASSERT_TRUE(rsa_verify_pkcs1(key, RSA_HASH_SHA256, (const uint8_t *)message,
                                  strlen(message), sig, siglen));
+}
+
+TEST(cryptoyield, rsa_sign_yields_through_the_shared_hook)
+{
+    rsa_key *key = sharedKey();
+    ASSERT_NOT_NULL(key);
+
+    const char *message = "one hook for every asymmetric primitive";
+    uint8_t sig[256];
+    size_t siglen = 0;
+
+    s_rsa_yield_calls = 0;
+    crypto_set_yield_hook(countingRsaYield);
+    bool ok = rsa_sign_pkcs1(key, RSA_HASH_SHA256, (const uint8_t *)message,
+                             strlen(message), sig, &siglen);
+    crypto_set_yield_hook(nullptr);
+
+    ASSERT_TRUE(ok);
+    ASSERT_TRUE(s_rsa_yield_calls > 0);
 }
 
 TEST(rsa, sha512_is_refused_when_the_modulus_is_too_narrow)

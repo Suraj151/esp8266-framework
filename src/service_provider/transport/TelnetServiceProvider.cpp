@@ -100,6 +100,24 @@ void TelnetServiceProvider::stop() {
 }
 
 /**
+ * Clear the pool-full grace window, so a restart does not open with a period
+ * that appears to have been full since the previous run.
+ */
+void TelnetServiceProvider::resetServiceState() {
+
+    m_poolfullsince = 0;
+}
+
+/**
+ * Releases the listener and every pooled client, so a stopped telnet service
+ * refuses a connection rather than leaving it to hang without a banner.
+ */
+bool TelnetServiceProvider::stopService() {
+    stop();
+    return ServiceProvider::stopService();
+}
+
+/**
  * @brief close the client held in one pool slot.
  */
 void TelnetServiceProvider::closeClient(uint8_t slot) {

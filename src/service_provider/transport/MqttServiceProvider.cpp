@@ -47,10 +47,6 @@ MqttServiceProvider::~MqttServiceProvider(){
  */
 bool MqttServiceProvider::initService( void *arg ){
 
-  if ( nullptr == arg ) {
-    return false;
-  }
-
   // m_client = reinterpret_cast<iClientInterface*>(arg);
   m_client = pdiutil::safe_new<TcpClientInterface>(); // Prefer new client instance for mqtt
   this->m_mqtt_payload = pdiutil::safe_new_array<char>( MQTT_PAYLOAD_BUF_SIZE );
@@ -174,6 +170,52 @@ void MqttServiceProvider::stop(){
   this->m_mqtt_client.DeleteClient();
   __task_scheduler.clearInterval( this->m_mqtt_timer_cb_id );
   this->m_mqtt_timer_cb_id = 0;
+}
+
+/**
+ * Copy what the next publish should carry into the buffer this service owns,
+ * refusing while it holds none and when the text does not fit.
+ */
+bool MqttServiceProvider::setMqttPayload(const char *data, uint16_t len){
+
+  if( nullptr == this->m_mqtt_payload ){
+    return false;
+  }
+
+  memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
+
+  if( nullptr == data || (uint32_t)len + 1 >= MQTT_PAYLOAD_BUF_SIZE ){
+    pdiutil::string _toobig = CHARPTR_WRAP("mqtt data is too big to fit in buffer !");
+    strncpy( this->m_mqtt_payload, _toobig.c_str(), MQTT_PAYLOAD_BUF_SIZE - 1 );
+    return false;
+  }
+
+  memcpy( this->m_mqtt_payload, data, len );
+  return true;
+}
+
+/**
+ * Forget the task ids, which name tasks the stop has already dropped.
+ */
+void MqttServiceProvider::resetServiceState(){
+
+  this->m_mqtt_timer_cb_id = 0;
+  this->m_mqtt_publish_cb_id = 0;
+  this->m_mqtt_subscribe_cb_id = 0;
+}
+
+/**
+ * Drops the broker connection and releases the client and payload buffer a
+ * run allocated, so a stopped mqtt service holds nothing.
+ */
+bool MqttServiceProvider::stopService(){
+
+  this->stop();
+
+  pdiutil::safe_delete(this->m_client);
+  pdiutil::safe_delete_array(this->m_mqtt_payload);
+
+  return ServiceProvider::stopService();
 }
 
 /**

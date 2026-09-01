@@ -32,7 +32,26 @@ public:
   ~MdnsServiceProvider();
 
   bool initService(void *arg = nullptr) override;
+
+  /**
+   * Needs the network it advertises on before it can come up.
+   */
+  uint8_t getServiceDependencies(service_t *_out, uint8_t _max) const override {
+    uint8_t _n = 0;
+  #ifdef ENABLE_WIFI_SERVICE
+    if( _max > _n ) _out[_n++] = SERVICE_WIFI;
+  #endif
+    return _n;
+  }
+
   bool stopService() override;
+
+  /**
+   * Forget that a certificate job is outstanding, since the stop drops the task
+   * that would have run it.
+   */
+  void resetServiceState() override;
+
   void printStatusToTerminal(iTerminalInterface *terminal) override;
 
   /* register a DNS-SD service to advertise */

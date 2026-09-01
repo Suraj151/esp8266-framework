@@ -75,11 +75,15 @@ typedef enum services{
 /**
  * Upper bound on tasks a single service can own. Services with more periodic
  * or one-shot tasks than this will lose lifecycle visibility for the overflow
- * (they still run, but srvc stop/start/status won't see them). Raise if a
+ * (they still run, but service stop/start/status won't see them). Raise if a
  * service needs more — cost is 2 bytes/slot per service instance.
  */
 #ifndef MAX_SERVICE_TASKS
 #define MAX_SERVICE_TASKS 6
+#endif
+
+#ifndef MAX_SERVICE_DEPENDENCIES
+#define MAX_SERVICE_DEPENDENCIES 3
 #endif
 
 /**
@@ -92,7 +96,7 @@ class ServiceProvider{
     /**
      * ServiceProvider constructor.
      */
-    ServiceProvider(service_t st, const char *_svc_name) : m_service_name(_svc_name), m_service_t(st), m_service_routine_task_id(-1), m_service_task_count(0), m_service_enabled(true) {
+    ServiceProvider(service_t st, const char *_svc_name) : m_service_name(_svc_name), m_service_t(st), m_service_routine_task_id(-1), m_service_task_count(0), m_service_enabled(true), m_service_state(SERVICE_STATE_INACTIVE) {
       m_services[st] = this;
       for (uint8_t i = 0; i < MAX_SERVICE_TASKS; i++) {
         m_service_task_ids[i] = -1;
@@ -100,9 +104,16 @@ class ServiceProvider{
     }
 
     /**
-		 * ServiceProvider destructor
+		 * ServiceProvider destructor. Drops the finalizer off every task still
+		 * tracked, because that callable holds this service and outlives it in the
+		 * scheduler until the task is reaped.
 		 */
     virtual ~ServiceProvider(){
+      for (uint8_t i = 0; i < m_service_task_count; i++) {
+        if (m_service_task_ids[i] >= 0) {
+          __task_scheduler.setTaskFinalizer(m_service_task_ids[i], nullptr);
+        }
+      }
     }
 
     /**
@@ -118,6 +129,27 @@ class ServiceProvider{
     }
 
     /**
+     * Brings the service up and records what its own init reported, so a service
+     * that did not come up says so instead of reading as never started.
+     */
+    bool startService(void *arg = nullptr){
+      bool _started = initService(arg);
+      m_service_state = _started ? SERVICE_STATE_ACTIVE : SERVICE_STATE_FAILED;
+      return _started;
+    }
+
+    /**
+     * What the service is doing, as its last start or stop left it.
+     */
+    service_state_t getServiceState() const { return m_service_state; }
+
+    /**
+     * Return what a run leaves behind — cached results, latched flags, ids of
+     * tasks that are gone — to the values a fresh service starts with.
+     */
+    virtual void resetServiceState() {}
+
+    /**
      * stop service — cleans every tracked scheduler task the service owns.
      * Services that need to release additional resources (connections, buffers,
      * hardware) should override, call the base impl, then do their own teardown.
@@ -125,12 +157,15 @@ class ServiceProvider{
     virtual bool stopService(){
       for (uint8_t i = 0; i < m_service_task_count; i++) {
         if (m_service_task_ids[i] >= 0) {
+          __task_scheduler.setTaskFinalizer(m_service_task_ids[i], nullptr);
           __task_scheduler.clearInterval(m_service_task_ids[i]);
           m_service_task_ids[i] = -1;
         }
       }
       m_service_task_count = 0;
       m_service_routine_task_id = -1;
+      resetServiceState();
+      m_service_state = SERVICE_STATE_INACTIVE;
       if(nullptr != m_terminal){
         m_terminal->with_timestamp()->write_ro(RODT_ATTR(" Stopping "));
         m_terminal->write_ro(m_service_name);
@@ -236,7 +271,7 @@ class ServiceProvider{
     }
 
     /**
-     * Count tracked tasks bucketed by lifecycle state. Used by `srvc list/status`
+     * Count tracked tasks bucketed by lifecycle state. Used by `service list/status`
      * to render a service's aggregate state.
      */
     void countServiceTasks(uint16_t &_running, uint16_t &_stopped, uint16_t &_zombie){
@@ -261,6 +296,7 @@ class ServiceProvider{
      * Get service instance
      */
     static ServiceProvider* getService(service_t st){
+      if( st >= SERVICE_MAX ) return nullptr;
       return m_services[st];
     }
 
@@ -290,6 +326,35 @@ class ServiceProvider{
      * beyond the reach of a runtime disable.
      */
     virtual bool isEssentialService() const { return false; }
+
+    /**
+     * The terminal transport this service carries, or TERMINAL_TYPE_MAX when it
+     * carries none, so a command cannot tear down the line it is answering on.
+     */
+    virtual terminal_types_t getServiceTerminalType() const { return TERMINAL_TYPE_MAX; }
+
+    /**
+     * The services this one needs running before it can start, written into the
+     * caller's array; the return is how many were written.
+     */
+    virtual uint8_t getServiceDependencies(service_t *_out, uint8_t _max) const { return 0; }
+
+    /**
+     * The first service this one needs that is not active, or nullptr when every
+     * one it names is running. A dependency absent from the build is not one.
+     */
+    ServiceProvider* findUnmetServiceDependency(){
+      service_t _deps[MAX_SERVICE_DEPENDENCIES];
+      uint8_t _count = getServiceDependencies(_deps, MAX_SERVICE_DEPENDENCIES);
+
+      for (uint8_t i = 0; i < _count; i++) {
+        ServiceProvider *_dep = getService(_deps[i]);
+        if (nullptr != _dep && SERVICE_STATE_ACTIVE != _dep->getServiceState()) {
+          return _dep;
+        }
+      }
+      return nullptr;
+    }
 
     /**
      * Read the persisted enable state into the service, so later callers answer
@@ -371,6 +436,7 @@ class ServiceProvider{
     uint8_t m_service_task_count;
 
     bool m_service_enabled;
+    service_state_t m_service_state;
 };
 
 #endif

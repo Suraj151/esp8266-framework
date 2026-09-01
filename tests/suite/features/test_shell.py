@@ -38,49 +38,45 @@ def free_heap(t):
     return int(found.group(1))
 
 
-def quiescent_heap(t, samples=4):
+def heap_band(t, seconds=20.0, interval=2.0):
     """
-    The heap with nothing transiently held, as the highest of several samples.
+    The top of the board's free heap and the spread it covers on its own.
 
-    A single reading is not a measurement: the board legitimately takes and gives
-    back a block of a few kilobytes while services run, so one sample says only
-    whether that block happened to be held at the instant it was taken. Comparing
-    two such instants reported a 4 KB leak on a board whose heap was, across 120
-    pipelines, a few bytes higher at the end than the start. The maximum is the
-    level with nothing in flight, and a real leak lowers it just the same.
+    The heap does not sit still. It visits discrete levels as services take and
+    return blocks, and it holds each one for tens of seconds: measured on esp8266
+    across five bursts it sat at +240, 0, -776 and -1016 relative to its start,
+    and on esp32 the step is nearer 4 KB. Samples taken close together therefore
+    land wholly inside whichever level is current, which is how a board whose
+    heap ended *above* where it started twice reported a leak. Watching for long
+    enough to see the spread is what lets a threshold be about leaks rather than
+    about which level the sampling happened to catch.
     """
-    best = free_heap(t)
-    for _ in range(samples - 1):
-        time.sleep(0.4)
-        best = max(best, free_heap(t))
-    return best
+    seen = [free_heap(t)]
+    started = time.time()
+    while time.time() - started < seconds:
+        time.sleep(interval)
+        seen.append(free_heap(t))
+    return max(seen), max(seen) - min(seen)
 
 
-def assert_no_leak(t, before, rounds, what, budget=512):
+def assert_no_leak(t, top, band, rounds, what, budget=512):
     """
-    Fail only on a drop that survives a settle, because a leak does and a held
-    block does not.
+    Fail on a drop the board's own movement cannot account for.
 
-    Sampling alone is not enough. The board holds a transient block for longer
-    than a sampling window can outlast: a measured series of 8 cycles of 20
-    redirects saw one cycle dip 1976 bytes and recover 2332 in the next idle
-    phase, ending 336 bytes above where it started across 160 redirects. That dip
-    is the size the two failing runs reported, so a wider window would only have
-    made the false failure rarer. Re-reading after the board has had a moment
-    separates them by what they do rather than by how large they are: a leak is
-    still there, a held block has been given back.
+    Waiting does not separate the two — the levels recur, so a settle is a second
+    throw of the same dice. Their sizes do: a held block is bounded by the spread
+    measured before the work started, while a leak keeps going past it.
     """
-    after = quiescent_heap(t)
-    if before - after <= budget:
+    after, after_band = heap_band(t)
+    moves = max(band, after_band)
+    allowed = moves + budget
+
+    if top - after <= allowed:
         return
 
-    time.sleep(6.0)
-    settled = quiescent_heap(t)
-    if before - settled <= budget:
-        return
-
-    raise AssertionError("heap fell %d bytes over %d %s (%d -> %d, still %d after a settle)"
-                         % (before - settled, rounds, what, before, after, settled))
+    raise AssertionError("heap fell %d bytes over %d %s (%d -> %d), past the %d "
+                         "this board moves on its own plus %d"
+                         % (top - after, rounds, what, top, after, moves, budget))
 
 
 @test("a command with no redirect handling of its own is captured", needs=("pwd", "cat"))
@@ -316,13 +312,12 @@ def redirect_releases_everything(t):
     for _ in range(3):
         t.run("echo settle > leak.txt")
 
-    before = quiescent_heap(t)
+    top, band = heap_band(t)
 
     for _ in range(20):
         t.run("echo repeated > leak.txt")
 
-    # a per-redirect leak of even 64 bytes would show as 1280 across 20 rounds
-    assert_no_leak(t, before, 20, "redirects")
+    assert_no_leak(t, top, band, 20, "redirects")
 
 
 @test("piping many times does not leak", needs=("echo", "wc", "ps"), slow=True)
@@ -331,12 +326,12 @@ def pipeline_releases_everything(t):
     for _ in range(3):
         t.run("echo settle | wc")
 
-    before = quiescent_heap(t)
+    top, band = heap_band(t)
 
     for _ in range(15):
         t.run("echo repeated here | wc")
 
-    assert_no_leak(t, before, 15, "pipelines")
+    assert_no_leak(t, top, band, 15, "pipelines")
 
 
 @test("a redirect works on a memory filesystem too", needs=("echo", "cat"), mounts=("/tmp",))

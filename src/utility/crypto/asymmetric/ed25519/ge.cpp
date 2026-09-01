@@ -1,6 +1,7 @@
 #include "ge.h"
 #include "precomp_data.h"
 #include <utility/SafeAlloc.h>
+#include <utility/crypto/crypto_yield.h>
 
 
 /*
@@ -116,6 +117,8 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 
     }
 
     for (; i >= 0; --i) {
+        if ((i & 0x1F) == 0) crypto_yield();
+
         ge_p2_dbl(&t, r);
 
         if (aslide[i] > 0) {
@@ -439,6 +442,8 @@ void ge_scalarmult_base(ge_p3 *h, const unsigned char *a) {
     ge_p3_0(h);
 
     for (i = 1; i < 64; i += 2) {
+        if ((i & 0x0F) == 1) crypto_yield();
+
         select(&t, i / 2, e[i]);
         ge_madd(&r, h, &t);
         ge_p1p1_to_p3(h, &r);
@@ -454,6 +459,8 @@ void ge_scalarmult_base(ge_p3 *h, const unsigned char *a) {
     ge_p1p1_to_p3(h, &r);
 
     for (i = 0; i < 64; i += 2) {
+        if ((i & 0x0F) == 0) crypto_yield();
+
         select(&t, i / 2, e[i]);
         ge_madd(&r, h, &t);
         ge_p1p1_to_p3(h, &r);

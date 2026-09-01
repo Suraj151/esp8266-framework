@@ -26,7 +26,7 @@ public:
      * @param port The port to listen on (default 23).
      * @return true if started successfully, false otherwise.
      */
-    bool start(uint16_t port = 23);
+    bool start(uint16_t port = TELNET_DEFAULT_PORT);
 
     /**
      * @brief Init the service.
@@ -36,9 +36,34 @@ public:
     bool initService(void *arg = nullptr) override;
 
     /**
+     * Needs the network it listens on before it can come up.
+     */
+    uint8_t getServiceDependencies(service_t *_out, uint8_t _max) const override {
+      uint8_t _n = 0;
+    #ifdef ENABLE_WIFI_SERVICE
+      if( _max > _n ) _out[_n++] = SERVICE_WIFI;
+    #endif
+      return _n;
+    }
+
+    /**
      * @brief Stop the Telnet service.
      */
     void stop();
+
+    /**
+     * Releases the listener and every pooled client, so a stopped telnet service
+     * refuses a connection rather than leaving it to hang without a banner.
+     */
+    bool stopService() override;
+
+    /**
+     * Clear the pool-full grace window, so a restart does not open with a
+     * period that appears to have been full since the previous run.
+     */
+    void resetServiceState() override;
+
+    terminal_types_t getServiceTerminalType() const override { return TERMINAL_TYPE_TELNET; }
 
     /**
      * @brief close the client held in one pool slot.

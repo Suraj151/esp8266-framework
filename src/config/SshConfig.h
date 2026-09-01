@@ -15,6 +15,10 @@ created Date    : 1st June 2025
 /**
  * SSH configurations for secure communication
  */
+#ifndef SSH_DEFAULT_PORT
+#define SSH_DEFAULT_PORT 22
+#endif
+
 #ifndef SSH_MAX_SESSIONS
 #define SSH_MAX_SESSIONS 2
 #endif

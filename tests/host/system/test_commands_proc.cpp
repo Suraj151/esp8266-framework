@@ -329,21 +329,21 @@ TEST(cmdproc, renice_clamps_a_value_past_the_range)
     reap();
 }
 
-/* ----------------------------------------------------------------- srvc */
+/* ----------------------------------------------------------------- service */
 
-TEST(cmdproc, srvc_list_names_the_running_services)
+TEST(cmdproc, service_list_names_the_running_services)
 {
     pditest::Shell shell;
-    std::string out = shell.run("srvc list");
+    std::string out = shell.run("service list");
 
     ASSERT_TRUE(out.length() > 0);
     ASSERT_EQ(shell.result(), PDI_OK);
 }
 
-TEST(cmdproc, srvc_status_of_an_unknown_service_is_not_ok)
+TEST(cmdproc, service_status_of_an_unknown_service_is_not_ok)
 {
     pditest::Shell shell;
-    shell.run("srvc status nosuchservice");
+    shell.run("service status nosuchservice");
 
     ASSERT_NE(shell.result(), CMD_ERROR_UNSET);
 }

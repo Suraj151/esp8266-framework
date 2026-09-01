@@ -47,15 +47,47 @@ public:
   virtual iTcpServerInterface* getNewTcpServerInstance() { return nullptr; }      // get new TCP server instance
   virtual iTcpClientInterface* getNewTcpClientInstance() { return nullptr; }      // get new TCP client instance
   virtual iUdpInterface* getNewUdpInstance() { return nullptr; }                  // get new UDP socket instance
+
+  /**
+   * The one outbound client the services share, built on first call and kept, so
+   * a service can source it instead of being handed it.
+   */
+  iTcpClientInterface* getSharedTcpClientInstance();
+
+  /**
+   * Releases the shared client, for the stack shutting down; a service that stops
+   * leaves it for the services still running.
+   */
+  void releaseSharedTcpClientInstance();
   #endif
 
   #ifdef ENABLE_TLS_SERVICE
   virtual iTlsServerInterface* getNewTlsServerInstance() { return nullptr; }      // get new TLS server instance
   virtual iTlsClientInterface* getNewTlsClientInstance() { return nullptr; }      // get new TLS client instance
+
+  /**
+   * The one outbound TLS client the services share, built on first call and kept,
+   * so a service can source it instead of being handed it.
+   */
+  iTlsClientInterface* getSharedTlsClientInstance();
+
+  /**
+   * Releases the shared TLS client, for the stack shutting down; a service that
+   * stops leaves it for the services still running.
+   */
+  void releaseSharedTlsClientInstance();
   #endif
 
   #ifdef ENABLE_STORAGE_SERVICE
   virtual iFileSystemInterface& getFileSystemInstance()  = 0;    // get new file system instance
+  #endif
+
+  protected:
+  #ifdef ENABLE_NETWORK_SERVICE
+    iTcpClientInterface *m_shared_tcp_client = nullptr;
+  #endif
+  #ifdef ENABLE_TLS_SERVICE
+    iTlsClientInterface *m_shared_tls_client = nullptr;
   #endif
 };
 

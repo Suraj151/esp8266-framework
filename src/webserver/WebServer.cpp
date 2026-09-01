@@ -57,7 +57,7 @@ bool HttpServer::initService(void *arg)
   iHttpServerInterface  *iServer = reinterpret_cast<iHttpServerInterface*>(arg);
 
   if (nullptr == iServer) {
-    return bStatus;
+    iServer = &__i_http_server;
   }
 
   // if(nullptr != m_terminal){
@@ -114,6 +114,18 @@ bool HttpServer::initService(void *arg)
 void HttpServer::handle_clients()
 {
   this->m_server->handleClient();
+}
+
+/**
+ * Closes the listener, so a stopped http service refuses a request rather than
+ * holding the browser open on a port nothing is serving.
+ */
+bool HttpServer::stopService()
+{
+  if (nullptr != this->m_server) {
+    this->m_server->close();
+  }
+  return ServiceProvider::stopService();
 }
 
 /**

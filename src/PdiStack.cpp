@@ -40,11 +40,6 @@ created Date    : 1st June 2019
  * If WiFi service is enabled, it initializes the client and server interfaces.
  */
 PDIStack::PDIStack()
-#ifdef ENABLE_WIFI_SERVICE
-  :
-  m_client(nullptr),
-  m_server(&__i_http_server)
-#endif
 {
 }
 
@@ -54,10 +49,11 @@ PDIStack::PDIStack()
  * Cleans up resources by setting client and server pointers to nullptr if WiFi service is enabled.
  */
 PDIStack::~PDIStack(){
-#ifdef ENABLE_WIFI_SERVICE
-  pdiutil::safe_delete(this->m_client);
-  this->m_client = nullptr;
-  this->m_server = nullptr;
+#ifdef ENABLE_NETWORK_SERVICE
+  __i_instance.releaseSharedTcpClientInstance();
+#endif
+#ifdef ENABLE_TLS_SERVICE
+  __i_instance.releaseSharedTlsClientInstance();
 #endif
 }
 
@@ -71,23 +67,6 @@ void PDIStack::initialize(){
 
   pdiutil::enable_heap_check();
 
-#ifdef ENABLE_WIFI_SERVICE
-  m_server = &__i_http_server;
-  #ifdef ENABLE_TLS_SERVICE
-  m_client = __i_instance.getNewTlsClientInstance();
-  if (m_client && m_client->isSecure()) {
-      // To verify the servers this client connects to, point the line
-      // below at a CA bundle on the device filesystem and comment out
-      // the setVerifyPeer(false) call. Default here is encrypted-but-
-      // unverified TLS so no cert needs to be provisioned for testing.
-      // static_cast<iTlsClientInterface*>(m_client)
-      //     ->setCertificateAuthorityPath(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH);
-      static_cast<iTlsClientInterface*>(m_client)->setVerifyPeer(false);
-  }
-  #else
-  m_client = __i_instance.getNewTcpClientInstance();
-  #endif
-#endif
   __utl_event.begin(&__i_dvc_ctrl);
   __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
   __task_scheduler.setMaxTasksLimit(MAX_SCHEDULABLE_TASKS);
@@ -142,65 +121,61 @@ void PDIStack::initialize(){
   // start the syslog sink first so subsequent services' SysLog lines are persisted
   #ifdef ENABLE_SYSLOG_SERVICE
   if (__syslog_service.isServiceEnabled()) {
-    __syslog_service.initService();
+    __syslog_service.startService();
   }
   #endif
 
-  __database_service.initService();
+  __database_service.startService();
 
   #ifdef ENABLE_SERIAL_SERVICE
-  __serial_service.initService();
+  __serial_service.startService();
   #endif
 
   #ifdef ENABLE_WIFI_SERVICE
   if (__wifi_service.isServiceEnabled()) {
-    __wifi_service.initService( &__i_wifi );
+    __wifi_service.startService();
     registerWiFiNetifs();
   }
   #endif
 
   #ifdef ENABLE_OTA_SERVICE
   if (__ota_service.isServiceEnabled()) {
-    __ota_service.initService( this->m_client );
+    __ota_service.startService();
   }
   #endif
 
   #ifdef ENABLE_GPIO_SERVICE
   if (__gpio_service.isServiceEnabled()) {
-    __gpio_service.initService(
-      #ifdef ENABLE_HTTP_CLIENT
-      this->m_client
-      #endif
-      );
+    __gpio_service.startService();
   }
   #endif
 
   #ifdef ENABLE_MQTT_SERVICE
   if (__mqtt_service.isServiceEnabled()) {
-    __mqtt_service.initService( this->m_client );
+    __mqtt_service.startService();
   }
   #endif
 
   #ifdef ENABLE_EMAIL_SERVICE
   if (__email_service.isServiceEnabled()) {
-    __email_service.initService( this->m_client );
+    __email_service.startService();
   }
   #endif
 
-  __factory_reset.initService();
+  __factory_reset.startService();
 
   #ifdef ENABLE_DEVICE_IOT
   if (__device_iot_service.isServiceEnabled()) {
-    __device_iot_service.initService( this->m_client );
+    __device_iot_service.startService();
   }
   #endif
 
   #ifdef ENABLE_AUTH_SERVICE
-  __auth_service.initService();
+  __auth_service.startService();
   #endif
 
   #if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
-  __user_store_service.initService();
+  __user_store_service.startService();
   #endif
 
   #ifdef ENABLE_NETWORK_SERVICE
@@ -209,32 +184,30 @@ void PDIStack::initialize(){
 
   #ifdef ENABLE_MDNS_SERVICE
   if (__mdns_service.isServiceEnabled()) {
-    __mdns_service.initService();
+    __mdns_service.startService();
   }
   #endif
 
   #ifdef ENABLE_HTTP_SERVER
   if (__web_server.isServiceEnabled()) {
-    __web_server.initService( this->m_server );
+    __web_server.startService();
   }
   #endif
 
   #ifdef ENABLE_TELNET_SERVICE
-  uint16_t telnet_port = 23; // Default Telnet port
   if (__telnet_service.isServiceEnabled()) {
-    __telnet_service.initService(&telnet_port);
+    __telnet_service.startService();
   }
   #endif
 
   #ifdef ENABLE_SSH_SERVICE
-  uint16_t ssh_port = 22; // Default SSH port
   if (__sshserver_service.isServiceEnabled()) {
-    __sshserver_service.initService(&ssh_port);
+    __sshserver_service.startService();
   }
   #endif
 
   #ifdef ENABLE_CMD_SERVICE
-  __cmd_service.initService();
+  __cmd_service.startService();
   CommandLineServiceProvider::startInteraction();
   #endif
 }
@@ -263,19 +236,6 @@ void PDIStack::serve(){
 
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   __i_cooperative_scheduler.tick_from_loop();
-  #endif
-}
-
-/**
- * @brief Prints logs at defined intervals.
- *
- * If the network service is enabled, this method logs the validity of the NTP time and the current NTP time.
- */
-void PDIStack::handleLogPrints(){
-
-  #ifdef ENABLE_NETWORK_SERVICE
-  LogI("\nNTP Validity : %d\n", __i_ntp.is_valid_ntptime());
-  LogI("NTP Time : %d\n", (int32_t)__i_ntp.get_ntp_time());
   #endif
 }
 

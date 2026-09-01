@@ -15,6 +15,10 @@ created Date    : 16th Aug 2026
 #include <utility/DataTypeConversions.h>
 #include <utility/crypto/asymmetric/curve25519/curve25519.h>
 #include <utility/crypto/asymmetric/ed25519/ed25519.h>
+#include <utility/crypto/crypto_yield.h>
+
+static uint32_t s_yield_calls = 0;
+static void countingYield() { s_yield_calls++; }
 
 static void fromHex(const char *hex, uint8_t *out, uint8_t bytelen)
 {
@@ -270,6 +274,72 @@ TEST(curve25519, both_sides_agree_on_the_shared_secret)
     crypto_scalarmult(sharedb, privbob, pubalice);
 
     ASSERT_MEMEQ(shareda, sharedb, 32);
+}
+
+TEST(cryptoyield, ed25519_verify_yields_while_it_works)
+{
+    uint8_t seed[32], pub[ED25519_PUBKEY_SIZE], priv[ED25519_PRIVKEY_SIZE];
+    uint8_t sig[64];
+    const char *message = "the hook has to actually fire";
+
+    memset(seed, 0x42, sizeof(seed));
+    ed25519_create_keypair(pub, priv, seed);
+    ed25519_sign(sig, (const uint8_t *)message, strlen(message), pub, priv);
+
+    s_yield_calls = 0;
+    crypto_set_yield_hook(countingYield);
+    int verified = ed25519_verify(sig, (const uint8_t *)message, strlen(message), pub);
+    crypto_set_yield_hook(nullptr);
+
+    ASSERT_EQ(verified, 1);
+    ASSERT_TRUE(s_yield_calls > 0);
+}
+
+TEST(cryptoyield, ed25519_sign_yields_while_it_works)
+{
+    uint8_t seed[32], pub[ED25519_PUBKEY_SIZE], priv[ED25519_PRIVKEY_SIZE];
+    uint8_t sig[64];
+    const char *message = "signing is the other long half";
+
+    memset(seed, 0x17, sizeof(seed));
+    ed25519_create_keypair(pub, priv, seed);
+
+    s_yield_calls = 0;
+    crypto_set_yield_hook(countingYield);
+    ed25519_sign(sig, (const uint8_t *)message, strlen(message), pub, priv);
+    crypto_set_yield_hook(nullptr);
+
+    ASSERT_TRUE(s_yield_calls > 0);
+}
+
+TEST(cryptoyield, curve25519_scalarmult_yields_while_it_works)
+{
+    uint8_t priv[CURVE25519_PRIVKEY_SIZE], pub[CURVE25519_PUBKEY_SIZE];
+    uint8_t shared[32];
+
+    curve25519_create_keypair(pub, priv);
+
+    s_yield_calls = 0;
+    crypto_set_yield_hook(countingYield);
+    crypto_scalarmult(shared, priv, pub);
+    crypto_set_yield_hook(nullptr);
+
+    ASSERT_TRUE(s_yield_calls > 0);
+}
+
+TEST(cryptoyield, a_cleared_hook_is_not_called)
+{
+    uint8_t priv[CURVE25519_PRIVKEY_SIZE], pub[CURVE25519_PUBKEY_SIZE];
+    uint8_t shared[32];
+
+    curve25519_create_keypair(pub, priv);
+
+    crypto_set_yield_hook(countingYield);
+    crypto_set_yield_hook(nullptr);
+    s_yield_calls = 0;
+    crypto_scalarmult(shared, priv, pub);
+
+    ASSERT_EQ((int)s_yield_calls, 0);
 }
 
 TEST(curve25519, generated_keypairs_agree)

@@ -8,6 +8,7 @@ out of a uart instead of a pipe, and the target cannot be restarted by killing
 a process. Everything the feature suites assert is the same either way.
 """
 
+import os
 import select
 import termios
 import time
@@ -51,9 +52,15 @@ class SerialShell(Shell):
         except Exception as err:
             raise ShellError("cannot open %s at %d: %s" % (port, baud, err))
 
+        self._rawlog = None
+        rawpath = os.environ.get("PDI_SERIAL_RAWLOG")
+        if rawpath:
+            self._rawlog = open(rawpath, "ab", buffering=0)
+
         if reset:
             self.reset()
         else:
+            self._drain_to_rawlog()
             self._port.reset_input_buffer()
 
     @property
@@ -91,6 +98,20 @@ class SerialShell(Shell):
         self._port.rts = False
         time.sleep(settle)
 
+    def _drain_to_rawlog(self):
+        """
+        Move whatever the port is already holding into the raw log before it is
+        discarded, so a panic printed while nothing was reading still survives.
+        """
+        if self._rawlog is None:
+            return
+        try:
+            waiting = self._port.in_waiting
+            if waiting:
+                self._rawlog.write(self._port.read(waiting))
+        except Exception:
+            pass
+
     def _send(self, data):
         self._port.write(data.encode())
         self._port.flush()
@@ -108,6 +129,9 @@ class SerialShell(Shell):
         chunk = self._port.read(waiting if waiting else 1)
         if not chunk:
             return ""
+
+        if self._rawlog is not None:
+            self._rawlog.write(chunk)
 
         return self.decode(chunk)
 
@@ -131,10 +155,17 @@ class SerialShell(Shell):
             return 0
 
     def close(self):
+        self._drain_to_rawlog()
         try:
             self._port.close()
         except Exception:
             pass
+        if self._rawlog is not None:
+            try:
+                self._rawlog.close()
+            except Exception:
+                pass
+            self._rawlog = None
 
     def __enter__(self):
         return self

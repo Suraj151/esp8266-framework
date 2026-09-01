@@ -31,7 +31,7 @@ static pditest::Shell *networked(pditest::Shell &shell)
     if (!wifiup)
     {
         wifiup = true;
-        __wifi_service.initService(&__i_wifi);
+        __wifi_service.startService(&__i_wifi);
     }
 
     NameResolver::ensureHostsFile();
@@ -202,6 +202,26 @@ TEST(cmdnet, net_without_a_subcommand_is_not_accepted)
 
     shell.run("net");
     ASSERT_NE(shell.result(), PDI_OK);
+}
+
+TEST(cmdnet, net_connsta_leaves_the_wifi_service_active)
+{
+    pditest::Shell shell;
+    networked(shell);
+
+    shell.run("net connsta,fixture-ap,fixture-pass");
+
+    ASSERT_EQ((int)__wifi_service.getServiceState(), (int)SERVICE_STATE_ACTIVE);
+}
+
+TEST(cmdnet, net_connsta_leaves_the_wifi_service_reporting_active)
+{
+    pditest::Shell shell;
+    networked(shell);
+
+    shell.run("net connsta,fixture-ap,fixture-pass");
+
+    ASSERT_TRUE(saw(shell.run("service status WiFi"), "state   : active"));
 }
 
 /* ------------------------------------------------------------ date, tdctl */

@@ -11,7 +11,6 @@ created Date    : 1st June 2019
 #ifndef _DEVICE_IOT_SERVICE_PROVIDER_H_
 #define _DEVICE_IOT_SERVICE_PROVIDER_H_
 
-
 #include <service_provider/ServiceProvider.h>
 #include <service_provider/transport/MqttServiceProvider.h>
 #include <service_provider/database/DatabaseServiceProvider.h>
@@ -35,6 +34,28 @@ class DeviceIotServiceProvider : public ServiceProvider {
     ~DeviceIotServiceProvider();
 
     bool initService(void *arg = nullptr) override;
+
+    /**
+     * Drop the registration token, the sampling position and everything the
+     * server last configured, so a restart asks for its config again.
+     */
+    void resetServiceState() override;
+
+    /**
+     * Needs the transport it reports over and the pins it reports about, each of
+     * which brings up what it needs in turn.
+     */
+    uint8_t getServiceDependencies(service_t *_out, uint8_t _max) const override {
+      uint8_t _n = 0;
+    #ifdef ENABLE_MQTT_SERVICE
+      if( _max > _n ) _out[_n++] = SERVICE_MQTT;
+    #endif
+    #ifdef ENABLE_GPIO_SERVICE
+      if( _max > _n ) _out[_n++] = SERVICE_GPIO;
+    #endif
+      return _n;
+    }
+
     void handleRegistrationOtpRequest(  device_iot_config_table *_device_iot_configs, pdiutil::string &_response  );
     void handleDeviceIotConfigRequest( void );
     void handleDeviceIotConfigResponse( Http_Client *client );
