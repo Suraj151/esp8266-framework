@@ -318,7 +318,8 @@ void SSHServer::serviceSession() {
         if (m_session->m_state == LWSSHSession::SESSION_STATE_CHANNEL_REQUEST ||
             m_session->m_state == LWSSHSession::SESSION_STATE_SESSION_ESTABLISHED) {
 
-            bool is_sftp = (m_session->current_channel.req_type == "subsystem" &&
+            pdiutil::string _subsystem_ro = CHARPTR_WRAP("subsystem");
+            bool is_sftp = (m_session->current_channel.req_type == _subsystem_ro &&
                             m_session->current_channel.subsystem_req.subsystem.find("sftp") == 0);
 
             session_t *termsession = m_session->m_sshclient ?
@@ -424,7 +425,8 @@ bool SSHServer::getSSHKeyPairs(SSHKeyAlgorithm type, pdiutil::vector<uint8_t> &p
 
         pdiutil::string keydir = CHARPTR_WRAP(SSH_HOST_KEY_DIR);
         pdiutil::string ed_algo = CHARPTR_WRAP(SSH_KEY_ALGO_ED25519_STR);
-        build_key_path(privkeyOrseed_path, sizeof(privkeyOrseed_path), keydir.c_str(), ed_algo.c_str(), (privkeyInSeedPlusPubkeyformat ? ".seed" : ""));
+        pdiutil::string _seed_ext_ro = CHARPTR_WRAP(".seed");
+        build_key_path(privkeyOrseed_path, sizeof(privkeyOrseed_path), keydir.c_str(), ed_algo.c_str(), (privkeyInSeedPlusPubkeyformat ? _seed_ext_ro.c_str() : ""));
         build_key_path(pubkey_path, sizeof(pubkey_path), keydir.c_str(), ed_algo.c_str(), ".pub");
 
         if (!__i_fs.isFileExist(privkeyOrseed_path) || !__i_fs.isFileExist(pubkey_path)) {
@@ -773,14 +775,14 @@ void LWSSH::SSHServer::handleAuthentication(){
                     if( nullptr == SessionManager::attach(m_session->m_sshclient) ){
                         SysLogW("SSH: no free session, refusing login\n");
 
-                        const char *nofree = "no session available";
+                        pdiutil::string nofree = CHARPTR_WRAP("no session available");
                         pdiutil::vector<uint8_t> bye;
                         bye.push_back(SSH2_MSG_DISCONNECT);
                         bye.push_back((SSH2_DISCONNECT_TOO_MANY_CONNECTIONS >> 24) & 0xFF);
                         bye.push_back((SSH2_DISCONNECT_TOO_MANY_CONNECTIONS >> 16) & 0xFF);
                         bye.push_back((SSH2_DISCONNECT_TOO_MANY_CONNECTIONS >> 8) & 0xFF);
                         bye.push_back(SSH2_DISCONNECT_TOO_MANY_CONNECTIONS & 0xFF);
-                        append_ssh_string(bye, nofree, strlen(nofree));
+                        append_ssh_string(bye, nofree.c_str(), nofree.length());
                         append_ssh_string(bye, "", 0);
                         send_server_ssh_packet(m_session, bye, true);
 
@@ -1618,9 +1620,9 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                 uint32_t mtimeLocal = e.mtime ? e.mtime + (uint32_t)TZ_SEC : 0;
                                 char mYear[5];
                                 EpochToDateTimeString(mtimeLocal, mYear, sizeof(mYear), "%Y");
-                                const char* mfmt = __are_arrays_equal(mYear, nowYear, 4)
-                                    ? "%b %d %H:%M" : "%b %d  %Y";
-                                EpochToDateTimeString(mtimeLocal, datebuf, sizeof(datebuf), mfmt);
+                                pdiutil::string mfmt = __are_arrays_equal(mYear, nowYear, 4)
+                                    ? CHARPTR_WRAP("%b %d %H:%M") : CHARPTR_WRAP("%b %d  %Y");
+                                EpochToDateTimeString(mtimeLocal, datebuf, sizeof(datebuf), mfmt.c_str());
 
                                 memset(longbuf, 0, sizeof(longbuf));
                                 __snprintf(longbuf, sizeof(longbuf), "%s 1 %lu %lu %10lu %s %s",

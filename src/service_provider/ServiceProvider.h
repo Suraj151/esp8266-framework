@@ -139,6 +139,15 @@ class ServiceProvider{
     }
 
     /**
+     * Takes the service down and brings it back up from cold, so one definition
+     * of a restart serves every caller that needs one.
+     */
+    bool restartService(void *arg = nullptr){
+      stopService();
+      return startService(arg);
+    }
+
+    /**
      * What the service is doing, as its last start or stop left it.
      */
     service_state_t getServiceState() const { return m_service_state; }
@@ -320,6 +329,12 @@ class ServiceProvider{
      * Absolute path of the file this service reads its options from.
      */
     virtual void getServiceConfigPath(pdiutil::string &_out);
+
+    /**
+     * The service's own name in the form its config carries, which is the key the
+     * enable state is listed under and the stem of its settings file.
+     */
+    void getServiceConfigName(pdiutil::string &_out);
 
     /**
      * A service the device cannot be recovered without, which therefore stays

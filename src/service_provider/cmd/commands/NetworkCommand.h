@@ -138,13 +138,14 @@ struct NetworkCommand : public CommandBase {
 					memset(_wifi_credentials.sta_password, 0, WIFI_CONFIGS_BUF_SIZE);
 				}
 
+				_wifi_credentials.sta_enable = true;
+
 				m_terminal->putln();
 				m_terminal->write_ro(RODT_ATTR("Connecting to "));
 				m_terminal->writeln(_wifi_credentials.sta_ssid);
 
 				__database_service.set_wifi_config_table( &_wifi_credentials );
-				__wifi_service.stopService();
-				__wifi_service.startService(&__i_wifi);
+				__wifi_service.restartService(&__i_wifi);
 
 				m_terminal->writeln_ro(RODT_ATTR("Check Station Status after 10 second using 'net ip' command"));
 			}else{

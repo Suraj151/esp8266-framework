@@ -13,6 +13,7 @@ created Date    : 1st June 2019
 #if defined(ENABLE_MQTT_SERVICE)
 
 #include "MqttServiceProvider.h"
+#include <helpers/FeatureConfigFiles.h>
 
 /**
  * MqttServiceProvider constructor.
@@ -60,6 +61,10 @@ bool MqttServiceProvider::initService( void *arg ){
   this->m_mqtt_client.m_mqttDataCallbackArgs = reinterpret_cast<uint32_t*>(this);
   this->m_mqtt_client.OnData( MqttServiceProvider::handleMqttDataCb );
 
+#ifdef ENABLE_MQTT_CONFIG_FILE
+  syncMqttConfigFile();
+#endif
+
   this->handleMqttConfigChange();
 
   return ServiceProvider::initService(arg);
@@ -100,9 +105,7 @@ void MqttServiceProvider::handleMqttPublish(bool sync){
             *_payload += __i_dvc_ctrl.getDeviceId();
           #endif
 
-          memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
-          size_t _payload_len = pdistd::min( (size_t)_payload->size(), (size_t)(MQTT_PAYLOAD_BUF_SIZE - 1) );
-          memcpy(this->m_mqtt_payload, _payload->c_str(), _payload_len);
+          setMqttPayload(_payload->c_str(), _payload->size());
 
           pdiutil::safe_delete(_payload);
         }
@@ -226,27 +229,46 @@ bool MqttServiceProvider::stopService(){
 void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
 
 
-  mqtt_general_config_table _mqtt_general_configs;
-  mqtt_pubsub_config_table _mqtt_pubsub_configs;
-  __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
-  __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
+  mqtt_general_config_table *_mqtt_general_configs = pdiutil::safe_new<mqtt_general_config_table>();
+  mqtt_pubsub_config_table *_mqtt_pubsub_configs = pdiutil::safe_new<mqtt_pubsub_config_table>();
+
+  if( nullptr == _mqtt_general_configs || nullptr == _mqtt_pubsub_configs ){
+    pdiutil::safe_delete(_mqtt_general_configs);
+    pdiutil::safe_delete(_mqtt_pubsub_configs);
+    return;
+  }
+
+  __database_service.get_mqtt_general_config_table(_mqtt_general_configs);
+  __database_service.get_mqtt_pubsub_config_table(_mqtt_pubsub_configs);
 
   if( MQTT_GENERAL_CONFIG == _mqtt_config_type || MQTT_LWT_CONFIG == _mqtt_config_type ){
 
     this->m_mqtt_client.DeleteClient();
     int _stat = this->serviceSetTimeout( [&]() {
 
-      mqtt_general_config_table _mqtt_general_configs;
-      mqtt_lwt_config_table _mqtt_lwt_configs;
-      __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
-      __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
+      mqtt_general_config_table *_general = pdiutil::safe_new<mqtt_general_config_table>();
+      mqtt_lwt_config_table *_lwt = pdiutil::safe_new<mqtt_lwt_config_table>();
+
+      if( nullptr == _general || nullptr == _lwt ){
+        pdiutil::safe_delete(_general);
+        pdiutil::safe_delete(_lwt);
+        return;
+      }
+
+      __database_service.get_mqtt_general_config_table(_general);
+      __database_service.get_mqtt_lwt_config_table(_lwt);
 
       pdiutil::string mac_placeholder = CHARPTR_WRAP("[mac]");
-      __find_and_replace( _mqtt_general_configs.username, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2, MQTT_USERNAME_BUF_SIZE );
-      __find_and_replace( _mqtt_general_configs.client_id, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2, MQTT_CLIENT_ID_BUF_SIZE );
-      __find_and_replace( _mqtt_lwt_configs.will_message, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2, MQTT_WILL_MSG_BUF_SIZE );
+      __find_and_replace( _general->username, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2, MQTT_USERNAME_BUF_SIZE );
+      __find_and_replace( _general->client_id, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2, MQTT_CLIENT_ID_BUF_SIZE );
+      __find_and_replace( _lwt->will_message, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2, MQTT_WILL_MSG_BUF_SIZE );
 
-      if( this->m_mqtt_client.begin( m_client, &_mqtt_general_configs, &_mqtt_lwt_configs ) ){
+      bool _began = this->m_mqtt_client.begin( m_client, _general, _lwt );
+
+      pdiutil::safe_delete(_general);
+      pdiutil::safe_delete(_lwt);
+
+      if( _began ){
         this->m_mqtt_timer_cb_id = this->serviceUpdateInterval(
           this->m_mqtt_timer_cb_id,
           [&]() { this->m_mqtt_client.mqtt_timer(); },
@@ -267,9 +289,9 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
       for (uint8_t j = 0; j < MQTT_MAX_SUBSCRIBE_TOPIC; j++) {
 
         if( __are_str_equals(
-          _mqtt_pubsub_configs.subscribe_topics[j].topic,
+          _mqtt_pubsub_configs->subscribe_topics[j].topic,
           this->m_mqtt_client.m_mqttClient.subscribed_topics[i].topic,
-          strlen( _mqtt_pubsub_configs.subscribe_topics[j].topic )
+          strlen( _mqtt_pubsub_configs->subscribe_topics[j].topic )
         ) ) _found = true;
 
       }
@@ -281,22 +303,22 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
 
   }
 
-  if( _mqtt_pubsub_configs.publish_frequency > 0 ){
+  if( _mqtt_pubsub_configs->publish_frequency > 0 ){
     this->m_mqtt_publish_cb_id = this->serviceUpdateInterval(
       this->m_mqtt_publish_cb_id,
       [&]() { this->handleMqttPublish(); },
-      _mqtt_pubsub_configs.publish_frequency*MILLISECOND_DURATION_1000
+      _mqtt_pubsub_configs->publish_frequency*MILLISECOND_DURATION_1000
     );
   }else{
     __task_scheduler.clearInterval( this->m_mqtt_publish_cb_id );
     this->m_mqtt_publish_cb_id = 0;
   }
 
-  if( _mqtt_general_configs.keepalive > 0 ){
+  if( _mqtt_general_configs->keepalive > 0 ){
     this->m_mqtt_subscribe_cb_id = this->serviceUpdateInterval(
       this->m_mqtt_subscribe_cb_id,
       [&]() { this->handleMqttSubScribe(); },
-      (_mqtt_general_configs.keepalive/2)*MILLISECOND_DURATION_1000,
+      (_mqtt_general_configs->keepalive/2)*MILLISECOND_DURATION_1000,
       DEFAULT_TASK_PRIORITY, ( __i_dvc_ctrl.millis_now() + MQTT_INITIALIZE_DURATION )
     );
   }else{
@@ -304,6 +326,8 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
     this->m_mqtt_subscribe_cb_id = 0;
   }
 
+  pdiutil::safe_delete(_mqtt_general_configs);
+  pdiutil::safe_delete(_mqtt_pubsub_configs);
 }
 
 /**

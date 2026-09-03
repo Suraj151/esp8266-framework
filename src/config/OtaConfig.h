@@ -26,6 +26,15 @@ created Date    : 1st June 2019
  */
 #define ALLOW_OTA_CONFIG_MODIFICATION
 
+/**
+ * enable/disable the ota /etc/ota/ota.conf settings file here. each entry it
+ * needs costs a filesystem block, so it is left to the board whether there is
+ * room for one.
+ */
+#ifdef ENABLE_STORAGE_SERVICE
+// #define ENABLE_OTA_CONFIG_FILE
+#endif
+
 // leading byte every esp firmware image carries, checked before a local image
 // is written so a wrong file cannot brick the device
 #ifndef OTA_IMAGE_MAGIC_BYTE

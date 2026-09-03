@@ -500,6 +500,18 @@ ipaddress_t WiFiInterface::softAPIP()
 }
 
 /**
+ * The mask of the network the access point advertises, read from the address
+ * record the interface holds.
+ */
+ipaddress_t WiFiInterface::softAPSubnetMask()
+{
+  struct ip_info info;
+  memset(&info, 0, sizeof(info));
+  wifi_get_ip_info(SOFTAP_IF, &info);
+  return (uint32_t)info.netmask.addr;
+}
+
+/**
  * Soft AP macAddress
  */
 pdiutil::string WiFiInterface::softAPmacAddress()

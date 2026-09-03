@@ -93,6 +93,7 @@ public:
   bool softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ipaddress_t _subnet) override;
   bool softAPdisconnect(bool _wifioff = false) override;
   ipaddress_t softAPIP() override;
+  ipaddress_t softAPSubnetMask() override;
   pdiutil::string softAPmacAddress() override;
   void softAPmacAddress(uint8_t *mac) override;
   void setSoftAPmacAddress(uint8_t *mac) override;
@@ -158,6 +159,7 @@ private:
   ipaddress_t m_subnet;
   ipaddress_t m_dns;
   ipaddress_t m_apip;
+  ipaddress_t m_apsubnet;
 
   mock_wifi_network_t m_scanresults[PDI_POSIX_WIFI_MAX_SCAN_RESULTS];
   uint8_t m_scancount;

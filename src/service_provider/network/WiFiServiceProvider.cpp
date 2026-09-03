@@ -12,6 +12,9 @@ created Date    : 1st June 2019
 #if defined(ENABLE_WIFI_SERVICE)
 
 #include "WiFiServiceProvider.h"
+#ifdef ENABLE_STORAGE_SERVICE
+#include <helpers/FeatureConfigFiles.h>
+#endif
 
 /**
  * only the ports that can actually offer nat define this, and esp8266 defines it
@@ -54,13 +57,30 @@ bool WiFiServiceProvider::initService( void *arg ){
   if ( nullptr == this->m_wifi ) {
     this->m_wifi = &__i_wifi;
   }
+#ifdef ENABLE_WIFI_CONFIG_FILE
+  syncWifiConfigFile();
+#endif
+
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table( &_wifi_credentials );
 
+  this->m_sta_enabled = _wifi_credentials.sta_enable;
+  this->m_ap_enabled = _wifi_credentials.ap_enable;
+
   this->m_wifi->init();
   this->m_wifi->setAutoReconnect(false);
-  this->configure_wifi_station( &_wifi_credentials );
-  this->configure_wifi_access_point( &_wifi_credentials );
+
+  if( this->m_sta_enabled ){
+    this->configure_wifi_station( &_wifi_credentials );
+  }else{
+    this->m_wifi->enableSTA(false);
+  }
+
+  if( this->m_ap_enabled ){
+    this->configure_wifi_access_point( &_wifi_credentials );
+  }else{
+    this->m_wifi->enableAP(false);
+  }
 
   // routine to check wifi and internet connectivity
   m_service_routine_task_id = this->serviceUpdateInterval( m_service_routine_task_id, [&]() {
@@ -100,6 +120,8 @@ void WiFiServiceProvider::resetServiceState(){
   this->m_last_reconnect_attempt_ms = 0;
   this->m_reconnect_attempt = 0;
   this->m_ping_busy_since = 0;
+  this->m_sta_enabled = true;
+  this->m_ap_enabled = true;
 }
 
 /**
@@ -307,7 +329,7 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
  */
 void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
 
-  if( nullptr == this->m_wifi ){
+  if( nullptr == this->m_wifi || !this->m_ap_enabled ){
     return;
   }
 
@@ -450,7 +472,7 @@ void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCo
  */
 void WiFiServiceProvider::handleWiFiConnectivity(){
 
-  if( nullptr == this->m_wifi ){
+  if( nullptr == this->m_wifi || !this->m_sta_enabled ){
     return;
   }
 
@@ -683,7 +705,8 @@ void WiFiServiceProvider::printStatusToTerminal(iTerminalInterface *terminal){
       uint8_t *bssid = this->m_wifi->BSSID();
       if(nullptr != bssid){
         char macstr[36] = {0};
-        __snprintf(macstr, sizeof(macstr), "%02X:%02X:%02X:%02X:%02X:%02X", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+        pdiutil::string _mac_fmt_ro = CHARPTR_WRAP("%02X:%02X:%02X:%02X:%02X:%02X");
+        __snprintf(macstr, sizeof(macstr), _mac_fmt_ro.c_str(), bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
         terminal->writeln(macstr);
       }else{
         terminal->putln();

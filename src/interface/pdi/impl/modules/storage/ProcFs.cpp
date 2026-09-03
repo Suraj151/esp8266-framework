@@ -422,7 +422,8 @@ pdiutil::string ProcFs::renderStat() {
 
 #ifdef ENABLE_NETWORK_SERVICE
 /**
- * The gateway each registered interface routes through.
+ * The routes the registered interfaces provide, each network they reach
+ * directly and the default route wherever a gateway answers for one.
  */
 pdiutil::string ProcFs::renderNetRoute() {
     pdiutil::string out;
@@ -430,7 +431,10 @@ pdiutil::string ProcFs::renderNetRoute() {
     __append_padded(out, CHARPTR_WRAP("Iface"), PROC_COL_IFACE);
     __append_padded(out, CHARPTR_WRAP("Destination"), PROC_COL_ADDR);
     __append_padded(out, CHARPTR_WRAP("Gateway"), PROC_COL_ADDR);
-    out += CHARPTR_WRAP("Mask" TERMINAL_NEW_LINE);
+    __append_padded(out, "Mask", PROC_COL_ADDR);
+    out += CHARPTR_WRAP("Flags" TERMINAL_NEW_LINE);
+
+    pdiutil::string anyaddr = CHARPTR_WRAP("0.0.0.0");
 
     for (uint8_t i = 0; i < __netif_registry.count(); ++i) {
         iNetifInterface* netif = __netif_registry.at(i);
@@ -439,11 +443,25 @@ pdiutil::string ProcFs::renderNetRoute() {
         netif_info_t info;
         if (!netif->getInfo(info) || !info.m_up) continue;
 
-        __append_padded(out, netif->name(), PROC_COL_IFACE);
-        __append_padded(out, CHARPTR_WRAP("0.0.0.0"), PROC_COL_ADDR);
-        __append_padded(out, pdiutil::string(info.m_gateway).c_str(), PROC_COL_ADDR);
-        out += pdiutil::string(info.m_netmask);
-        out += TERMINAL_NEW_LINE;
+        if (IP4_ADDRESS_ANY != (uint32_t)info.m_netmask) {
+            ipaddress_t network((uint32_t)info.m_ip & (uint32_t)info.m_netmask);
+
+            __append_padded(out, netif->name(), PROC_COL_IFACE);
+            __append_padded(out, pdiutil::string(network).c_str(), PROC_COL_ADDR);
+            __append_padded(out, anyaddr.c_str(), PROC_COL_ADDR);
+            __append_padded(out, pdiutil::string(info.m_netmask).c_str(), PROC_COL_ADDR);
+            out += "U";
+            out += TERMINAL_NEW_LINE;
+        }
+
+        if (info.m_gateway.isSet()) {
+            __append_padded(out, netif->name(), PROC_COL_IFACE);
+            __append_padded(out, anyaddr.c_str(), PROC_COL_ADDR);
+            __append_padded(out, pdiutil::string(info.m_gateway).c_str(), PROC_COL_ADDR);
+            __append_padded(out, anyaddr.c_str(), PROC_COL_ADDR);
+            out += "UG";
+            out += TERMINAL_NEW_LINE;
+        }
     }
 
     return out;

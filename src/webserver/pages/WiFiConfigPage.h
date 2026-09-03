@@ -27,7 +27,12 @@ Created Date    : 1st June 2019
  */
 static const char WEB_SERVER_WIFI_CONFIG_PAGE_TOP[] PROG_RODT_ATTR = "\
 <h2>WiFi Configuration</h2>\
-<form action='/wifi-config' method='POST'>\
+<script>function wchk(){\
+var s=document.getElementsByName('sta_en')[0],a=document.getElementsByName('ap_en')[0];\
+if(s&&a&&!s.checked&&!a.checked){\
+return confirm('Station and access point are both off. This device will not be reachable over the network. Continue?');}\
+return true;}</script>\
+<form action='/wifi-config' method='POST' onsubmit='return wchk()'>\
 <table>";
 
 /**

@@ -61,7 +61,7 @@ public:
 			this->m_route_handler->register_route(
 				WEB_SERVER_EMAIL_CONFIG_ROUTE, [&]()
 				{ this->handleEmailConfigRoute(); },
-				AUTH_MIDDLEWARE);
+				ROOT_AUTH_MIDDLEWARE);
 		}
 	}
 
@@ -85,6 +85,7 @@ public:
 		char _port[10];
 		memset(_port, 0, 10);
 		__appendUintToBuff(_port, "%d", this->email_configs.mail_port, 8);
+		pdiutil::string _password_type_ro = CHARPTR_WRAP("password");
 		// char _freq[10];memset( _freq, 0, 10 );
 		// __appendUintToBuff( _freq, "%d", this->email_configs.mail_frequency, 8 );
 
@@ -93,7 +94,7 @@ public:
 
 		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Port:"), RODT_ATTR("ml_prt"), _port);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Username:"), RODT_ATTR("ml_usr"), this->email_configs.mail_username, DEFAULT_MAIL_USERNAME_MAX_SIZE - 1);
-		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Password:"), RODT_ATTR("ml_psw"), this->email_configs.mail_password, DEFAULT_MAIL_PASSWORD_MAX_SIZE - 1, (char *)"password");
+		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Password:"), RODT_ATTR("ml_psw"), this->email_configs.mail_password, DEFAULT_MAIL_PASSWORD_MAX_SIZE - 1, (char *)_password_type_ro.c_str());
 		CONTINUE_SEND_IN_CHUNK(_page);
 
 		concat_tr_input_html_tags(_page, RODT_ATTR("Mail From:"), RODT_ATTR("ml_frm"), this->email_configs.mail_from, DEFAULT_MAIL_FROM_MAX_SIZE - 1);
@@ -208,7 +209,8 @@ public:
 
 		if (_is_posted && !_is_error && _is_test_mail)
 		{
-			__email_service.sendMail(TEST_EMAIL_MESSAGE);
+			pdiutil::string _test_message_ro = CHARPTR_WRAP(TEST_EMAIL_MESSAGE);
+			__email_service.sendMail(_test_message_ro.c_str());
 			// __email_service.sendMail( RODT_ATTR("this is test mail") );
 		}
 	}

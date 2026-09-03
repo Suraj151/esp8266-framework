@@ -51,6 +51,7 @@ WiFiInterface::WiFiInterface() : m_mode(MOCK_WIFI_OFF),
     m_subnet = ipaddress_t(255, 255, 255, 0);
     m_dns = ipaddress_t(192, 168, 1, 1);
     m_apip = ipaddress_t(192, 168, 0, 1);
+    m_apsubnet = ipaddress_t(255, 255, 255, 0);
 }
 
 WiFiInterface::~WiFiInterface()
@@ -309,6 +310,7 @@ bool WiFiInterface::softAP(const char *_ssid, const char *_passphrase, int _chan
 bool WiFiInterface::softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ipaddress_t _subnet)
 {
     m_apip = _local_ip;
+    m_apsubnet = _subnet;
     return true;
 }
 
@@ -322,6 +324,15 @@ bool WiFiInterface::softAPdisconnect(bool _wifioff)
 ipaddress_t WiFiInterface::softAPIP()
 {
     return m_apip;
+}
+
+/**
+ * The mask of the network the access point advertises, read from the address
+ * record the interface holds.
+ */
+ipaddress_t WiFiInterface::softAPSubnetMask()
+{
+    return m_apsubnet;
 }
 
 pdiutil::string WiFiInterface::softAPmacAddress()

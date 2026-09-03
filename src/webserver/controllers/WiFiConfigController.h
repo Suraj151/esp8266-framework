@@ -13,6 +13,9 @@ created Date    : 1st June 2019
 
 #include "Controller.h"
 #include <webserver/pages/WiFiConfigPage.h>
+#ifdef ENABLE_WIFI_SERVICE
+#include <service_provider/network/WiFiServiceProvider.h>
+#endif
 
 /**
  * WiFiConfigController class
@@ -56,7 +59,7 @@ public:
       this->m_route_handler->register_route(
           WEB_SERVER_WIFI_CONFIG_ROUTE, [&]()
           { this->handleWiFiConfigRoute(); },
-          AUTH_MIDDLEWARE);
+          ROOT_AUTH_MIDDLEWARE);
     }
   }
 
@@ -79,6 +82,7 @@ public:
 
 #ifdef ALLOW_WIFI_CONFIG_MODIFICATION
 
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Station:"), RODT_ATTR("sta_en"), "enable", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, this->wifi_configs.sta_enable);
     concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Name:"), RODT_ATTR("sta_ssid"), this->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE - 1);
     concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Password:"), RODT_ATTR("sta_pswd"), this->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE - 1);
 
@@ -90,6 +94,7 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Subnet:"), RODT_ATTR("sta_sip"), _ip_address);
     CONTINUE_SEND_IN_CHUNK(_page);
 
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Point:"), RODT_ATTR("ap_en"), "enable", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, this->wifi_configs.ap_enable);
     concat_tr_input_html_tags(_page, RODT_ATTR("Access Name:"), RODT_ATTR("ap_ssid"), this->wifi_configs.ap_ssid, WIFI_CONFIGS_BUF_SIZE - 1);
     concat_tr_input_html_tags(_page, RODT_ATTR("Access Password:"), RODT_ATTR("ap_pswd"), this->wifi_configs.ap_password, WIFI_CONFIGS_BUF_SIZE - 1);
 
@@ -188,6 +193,8 @@ public:
       pdiutil::string _ap_lip = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ap_lip"));
       pdiutil::string _ap_gip = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ap_gip"));
       pdiutil::string _ap_sip = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ap_sip"));
+      pdiutil::string _sta_en = this->m_web_resource->m_server->arg(CHARPTR_WRAP("sta_en"));
+      pdiutil::string _ap_en = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ap_en"));
       __i_dvc_ctrl.yield();
 
       LogI("\nSubmitted info :\n");
@@ -238,6 +245,10 @@ public:
         strncpy(_ip_address, _ap_sip.c_str(), _ap_sip.size());
         __str_ip_to_int(_ip_address, this->wifi_configs.ap_subnet, 20);
 
+        pdiutil::string _enable_flag = CHARPTR_WRAP("enable");
+        this->wifi_configs.sta_enable = (_sta_en == _enable_flag);
+        this->wifi_configs.ap_enable = (_ap_en == _enable_flag);
+
 #else
 
         strncpy(this->wifi_configs.sta_ssid, _sta_ssid.c_str(), _sta_ssid.size());
@@ -270,7 +281,7 @@ public:
     if (_is_posted && !_is_error)
     {
       __i_dvc_ctrl.wait(100);
-      __i_dvc_ctrl.restartDevice();
+      __wifi_service.restartService(&__i_wifi);
     }
   }
 };

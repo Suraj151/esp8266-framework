@@ -726,6 +726,9 @@ enum file_attr_id_t : uint8_t {
 // Default POSIX-style permission bits assigned to newly created entries.
 #define FILE_PERM_DEFAULT_FILE  0644
 #define FILE_PERM_DEFAULT_DIR   0755
+#define FILE_PERM_PRIVATE_FILE  0600
+#define FILE_OWNER_ROOT_UID     0
+#define FILE_OWNER_ROOT_GID     0
 
 // Default per-session umask (POSIX-style). Applied at file/dir creation as
 // (default_perms & ~umask).

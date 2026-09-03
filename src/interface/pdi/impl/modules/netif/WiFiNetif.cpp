@@ -53,6 +53,7 @@ bool WiFiStationNetif::getCounters(netif_counters_t &out) {
 bool WiFiApNetif::getInfo(netif_info_t &out) {
     out.m_kind = NETIF_KIND_WIFI_AP;
     out.m_ip = __i_wifi.softAPIP();
+    out.m_netmask = __i_wifi.softAPSubnetMask();
 
     // there are no portable mode constants to ask, and an access point that
     // holds an address is one that came up

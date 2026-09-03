@@ -81,6 +81,8 @@ public:
   virtual bool softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ipaddress_t _subnet) = 0;
   virtual bool softAPdisconnect(bool _wifioff = false) = 0;
   virtual ipaddress_t softAPIP() = 0;
+
+  virtual ipaddress_t softAPSubnetMask() { return ipaddress_t(); }
   virtual pdiutil::string softAPmacAddress() = 0;
   virtual void softAPmacAddress(uint8_t *mac) = 0;
   virtual void setSoftAPmacAddress(uint8_t *mac) = 0;

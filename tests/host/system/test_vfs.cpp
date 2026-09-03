@@ -692,7 +692,7 @@ TEST(procfs, the_net_directory_holds_route_dev_and_tcp)
     ASSERT_FALSE(fs->isFileExist("/proc/net/bogus"));
 }
 
-TEST(procfs, route_names_every_interface_that_is_up)
+TEST(procfs, route_names_every_interface_that_has_somewhere_to_route)
 {
     VfsDispatcher *fs = mountedVfs();
     pditest::readyNetifs();
@@ -708,8 +708,64 @@ TEST(procfs, route_names_every_interface_that_is_up)
         netif_info_t info;
         if (!netif->getInfo(info) || !info.m_up) continue;
 
-        ASSERT_TRUE(route.find(netif->name()) != pdiutil::string::npos);
+        // an interface can be up before it holds an address, and one with
+        // neither a network nor a gateway has no route to report
+        bool routable = (IP4_ADDRESS_ANY != (uint32_t)info.m_netmask) || info.m_gateway.isSet();
+        bool named = (route.find(netif->name()) != pdiutil::string::npos);
+
+        ASSERT_EQ(named, routable);
     }
+}
+
+TEST(procfs, route_carries_the_network_each_interface_reaches_directly)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+    pdiutil::string route = slurp(fs, "/proc/net/route");
+
+    ASSERT_TRUE(route.find("Flags") != pdiutil::string::npos);
+
+    for (uint8_t i = 0; i < __netif_registry.count(); i++)
+    {
+        iNetifInterface *netif = __netif_registry.at(i);
+        ASSERT_TRUE(nullptr != netif);
+
+        netif_info_t info;
+        if (!netif->getInfo(info) || !info.m_up) continue;
+        if (IP4_ADDRESS_ANY == (uint32_t)info.m_netmask) continue;
+
+        ipaddress_t network((uint32_t)info.m_ip & (uint32_t)info.m_netmask);
+        ASSERT_TRUE(route.find(pdiutil::string(network).c_str()) != pdiutil::string::npos);
+        ASSERT_TRUE(route.find(pdiutil::string(info.m_netmask).c_str()) != pdiutil::string::npos);
+    }
+}
+
+TEST(procfs, route_gives_a_default_route_only_to_an_interface_with_a_gateway)
+{
+    VfsDispatcher *fs = mountedVfs();
+    pditest::readyNetifs();
+    pdiutil::string route = slurp(fs, "/proc/net/route");
+
+    uint8_t defaults = 0;
+    uint8_t gateways = 0;
+
+    const char *scan = route.c_str();
+    for (uint32_t i = 0; '\0' != scan[i] && '\0' != scan[i + 1]; i++)
+    {
+        if ('U' == scan[i] && 'G' == scan[i + 1]) defaults++;
+    }
+
+    for (uint8_t i = 0; i < __netif_registry.count(); i++)
+    {
+        iNetifInterface *netif = __netif_registry.at(i);
+        ASSERT_TRUE(nullptr != netif);
+
+        netif_info_t info;
+        if (!netif->getInfo(info) || !info.m_up) continue;
+        if (info.m_gateway.isSet()) gateways++;
+    }
+
+    ASSERT_EQ(defaults, gateways);
 }
 
 TEST(procfs, dev_lists_only_interfaces_that_can_count)

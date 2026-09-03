@@ -17,6 +17,7 @@ created Date    : 16th Aug 2026
 #define _PDITEST_MOUNTED_STACK_H_
 
 #include <interface/pdi.h>
+#include <service_provider/database/DatabaseServiceProvider.h>
 #ifdef ENABLE_PROCFS
 #include <interface/pdi/impl/modules/storage/ProcFs.h>
 #endif
@@ -82,6 +83,26 @@ inline VfsDispatcher *mountedVfs()
     }
 
     return &__i_fs;
+}
+
+/**
+ * @brief The record store, registered and mounted on the same filesystem.
+ *
+ * Without this the layout is never mounted, so every set on a config table is
+ * refused and a test that reads one back sees only the struct defaults.
+ */
+inline DatabaseServiceProvider *mountedDb()
+{
+    static bool ready = false;
+
+    if (!ready)
+    {
+        ready = true;
+        mountedVfs();
+        __database_service.initService();
+    }
+
+    return &__database_service;
 }
 
 } // namespace pditest

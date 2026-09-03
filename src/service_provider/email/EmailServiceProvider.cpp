@@ -13,6 +13,7 @@ created Date    : 1st June 2019
 #if defined(ENABLE_EMAIL_SERVICE)
 
 #include "EmailServiceProvider.h"
+#include <helpers/FeatureConfigFiles.h>
 
 /**
  * EmailServiceProvider constructor.
@@ -47,6 +48,10 @@ bool EmailServiceProvider::initService(void *arg)
   }
 
   this->m_mail_handler_cb_id = 0;
+
+#ifdef ENABLE_EMAIL_CONFIG_FILE
+  syncEmailConfigFile();
+#endif
 
   return ServiceProvider::initService(arg);
 }

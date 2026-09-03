@@ -202,10 +202,12 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
                 break;
             }
 
-            {
+            if (0 == waited) {
                 TCP_GUARD_BEGIN
                 err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD;
                 TCP_GUARD_END
+            } else {
+                err = ERR_OK;
             }
 
             __i_dvc_ctrl.wait(1);
@@ -558,9 +560,9 @@ void TcpClientInterface::setNoDelay(bool noDelay) {
     TCP_GUARD_BEGIN
     if (m_pcb) {
         if (noDelay) {
-            m_pcb->so_options |= TF_NODELAY;
+            tcp_nagle_disable(m_pcb);
         } else {
-            m_pcb->so_options &= ~TF_NODELAY;
+            tcp_nagle_enable(m_pcb);
         }
     }
     TCP_GUARD_END
@@ -594,7 +596,10 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
 
     if(m_pcb && err == ERR_OK) {
 
-        tcp_output(m_pcb);
+        if (nullptr != m_pcb->unsent && 0 == (m_pcb->flags & TF_RTO)) {
+            tcp_output(m_pcb);
+        }
+
         uint32_t availablebuff = tcp_sndbuf(m_pcb);
         uint32_t queuelen = tcp_sndqueuelen(m_pcb);
 

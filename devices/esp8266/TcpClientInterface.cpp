@@ -245,13 +245,17 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
                 break;
             }
 
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            __lwip_mutex.critical_lock();
-            #endif
-            err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD;
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            __lwip_mutex.critical_unlock();
-            #endif
+            if (0 == waited) {
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __lwip_mutex.critical_lock();
+                #endif
+                err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD;
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __lwip_mutex.critical_unlock();
+                #endif
+            } else {
+                err = ERR_OK;
+            }
 
             __i_dvc_ctrl.wait(1);
             __i_dvc_ctrl.yield();
@@ -684,9 +688,9 @@ void TcpClientInterface::setNoDelay(bool noDelay) {
     }
 
     if (noDelay) {
-        m_pcb->so_options |= TF_NODELAY; // Disable Nagle's algorithm
+        tcp_nagle_disable(m_pcb); // Disable Nagle's algorithm
     } else {
-        m_pcb->so_options &= ~TF_NODELAY; // Enable Nagle's algorithm
+        tcp_nagle_enable(m_pcb); // Enable Nagle's algorithm
     }
 }
 
@@ -723,7 +727,9 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
 
     if(m_pcb && err == ERR_OK) {
 
-        err_t tcpout_err = tcp_output(m_pcb);  // Ensure the data is sent
+        if (nullptr != m_pcb->unsent && 0 == (m_pcb->flags & TF_RTO)) {
+            tcp_output(m_pcb);
+        }
 
         uint32_t availablebuff = tcp_sndbuf(m_pcb);
         uint32_t queuelen = tcp_sndqueuelen(m_pcb);

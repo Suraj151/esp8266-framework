@@ -71,6 +71,11 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define MAX_DB_TABLES 15
 
 /**
+ * Bytes a pipe carries between two stages.
+ */
+#define PDI_PIPE_CAPACITY 6*1024
+
+/**
  * device can spare the ram the record ciphers need
  */
 #define DEVICE_SUPPORTS_DB_SEALING

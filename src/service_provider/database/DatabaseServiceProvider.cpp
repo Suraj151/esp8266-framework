@@ -16,6 +16,9 @@ created Date    : 1st June 2019
 #include <database/core/DbKey.h>
 #endif
 #include <service_provider/device/FactoryResetServiceProvider.h>
+#ifdef ENABLE_STORAGE_SERVICE
+#include <helpers/FeatureConfigFiles.h>
+#endif
 
 #if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
 /**
@@ -431,7 +434,13 @@ bool DatabaseServiceProvider::set_login_credential_table(login_credential_table 
  */
 bool DatabaseServiceProvider::set_wifi_config_table(wifi_config_table *_table)
 {
-  return __wifi_table.set(_table);
+  bool status = __wifi_table.set(_table);
+
+#ifdef ENABLE_WIFI_CONFIG_FILE
+  writeWifiConfigFile(_table);
+#endif
+
+  return status;
 }
 #endif
 
@@ -444,7 +453,13 @@ bool DatabaseServiceProvider::set_wifi_config_table(wifi_config_table *_table)
  */
 bool DatabaseServiceProvider::set_ota_config_table(ota_config_table *_table)
 {
-  return __ota_table.set(_table);
+  bool status = __ota_table.set(_table);
+
+#ifdef ENABLE_OTA_CONFIG_FILE
+  writeOtaConfigFile(_table);
+#endif
+
+  return status;
 }
 #endif
 
@@ -470,7 +485,13 @@ bool DatabaseServiceProvider::set_gpio_config_table(gpio_config_table *_table)
  */
 bool DatabaseServiceProvider::set_mqtt_general_config_table(mqtt_general_config_table *_table)
 {
-  return __mqtt_general_table.set(_table);
+  bool status = __mqtt_general_table.set(_table);
+
+#ifdef ENABLE_MQTT_CONFIG_FILE
+  writeMqttConfigFile();
+#endif
+
+  return status;
 }
 
 /**
@@ -481,7 +502,13 @@ bool DatabaseServiceProvider::set_mqtt_general_config_table(mqtt_general_config_
  */
 bool DatabaseServiceProvider::set_mqtt_lwt_config_table(mqtt_lwt_config_table *_table)
 {
-  return __mqtt_lwt_table.set(_table);
+  bool status = __mqtt_lwt_table.set(_table);
+
+#ifdef ENABLE_MQTT_CONFIG_FILE
+  writeMqttConfigFile();
+#endif
+
+  return status;
 }
 
 /**
@@ -505,7 +532,13 @@ bool DatabaseServiceProvider::set_mqtt_pubsub_config_table(mqtt_pubsub_config_ta
  */
 bool DatabaseServiceProvider::set_email_config_table(email_config_table *_table)
 {
-  return __email_table.set(_table);
+  bool status = __email_table.set(_table);
+
+#ifdef ENABLE_EMAIL_CONFIG_FILE
+  writeEmailConfigFile(_table);
+#endif
+
+  return status;
 }
 #endif
 

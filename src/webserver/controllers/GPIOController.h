@@ -62,19 +62,19 @@ public:
 			this->m_route_handler->register_route(
 				WEB_SERVER_GPIO_SERVER_CONFIG_ROUTE, [&]()
 				{ this->handleGpioServerConfigRoute(); },
-				AUTH_MIDDLEWARE);
+				ROOT_AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
 				WEB_SERVER_GPIO_MODE_CONFIG_ROUTE, [&]()
 				{ this->handleGpioModeConfigRoute(); },
-				AUTH_MIDDLEWARE);
+				ROOT_AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
 				WEB_SERVER_GPIO_WRITE_CONFIG_ROUTE, [&]()
 				{ this->handleGpioWriteConfigRoute(); },
-				AUTH_MIDDLEWARE);
+				ROOT_AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
 				WEB_SERVER_GPIO_EVENT_CONFIG_ROUTE, [&]()
 				{ this->handleGpioEventConfigRoute(); },
-				AUTH_MIDDLEWARE);
+				ROOT_AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
 				WEB_SERVER_GPIO_MONITOR_ROUTE, [&]()
 				{ this->handleGpioMonitorRoute(); },
@@ -115,18 +115,17 @@ public:
 
 		if (nullptr != _response)
 		{
-			*_response = "{\"x1\":";
+			*_response = CHARPTR_WRAP("{\"x1\":");
 			*_response += pdiutil::to_string(x1);
-			*_response += ",\"y1\":";
+			*_response += CHARPTR_WRAP(",\"y1\":");
 			*_response += pdiutil::to_string(y1);
-			*_response += ",\"x2\":";
+			*_response += CHARPTR_WRAP(",\"x2\":");
 			*_response += pdiutil::to_string(x2);
-			*_response += ",\"y2\":";
+			*_response += CHARPTR_WRAP(",\"y2\":");
 			*_response += pdiutil::to_string(y2);
-			*_response += ",\"d\":";
+			*_response += CHARPTR_WRAP(",\"d\":");
 			__gpio_service.appendGpioJsonPayload(*_response);
-			*_response += ",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"BLINK\", \"AOUT\", \"AIN\"]";
-			*_response += "}";
+			*_response += CHARPTR_WRAP(",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"BLINK\", \"AOUT\", \"AIN\"]}");
 
 			this->_last_monitor_point.x = x2;
 			this->_last_monitor_point.y = y2;
@@ -669,6 +668,7 @@ public:
 		getEnabledGpiosForEvents(_enabled_gpios);
 		bool _added_options = !_enabled_gpios.empty();
 
+		pdiutil::string _analog_label_fmt = CHARPTR_WRAP("anlt%d"), _analog_value_fmt = CHARPTR_WRAP("aval%d");
 
 		for (uint8_t _evtidx = 0; _evtidx < MAX_GPIO_EVENTS; _evtidx++) {
 
@@ -702,8 +702,8 @@ public:
 					{
 						__appendUintToBuff(_name, "A%d", (gpionumber - MAX_DIGITAL_GPIO_PINS), 7);
 						__appendUintToBuff(_label, "a%d", _evtidx, 7);
-						__appendUintToBuff(_event_label, "anlt%d", _evtidx, 7);
-						__appendUintToBuff(_event_value, "aval%d", _evtidx, 7);
+						__appendUintToBuff(_event_label, _analog_label_fmt.c_str(), _evtidx, 7);
+						__appendUintToBuff(_event_value, _analog_value_fmt.c_str(), _evtidx, 7);
 
 						_added_options = true;
 						memset(_analog_value, 0, 10);
@@ -813,6 +813,7 @@ public:
 			}
 			
 			char _label[8], _event_label[8], _event_value[8];
+			pdiutil::string _analog_label_fmt = CHARPTR_WRAP("anlt%d"), _analog_value_fmt = CHARPTR_WRAP("aval%d");
 
 			for (uint8_t _evtidx = 0; _evtidx < MAX_GPIO_EVENTS; _evtidx++) {
 
@@ -848,8 +849,8 @@ public:
 					}else{
 
 						__appendUintToBuff(_label, "a%d", _evtidx, 7);
-						__appendUintToBuff(_event_label, "anlt%d", _evtidx, 7);
-						__appendUintToBuff(_event_value, "aval%d", _evtidx, 7);
+						__appendUintToBuff(_event_label, _analog_label_fmt.c_str(), _evtidx, 7);
+						__appendUintToBuff(_event_value, _analog_value_fmt.c_str(), _evtidx, 7);
 
 						if (!this->m_web_resource->m_server->arg(_label).empty() && !this->m_web_resource->m_server->arg(_event_value).empty() && !this->m_web_resource->m_server->arg(_event_label).empty())
 						{

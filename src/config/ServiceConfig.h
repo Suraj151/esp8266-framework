@@ -15,10 +15,10 @@ created Date    : 30th Aug 2026
 
 #define SERVICE_CONFIG_DIR_ROOT "/etc/"
 #define SERVICE_CONFIG_FILE_SUFFIX ".conf"
-#define SERVICE_CONFIG_KEY_ENABLED "enabled"
-#define SERVICE_CONFIG_HEADER \
-    "# PDI service configuration" TERMINAL_NEW_LINE \
-    "# enabled yes|no" TERMINAL_NEW_LINE
+#define SERVICE_ENABLE_CONFIG_FILE "/etc/service.conf"
+#define SERVICE_ENABLE_CONFIG_HEADER \
+    "# PDI service enable state, one line per service" TERMINAL_NEW_LINE \
+    "# <service> yes|no" TERMINAL_NEW_LINE
 
 #ifndef SERVICE_NAME_MAX
 #define SERVICE_NAME_MAX 16

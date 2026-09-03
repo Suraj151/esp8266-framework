@@ -131,7 +131,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [no-network, no-storage, no-auth, no-cmd, no-seal, minimal]
+        profile: [no-network, no-storage, no-auth, no-cmd, no-seal, no-featureconf, minimal]
     steps:
       - uses: actions/checkout@v4
 

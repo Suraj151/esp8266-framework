@@ -48,7 +48,7 @@ public:
 			this->m_route_handler->register_route(
 				WEB_SERVER_OTA_CONFIG_ROUTE, [&]()
 				{ this->handleOtaServerConfigRoute(); },
-				AUTH_MIDDLEWARE);
+				ROOT_AUTH_MIDDLEWARE);
 		}
 	}
 

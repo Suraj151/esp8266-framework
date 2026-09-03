@@ -66,7 +66,8 @@ private:
   pdiutil::string renderStat();
 
   /**
-   * The gateway each registered interface routes through.
+   * The routes the registered interfaces provide, each network they reach
+   * directly and the default route wherever a gateway answers for one.
    */
   pdiutil::string renderNetRoute();
 

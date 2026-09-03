@@ -38,6 +38,15 @@ created Date    : 1st June 2019
 #define DEFAULT_MAIL_FROM_NAME            "pdiStack"
 // #define DEFAULT_MAIL_ENCRYPTION           "tls"
 
+/**
+ * enable/disable the email /etc/email/email.conf settings file here. each entry
+ * it needs costs a filesystem block, so it is left to the board whether there is
+ * room for one.
+ */
+#ifdef ENABLE_STORAGE_SERVICE
+// #define ENABLE_EMAIL_CONFIG_FILE
+#endif
+
 
 struct email_config {
 

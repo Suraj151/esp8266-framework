@@ -96,15 +96,16 @@ class LoginController : public Controller {
 		void build_login_config_html( char* _page, bool _is_error=false, bool _enable_flash=false, const char* _message=nullptr, const char* _username=nullptr, int _max_size=PAGE_HTML_MAX_SIZE ){
 
       char _empty[1] = {0};
+      pdiutil::string _password_type_ro = CHARPTR_WRAP("password");
 
       concat_header_html( _page );
       strcat_ro( _page, WEB_SERVER_LOGIN_CONFIG_PAGE_TOP );
       CONTINUE_SEND_IN_CHUNK(_page);
 
       concat_tr_input_html_tags( _page, RODT_ATTR("User:"), RODT_ATTR("usrnm"), (char*)( nullptr != _username ? _username : __auth_service.getUsername() ), LOGIN_CONFIGS_BUF_SIZE-1, (char*)"text", false, true );
-      concat_tr_input_html_tags( _page, RODT_ATTR("Current Password:"), RODT_ATTR("cpswd"), _empty, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
-      concat_tr_input_html_tags( _page, RODT_ATTR("New Password:"), RODT_ATTR("npswd"), _empty, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
-      concat_tr_input_html_tags( _page, RODT_ATTR("Confirm Password:"), RODT_ATTR("rpswd"), _empty, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
+      concat_tr_input_html_tags( _page, RODT_ATTR("Current Password:"), RODT_ATTR("cpswd"), _empty, LOGIN_CONFIGS_BUF_SIZE-1, (char*)_password_type_ro.c_str() );
+      concat_tr_input_html_tags( _page, RODT_ATTR("New Password:"), RODT_ATTR("npswd"), _empty, LOGIN_CONFIGS_BUF_SIZE-1, (char*)_password_type_ro.c_str() );
+      concat_tr_input_html_tags( _page, RODT_ATTR("Confirm Password:"), RODT_ATTR("rpswd"), _empty, LOGIN_CONFIGS_BUF_SIZE-1, (char*)_password_type_ro.c_str() );
       concat_csrf_input_html_tag( _page );
 
       strcat_ro( _page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
@@ -134,15 +135,17 @@ class LoginController : public Controller {
       pdiutil::string _message = CHARPTR_WRAP("Invalid length error(4-24)");
       pdiutil::string _username = __auth_service.getUsername();
 
-      if ( this->m_web_resource->m_server->hasArg("cpswd") &&
-           this->m_web_resource->m_server->hasArg("npswd") &&
-           this->m_web_resource->m_server->hasArg("rpswd") ) {
+      pdiutil::string _cpswd_arg = CHARPTR_WRAP("cpswd"), _npswd_arg = CHARPTR_WRAP("npswd"), _rpswd_arg = CHARPTR_WRAP("rpswd");
+
+      if ( this->m_web_resource->m_server->hasArg(_cpswd_arg.c_str()) &&
+           this->m_web_resource->m_server->hasArg(_npswd_arg.c_str()) &&
+           this->m_web_resource->m_server->hasArg(_rpswd_arg.c_str()) ) {
 
         _is_posted = true;
 
-        pdiutil::string _current = this->m_web_resource->m_server->arg("cpswd");
-        pdiutil::string _new = this->m_web_resource->m_server->arg("npswd");
-        pdiutil::string _repeat = this->m_web_resource->m_server->arg("rpswd");
+        pdiutil::string _current = this->m_web_resource->m_server->arg(_cpswd_arg.c_str());
+        pdiutil::string _new = this->m_web_resource->m_server->arg(_npswd_arg.c_str());
+        pdiutil::string _repeat = this->m_web_resource->m_server->arg(_rpswd_arg.c_str());
 
         if( _new.size() >= LOGIN_CONFIGS_BUF_SIZE || _new.size() <= MIN_ACCEPTED_ARG_SIZE ){
 
@@ -285,8 +288,10 @@ class LoginController : public Controller {
         return;
       }
 
-      bool _is_posted = ( this->m_web_resource->m_server->hasArg("username") &&
-                          this->m_web_resource->m_server->hasArg("password") );
+      pdiutil::string _username_arg = CHARPTR_WRAP("username"), _password_arg = CHARPTR_WRAP("password");
+
+      bool _is_posted = ( this->m_web_resource->m_server->hasArg(_username_arg.c_str()) &&
+                          this->m_web_resource->m_server->hasArg(_password_arg.c_str()) );
       pdiutil::string _message = CHARPTR_WRAP("Wrong Credentials.");
 
       if( _is_posted ){
@@ -297,8 +302,8 @@ class LoginController : public Controller {
 
         }else{
 
-          pdiutil::string _username = this->m_web_resource->m_server->arg("username");
-          pdiutil::string _password = this->m_web_resource->m_server->arg("password");
+          pdiutil::string _username = this->m_web_resource->m_server->arg(_username_arg.c_str());
+          pdiutil::string _password = this->m_web_resource->m_server->arg(_password_arg.c_str());
 
           if( __auth_service.isAuthorized( _username.c_str(), _password.c_str() ) ){
 

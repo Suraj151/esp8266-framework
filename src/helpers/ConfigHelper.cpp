@@ -66,15 +66,53 @@ static void buildConfigLine(pdiutil::string &out, const char *key, const char *v
   out += TERMINAL_NEW_LINE;
 }
 
-static void restoreConfigMeta(const char *path, const file_info_t &meta, bool owner)
+static bool parseConfigNumber(const pdiutil::string &value, uint32_t maxvalue, uint32_t &out)
+{
+  uint32_t parsed = StringToUint32(value.c_str());
+
+  if (parsed > maxvalue || configNumberAsValue(parsed) != value)
+  {
+    return false;
+  }
+
+  out = parsed;
+  return true;
+}
+
+static void applyConfigMeta(const char *path, uint16_t perms, uint16_t uid, uint16_t gid, bool owner)
 {
   __i_fs.beginPrivileged();
-  __i_fs.setFilePermissions(path, meta.m_perms);
+  __i_fs.setFilePermissions(path, perms);
   if (owner)
   {
-    __i_fs.setFileOwner(path, meta.m_uid, meta.m_gid);
+    __i_fs.setFileOwner(path, uid, gid);
   }
   __i_fs.endPrivileged();
+}
+
+static void restoreConfigMeta(const char *path, const file_info_t &meta, bool owner)
+{
+  applyConfigMeta(path, meta.m_perms, meta.m_uid, meta.m_gid, owner);
+}
+
+/**
+ * Build the config file path a feature is read from, so the service layer and
+ * the feature tables cannot drift on where a config lives.
+ */
+void buildConfigPath(const char *name, pdiutil::string &out)
+{
+  out.clear();
+
+  if (nullptr == name || 0 == name[0])
+  {
+    return;
+  }
+
+  out = CHARPTR_WRAP(SERVICE_CONFIG_DIR_ROOT);
+  out += name;
+  out += FILE_SEPARATOR;
+  out += name;
+  out += CHARPTR_WRAP(SERVICE_CONFIG_FILE_SUFFIX);
 }
 
 /**
@@ -259,27 +297,14 @@ bool setConfigValue(const char *path, const char *key, const char *value)
 
 /**
  * Write a whole config file from key/value pairs, keeping the permissions and
- * ownership the file already had.
+ * ownership the file already had. A file being created takes the given mode,
+ * owned by root, so one carrying a secret is not left world readable.
  */
-bool saveConfigFile(const char *path, const pdiutil::vector<config_kv_t> &kvs, const char *header)
+bool saveConfigFile(const char *path, const pdiutil::vector<config_kv_t> &kvs, const char *header, uint16_t mode)
 {
   if (nullptr == path)
   {
     return false;
-  }
-
-  pdiutil::string content;
-  if (nullptr != header)
-  {
-    content += header;
-  }
-
-  pdiutil::string line;
-  for (size_t i = 0; i < kvs.size(); i++)
-  {
-    buildConfigLine(line, kvs[i].m_key.c_str(), kvs[i].m_value.c_str());
-    content += line;
-    __i_dvc_ctrl.yield();
   }
 
   file_info_t original;
@@ -289,14 +314,38 @@ bool saveConfigFile(const char *path, const pdiutil::vector<config_kv_t> &kvs, c
     __i_fs.deleteFile(path);
   }
 
-  if (__i_fs.createFile(path, content.c_str(), content.size()) < 0)
+  if (__i_fs.createFile(path, "", 0) < 0)
   {
+    return false;
+  }
+
+  bool writeok = true;
+  if (nullptr != header && 0 != header[0])
+  {
+    writeok = (__i_fs.writeFile(path, header, strlen(header), true) >= 0);
+  }
+
+  pdiutil::string line;
+  for (size_t i = 0; writeok && i < kvs.size(); i++)
+  {
+    buildConfigLine(line, kvs[i].m_key.c_str(), kvs[i].m_value.c_str());
+    writeok = (__i_fs.writeFile(path, line.c_str(), line.size(), true) >= 0);
+    __i_dvc_ctrl.yield();
+  }
+
+  if (!writeok)
+  {
+    __i_fs.deleteFile(path);
     return false;
   }
 
   if (haveoriginal)
   {
     restoreConfigMeta(path, original, true);
+  }
+  else if (0 != mode)
+  {
+    applyConfigMeta(path, mode, FILE_OWNER_ROOT_UID, FILE_OWNER_ROOT_GID, true);
   }
 
   return true;
@@ -306,7 +355,7 @@ bool saveConfigFile(const char *path, const pdiutil::vector<config_kv_t> &kvs, c
  * Create the config file and its directory with the given defaults when it is
  * missing, so a feature always has somewhere to read from.
  */
-bool ensureConfigFile(const char *path, const pdiutil::vector<config_kv_t> &defaults, const char *header)
+bool ensureConfigFile(const char *path, const pdiutil::vector<config_kv_t> &defaults, const char *header, uint16_t mode)
 {
   if (nullptr == path)
   {
@@ -329,7 +378,195 @@ bool ensureConfigFile(const char *path, const pdiutil::vector<config_kv_t> &defa
     }
   }
 
-  return saveConfigFile(path, defaults, header);
+  return saveConfigFile(path, defaults, header, mode);
+}
+
+/**
+ * Bring the file to the given options, creating it when absent and otherwise
+ * rewriting only the ones whose value actually changed.
+ */
+bool writeConfigValues(const char *path, const pdiutil::vector<config_kv_t> &kvs, const char *header, uint16_t mode)
+{
+  if (nullptr == path)
+  {
+    return false;
+  }
+
+  if (!__i_fs.isFileExist(path))
+  {
+    return ensureConfigFile(path, kvs, header, mode);
+  }
+
+  pdiutil::vector<config_kv_t> present;
+  loadConfigFile(path, present);
+
+  bool written = true;
+  pdiutil::string current;
+
+  for (size_t i = 0; i < kvs.size(); i++)
+  {
+    if (findConfigValue(present, kvs[i].m_key, current) && current == kvs[i].m_value)
+    {
+      continue;
+    }
+
+    written = setConfigValue(path, kvs[i].m_key.c_str(), kvs[i].m_value.c_str()) && written;
+    __i_dvc_ctrl.yield();
+  }
+
+  if (0 != mode)
+  {
+    applyConfigMeta(path, mode, FILE_OWNER_ROOT_UID, FILE_OWNER_ROOT_GID, true);
+  }
+
+  return written;
+}
+
+/**
+ * Add an option to a set being built, so a caller renders its settings without
+ * knowing how a config line is spelled.
+ */
+void appendConfigValue(pdiutil::vector<config_kv_t> &kvs, const pdiutil::string &key, const pdiutil::string &value)
+{
+  config_kv_t kv;
+  kv.m_key = key;
+  kv.m_value = value;
+  kvs.push_back(kv);
+}
+
+/**
+ * Read one option out of a set already in hand, for a caller that would
+ * otherwise walk the whole file once per key.
+ */
+bool findConfigValue(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::string &key, pdiutil::string &out)
+{
+  for (size_t i = 0; i < kvs.size(); i++)
+  {
+    if (kvs[i].m_key == key)
+    {
+      out = kvs[i].m_value;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Take an option into a fixed width text field, leaving the field alone when
+ * the set does not carry the option or the value would not fit.
+ */
+bool takeConfigText(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::string &key, char *field, uint16_t size)
+{
+  pdiutil::string value;
+  if (nullptr == field || !findConfigValue(kvs, key, value) || value.size() >= size)
+  {
+    return false;
+  }
+
+  memset(field, 0, size);
+  memcpy(field, value.c_str(), value.size());
+  return true;
+}
+
+/**
+ * Take an option into a four octet address, leaving the field alone unless the
+ * value reads back as the very address it spells.
+ */
+bool takeConfigAddress(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::string &key, uint8_t *field)
+{
+  pdiutil::string value;
+  if (nullptr == field || !findConfigValue(kvs, key, value))
+  {
+    return false;
+  }
+
+  ipaddress_t address(value.c_str());
+  pdiutil::string rendered = address;
+  if (rendered != value)
+  {
+    return false;
+  }
+
+  memcpy(field, address.ip4, 4);
+  return true;
+}
+
+/**
+ * Take an option into a truth value, leaving the field alone when the set does
+ * not carry the option or its text says nothing recognisable.
+ */
+bool takeConfigBool(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::string &key, bool *field)
+{
+  pdiutil::string value;
+  if (nullptr == field || !findConfigValue(kvs, key, value))
+  {
+    return false;
+  }
+
+  *field = configValueAsBool(value, *field);
+  return true;
+}
+
+/**
+ * Take an option into a truth value kept as a byte, for a record that spells a
+ * flag as a number rather than as a bool.
+ */
+bool takeConfigBool(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::string &key, uint8_t *field)
+{
+  pdiutil::string value;
+  if (nullptr == field || !findConfigValue(kvs, key, value))
+  {
+    return false;
+  }
+
+  *field = configValueAsBool(value, 0 != *field) ? 1 : 0;
+  return true;
+}
+
+/**
+ * Take an option into a whole number, leaving the field alone unless every
+ * character is a digit and the result is one the field is allowed to hold.
+ */
+bool takeConfigNumber(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::string &key, uint8_t *field, uint8_t maxvalue)
+{
+  pdiutil::string value;
+  uint32_t parsed = 0;
+
+  if (nullptr == field || !findConfigValue(kvs, key, value) || !parseConfigNumber(value, maxvalue, parsed))
+  {
+    return false;
+  }
+
+  *field = (uint8_t)parsed;
+  return true;
+}
+
+/**
+ * Take an option into a whole number, leaving the field alone unless every
+ * character is a digit and the result is one the field is allowed to hold.
+ */
+bool takeConfigNumber(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::string &key, uint16_t *field, uint16_t maxvalue)
+{
+  pdiutil::string value;
+  uint32_t parsed = 0;
+
+  if (nullptr == field || !findConfigValue(kvs, key, value) || !parseConfigNumber(value, maxvalue, parsed))
+  {
+    return false;
+  }
+
+  *field = (uint16_t)parsed;
+  return true;
+}
+
+/**
+ * Render a four octet address the way a config file carries it.
+ */
+pdiutil::string configAddressAsValue(const uint8_t *octets)
+{
+  ipaddress_t address(octets[0], octets[1], octets[2], octets[3]);
+  return address;
 }
 
 /**
@@ -383,6 +620,16 @@ pdiutil::string configBoolAsValue(bool value)
   }
 
   return out;
+}
+
+/**
+ * Render a whole number the way a config file carries it.
+ */
+pdiutil::string configNumberAsValue(uint32_t value)
+{
+  char buf[12];
+  Uint32ToString(value, buf, sizeof(buf));
+  return pdiutil::string(buf);
 }
 
 #endif

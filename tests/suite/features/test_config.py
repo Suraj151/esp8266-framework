@@ -22,6 +22,9 @@ TOGGLE_CANDIDATES = ("OTA", "MQTT", "Email", "IOT", "MDNS")
 # Services the device cannot be recovered without, which must refuse a disable.
 ESSENTIAL_CANDIDATES = ("CMD", "DB", "Serial", "Auth", "UserStore", "FactoryReset")
 
+# One flat file carries every service's enable state, keyed by lowercased name.
+SERVICE_ENABLE_CONF = "/etc/service.conf"
+
 
 def _service_rows(text):
     """`service list` rows as columns, header and blank lines dropped."""
@@ -167,9 +170,16 @@ def service_status_names_config(t):
 
 # ------------------------------------------------------------ enable/disable
 
-@test("disabling a service persists into its config file",
+@test("disabling a service persists into the service enable file",
       needs=("service", "cat"))
 def disable_persists(t):
+    """
+    Enable state lives in one flat /etc/service.conf keyed by the service's own
+    lowercased name, not in the feature's own settings file. An older build kept
+    an `enabled` line in each feature conf, and a board upgraded from one still
+    carries that stale line — so asserting on the feature conf would pass on the
+    leftover and prove nothing.
+    """
     name = _pick(t, TOGGLE_CANDIDATES)
     if name is None:
         raise Skip("no service is safe to toggle on this build")
@@ -177,7 +187,6 @@ def disable_persists(t):
     before = _status(t, name)
     if "enabled" not in before:
         raise Skip("this build's service status does not report enabled")
-    path = _field(before, "config")
     was = _field(before, "enabled")
 
     out = t.run("service disable %s" % name)
@@ -188,16 +197,27 @@ def disable_persists(t):
     # service off for every test that follows.
     try:
         after = _status(t, name)
-        conf = t.run("cat %s" % path)
+        conf = t.run("cat %s" % SERVICE_ENABLE_CONF)
     finally:
         t.run("service %s %s" % ("enable" if was != "no" else "disable", name))
 
     if _field(after, "enabled") != "no":
         raise AssertionError("%s still reports enabled after disable:\n%s" % (name, after))
 
-    expect_in("enabled", conf, "the service conf carries the enabled option")
-    if "no" not in conf.split("enabled", 1)[1].split("\n", 1)[0]:
-        raise AssertionError("%s says enabled but not no:\n%s" % (path, conf))
+    if "CmdErr" in conf or "Failed" in conf:
+        raise AssertionError("disabling %s wrote no %s:\n%s" % (name, SERVICE_ENABLE_CONF, conf))
+
+    key = name.lower()
+    for line in conf.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] == key:
+            if parts[1] != "no":
+                raise AssertionError("%s lists %s as %r, not no:\n%s"
+                                     % (SERVICE_ENABLE_CONF, key, parts[1], conf))
+            return
+
+    raise AssertionError("%s carries no line for %r after disabling it:\n%s"
+                         % (SERVICE_ENABLE_CONF, key, conf))
 
 
 @test("enabling a service again puts it back", needs=("service", "cat"))
@@ -294,3 +314,96 @@ def service_task_count_agrees_with_ps(t):
         if seen == 0:
             raise AssertionError("%s claims %s task(s) and ps shows none:\nservice:\n%s\nps:\n%s"
                                  % (name, claimed, listing, ps))
+
+
+# ------------------------------------------------------ feature config files
+
+# Each feature's /etc conf sits behind its own ENABLE_<X>_CONFIG_FILE gate, and a
+# board short of filesystem blocks is meant to turn one off. The file's presence
+# is that gate read at run time, so a build without it is skipped rather than
+# failed.
+#
+# Only the keys are asserted, never their values. A value differs from board to
+# board and any test that writes config can move it, so an assertion on one would
+# fail for reasons that have nothing to do with the config surface.
+FEATURE_CONFS = (
+    ("wifi", "/etc/wifi/wifi.conf",
+     ("sta_ssid", "sta_password", "ap_ssid", "ap_password", "sta_enable", "ap_enable")),
+    ("mqtt", "/etc/mqtt/mqtt.conf",
+     ("host", "port", "client_id", "username", "password", "keepalive", "clean_session",
+      "will_topic", "will_message", "will_qos", "will_retain")),
+    ("ota", "/etc/ota/ota.conf",
+     ("host", "port")),
+    ("email", "/etc/email/email.conf",
+     ("sending_domain", "host", "port", "username", "password", "from", "from_name",
+      "to", "subject")),
+)
+
+
+def _conf_text(t, path):
+    """The conf's text, or a skip when this build did not compile it in."""
+    out = t.run("cat %s" % path)
+    if "CmdErr" in out or "Failed" in out:
+        raise Skip("this build has no %s" % path)
+    return out
+
+
+def _conf_has_key(text, key):
+    for line in text.splitlines():
+        if line.startswith("#"):
+            continue
+        parts = line.split(None, 1)
+        if parts and parts[0] == key:
+            return True
+    return False
+
+
+def _register_feature_conf_tests(feature, path, keys):
+
+    @test("the %s config file carries every option it owns" % feature, needs=("cat",))
+    def carries_its_options(t, path=path, keys=keys):
+        text = _conf_text(t, path)
+        missing = [key for key in keys if not _conf_has_key(text, key)]
+        if missing:
+            raise AssertionError("%s carries no line for %s:\n%s"
+                                 % (path, ", ".join(missing), text))
+
+    @test("the %s config file is readable only by root" % feature, needs=("ls",))
+    def is_not_world_readable(t, path=path):
+        _conf_text(t, path)
+        directory, name = path.rsplit("/", 1)
+        listing = t.run("ls %s" % directory)
+        for line in listing.splitlines():
+            if line.split()[-1:] == [name]:
+                expect_in("-rw-------", line, "%s is not readable by others" % path)
+                return
+        raise AssertionError("%s did not appear in its own directory listing:\n%s"
+                             % (path, listing))
+
+    @test("the %s config file reads back the same twice" % feature, needs=("cat",))
+    def is_stable(t, path=path):
+        first = _conf_text(t, path)
+        second = t.run("cat %s" % path)
+        if first != second:
+            raise AssertionError("reading %s twice gave two answers:\n%s\nthen\n%s"
+                                 % (path, first, second))
+
+
+for _feature, _path, _keys in FEATURE_CONFS:
+    _register_feature_conf_tests(_feature, _path, _keys)
+
+
+@test("the mqtt config carries no publish or subscribe topic", needs=("cat",))
+def mqtt_conf_holds_no_pubsub(t):
+    """
+    Publish and subscribe topics are payload the portal and the iot api rewrite
+    while the device runs, not settings, so they are deliberately not config
+    keys. One here would be rewritten behind the admin's back.
+    """
+    text = _conf_text(t, "/etc/mqtt/mqtt.conf")
+    for line in text.splitlines():
+        if line.startswith("#") or not line.split():
+            continue
+        key = line.split(None, 1)[0]
+        if key.startswith("publish") or key.startswith("subscribe"):
+            raise AssertionError("the mqtt conf carries runtime state %r:\n%s" % (key, text))

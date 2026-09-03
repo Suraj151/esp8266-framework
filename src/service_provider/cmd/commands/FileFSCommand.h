@@ -147,6 +147,13 @@ struct FileEditCommand : public CommandBase {
 	uint16_t m_rows = 24;               // terminal rows
 	uint16_t m_winRows = FWRITE_MAX_ROWS; // active viewport content rows
 	uint16_t m_footerRow = FWRITE_MAX_ROWS + 2; // terminal row of the footer bar
+	bool m_writefailed = false;
+	int m_writeerr = 0;
+	uint8_t m_writestage = 0;
+	bool m_hasorigmeta = false;
+	uint16_t m_origperms = 0;
+	uint16_t m_origuid = 0;
+	uint16_t m_origgid = 0;
 
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
@@ -251,7 +258,21 @@ struct FileEditCommand : public CommandBase {
 			__i_fs.deleteFile(m_tmppath.c_str());
 		}
 
+		m_writefailed = false;
+		m_writeerr = 0;
+		m_writestage = 0;
+		m_hasorigmeta = false;
+
 		if( __i_fs.isFileExist(m_origpath.c_str()) ){
+
+			file_info_t origmeta;
+			if( PDI_OK == __i_fs.getFileMeta(m_origpath.c_str(), origmeta) ){
+				m_origperms = origmeta.m_perms;
+				m_origuid = origmeta.m_uid;
+				m_origgid = origmeta.m_gid;
+				m_hasorigmeta = true;
+			}
+
 			if( __i_fs.copyFile(m_origpath.c_str(), m_tmppath.c_str()) < 0 ) return false;
 		}else{
 			if( __i_fs.createFile(m_tmppath.c_str(), "") < 0 ) return false;
@@ -343,27 +364,44 @@ struct FileEditCommand : public CommandBase {
 		pdiutil::string scratch = m_tmppath;
 		scratch += ".e";
 		if( __i_fs.isFileExist(scratch.c_str()) ) __i_fs.deleteFile(scratch.c_str());
-		if( __i_fs.createFile(scratch.c_str(), "") < 0 ) return;
+
+		int ret = __i_fs.createFile(scratch.c_str(), "");
+		if( ret < 0 ){ m_writefailed = true; m_writeerr = ret; m_writestage = 1; return; }
+
+		bool writeok = true;
 
 		if( spliceStart > 0 ){
 			uint32_t copied = 0;
 			__i_fs.readFile(m_tmppath.c_str(), 128, [&](char *d, uint32_t sz)->bool{
 				uint32_t take = sz;
 				if( copied + take > spliceStart ) take = spliceStart - copied;
-				if( take ) __i_fs.writeFile(scratch.c_str(), d, take, true);
+				if( take ){
+					ret = __i_fs.writeFile(scratch.c_str(), d, take, true);
+					if( ret < 0 ){ writeok = false; m_writeerr = ret; m_writestage = 2; }
+				}
 				copied += take;
-				return copied < spliceStart;
+				return writeok && copied < spliceStart;
 			}, 0);
 		}
 
-		if( insertData && insertLen ){
-			__i_fs.writeFile(scratch.c_str(), insertData, insertLen, true);
+		if( writeok && insertData && insertLen ){
+			ret = __i_fs.writeFile(scratch.c_str(), insertData, insertLen, true);
+			if( ret < 0 ){ writeok = false; m_writeerr = ret; m_writestage = 3; }
 		}
 
-		__i_fs.readFile(m_tmppath.c_str(), 128, [&](char *d, uint32_t sz)->bool{
-			__i_fs.writeFile(scratch.c_str(), d, sz, true);
-			return true;
-		}, spliceEnd);
+		if( writeok ){
+			__i_fs.readFile(m_tmppath.c_str(), 128, [&](char *d, uint32_t sz)->bool{
+				ret = __i_fs.writeFile(scratch.c_str(), d, sz, true);
+				if( ret < 0 ){ writeok = false; m_writeerr = ret; m_writestage = 4; }
+				return writeok;
+			}, spliceEnd);
+		}
+
+		if( !writeok ){
+			__i_fs.deleteFile(scratch.c_str());
+			m_writefailed = true;
+			return;
+		}
 
 		__i_fs.deleteFile(m_tmppath.c_str());
 		__i_fs.rename(scratch.c_str(), m_tmppath.c_str());
@@ -530,6 +568,20 @@ struct FileEditCommand : public CommandBase {
 	pdi_err_t finalizeSave(session_t *s){
 		pdi_err_t ret = PDI_OK;
 		pdiutil::string retstr = CHARPTR_WRAP("saved");
+
+		if( m_writefailed ){
+			retstr = CHARPTR_WRAP("not saved, write refused at stage ");
+			retstr += pdiutil::to_string((int)m_writestage);
+			retstr += CHARPTR_WRAP(" err ");
+			retstr += pdiutil::to_string((int)m_writeerr);
+
+			if( __i_fs.isFileExist(m_tmppath.c_str()) ){
+				__i_fs.deleteFile(m_tmppath.c_str());
+			}
+
+			return closeEditor(s, retstr.c_str());
+		}
+
 		if( __i_fs.isFileExist(m_origpath.c_str()) ){
 			ret = __i_fs.deleteFile(m_origpath.c_str());
 		}
@@ -556,6 +608,13 @@ struct FileEditCommand : public CommandBase {
 			}
 
 			return closeEditor(s, retstr.c_str());
+		}
+
+		if( m_hasorigmeta ){
+			__i_fs.beginPrivileged();
+			__i_fs.setFilePermissions(m_origpath.c_str(), m_origperms);
+			__i_fs.setFileOwner(m_origpath.c_str(), m_origuid, m_origgid);
+			__i_fs.endPrivileged();
 		}
 
 		return closeEditor(s, retstr.c_str());

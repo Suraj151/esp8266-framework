@@ -76,6 +76,7 @@ public:
   bool softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ipaddress_t _subnet) override;
   bool softAPdisconnect(bool _wifioff = false) override;
   ipaddress_t softAPIP() override;
+  ipaddress_t softAPSubnetMask() override;
   pdiutil::string softAPmacAddress() override;
   void softAPmacAddress(uint8_t *mac) override;
   void setSoftAPmacAddress(uint8_t *mac) override;

@@ -22,6 +22,8 @@ What comes out of the box is closer to a small system than to a sketch template:
 
 **A filesystem with users.** Several backends mount into one tree and are routed by longest prefix: LittleFS at the root, a read-only `/proc` of live system nodes covering memory, mounts, a directory per running task and the network under `/proc/net`, a writable `/sys` where GPIO pins and network interfaces are files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with `null`/`zero`/`random`, and a RAM-backed `/tmp`. Permissions, ownership and per-session umask are enforced in the VFS layer, so `/etc/passwd` and `/etc/shadow` mean what they say and two logged-in users genuinely see different access.
 
+**Settings that live in files.** WiFi, MQTT, OTA and email keep theirs in `/etc/<feature>/<feature>.conf` — plain `key value` text you can `cat`, edit with `fedit`, pull off over SFTP and diff between two devices, rather than something you reflash for. Which services run is a separate flat `/etc/service.conf`. Each settings file is `0600 root:root` and the portal page that edits one demands a root session, so the file and the browser agree on who may change what — see [§3.10](#310-the-etc-config-surface).
+
 **Scheduling that scales down and up.** Tasks run inline, cooperatively, or preemptively on a hardware tick, with priorities, POSIX nice values and per-task signals. Where the port supplies a loader, an external program image can be loaded from the filesystem and launched as a background process — `exec <path>` returns a pid you can `ps` and `kill`, no reflash involved.
 
 **Found on the network without help.** A from-scratch mDNS/DNS-SD responder built straight on lwIP UDP advertises `pdi-<mac>.local` and the services it is listening on, so the device answers to a name and shows up in `avahi-browse -a`. Name lookups walk IP literal, then `/etc/hosts`, then DNS.
@@ -642,30 +644,80 @@ On a board with a filesystem, a feature keeps its settings in a plain text file 
 
 | Call | What it does |
 |---|---|
+| `buildConfigPath(name, out)` | the path a feature's settings live at, in one place |
 | `loadConfigFile(path, out)` | every option as key/value pairs |
 | `getConfigValue(path, key, out)` | one option, without holding the rest |
 | `setConfigValue(path, key, value)` | persist one option, leaving comments, ordering and other options untouched |
-| `saveConfigFile(path, kvs, header)` | write the whole file from pairs |
-| `ensureConfigFile(path, defaults, header)` | create the directory and the file with defaults, only if missing |
-| `configValueAsBool` / `configBoolAsValue` | the `yes`/`no` rule, in one place |
+| `saveConfigFile(path, kvs, header, mode)` | write the whole file from pairs |
+| `ensureConfigFile(path, defaults, header, mode)` | create the directory and the file with defaults, only if missing |
+| `writeConfigValues(path, kvs, header, mode)` | bring the file to these options, creating it when absent and otherwise rewriting only what changed |
+| `appendConfigValue` / `findConfigValue` | build and read a set of pairs without knowing how a line is spelled |
+| `takeConfigText` / `takeConfigAddress` / `takeConfigBool` / `takeConfigNumber` | take one option into a record field, leaving it alone if the file does not carry it or the value will not read |
+| `configAddressAsValue` / `configBoolAsValue` / `configNumberAsValue` | render a field the way a file carries it |
+| `configValueAsBool` | the `yes`/`no` rule, in one place |
+
+The `take*` calls are where a malformed file is made harmless. Each returns whether it applied anything and otherwise leaves the field exactly as it arrived, so a typo costs that one option rather than the record. They validate by round-tripping through the matching renderer — `port smtp` and `port 70000` both fail to read back as themselves and are ignored, and so is `sta_gateway not.an.address`.
+
+A feature turns its record into pairs and back in `src/helpers/FeatureConfigFiles.h`, four functions per feature: render to pairs, take from pairs, write the file, and sync file and record store at service init. `ConfigHelper` stays generic — if a signature mentions only keys, values and paths it belongs there; if it names a feature's table it belongs in `FeatureConfigFiles`.
 
 `setConfigValue` rewrites through a working copy and renames over the original, so a half-written file never replaces a good one — and it restores the original's permissions and owner afterwards, because a file created on this VFS is stamped with the *writer's* identity. A `0600 root:root` config stays that way.
 
 Values are written with CRLF, the same line ending `fedit` writes and `putln()` sends. `cat` streams file bytes straight to the terminal, so a file with bare newlines would staircase down a raw console.
 
-**Precedence.** Where a filesystem exists, a key present in the conf file wins. A key that is absent leaves whatever the record store or the compiled default supplied, and a value that cannot be read as a boolean keeps the default rather than silently becoming `false`. On a board with no filesystem the whole layer compiles out — the record store is the fallback and the boot-critical minimum, and the UNO keeps working with no `/etc` at all.
+**Precedence.** Where a filesystem exists, a key present in the conf file wins. A key that is absent leaves whatever the record store or the compiled default supplied, and a value that cannot be read keeps the default rather than silently becoming zero or `false`. On a board with no filesystem the whole layer compiles out — the record store is the fallback and the boot-critical minimum, and the UNO keeps working with no `/etc` at all.
 
-**Runtime service enable.** Every service reads `enabled yes|no` from its own conf file at boot, so what runs stops being a compile-time decision:
+#### Which features have a settings file, and turning one on
+
+Four features keep their settings in `/etc`:
+
+| Feature | File | Gate | Carries |
+|---|---|---|---|
+| WiFi | `/etc/wifi/wifi.conf` | `ENABLE_WIFI_CONFIG_FILE` | station and AP credentials, addresses, and the `sta_enable` / `ap_enable` gates |
+| MQTT | `/etc/mqtt/mqtt.conf` | `ENABLE_MQTT_CONFIG_FILE` | broker host, port, client id, credentials, keepalive, clean session, and the last will |
+| OTA | `/etc/ota/ota.conf` | `ENABLE_OTA_CONFIG_FILE` | update server host and port |
+| Email | `/etc/email/email.conf` | `ENABLE_EMAIL_CONFIG_FILE` | SMTP host, port, credentials, sender, recipient and subject |
+
+Each gate is declared in that feature's own header under `src/config/`, inside `#ifdef ENABLE_STORAGE_SERVICE`, and ships commented out:
+
+```cpp
+/* src/config/MqttConfig.h */
+#ifdef ENABLE_STORAGE_SERVICE
+// #define ENABLE_MQTT_CONFIG_FILE
+#endif
+```
+
+Uncomment one and that feature starts keeping a file, seeded from whatever the record store currently holds so a configured device keeps working. Leave it commented and the record store stays the only source, and a conf an earlier build left behind is inert text. Every file costs two LittleFS entries, the directory and the file itself, and LittleFS charges a whole block per entry — so a board opts in where it has the room rather than paying for the surface it does not use.
+
+**What earns a file.** A *setting you configure*, not *state you operate*. MQTT's publish and subscribe topics are rewritten at run time by the portal and the IoT API, so they stay in the record store and get no keys; the same reasoning keeps GPIO and device-IoT out of `/etc` altogether. A key here is one an administrator sets and the device then honours.
+
+#### Runtime service enable
+
+Which services run is a runtime decision, and it lives in **one** file rather than in each feature's:
+
+```
+# /etc/service.conf — one line per service
+mqtt no
+email yes
+```
+
+The key is the service's own name, lowercased. That keeps the whole enable surface to a single filesystem entry however many services a build has, and leaves a feature's own conf holding only its settings.
 
 ```
 service list                # SERVICE  STATE  ENABLED  TASKS  R/S/Z
-service status MQTT         # state, enabled, and the file it came from
+service status MQTT         # state, enabled, and the file its settings come from
 service disable MQTT        # persists; takes effect on the next boot
 service enable MQTT         # persists; starts on the next boot
-service stop MQTT           # tears it down immediately, leaving the conf file alone
+service stop MQTT           # tears it down immediately, leaving the conf files alone
+service restart WiFi        # stop and start in place, without rebooting the device
 ```
 
-Both are root-only. A service the device cannot be recovered without — the database, the command line, the serial console, auth, the user store and factory reset — reports `enabled yes` and refuses to be turned off, from the command *and* from a hand-edited conf file. On a board with one console there is no equivalent of walking to the machine.
+Everything but `list` and `status` is root-only. A service the device cannot be recovered without — the database, the command line, the serial console, auth, the user store and factory reset — reports `enabled yes` and refuses to be turned off, from the command *and* from a hand-edited `/etc/service.conf`. On a board with one console there is no equivalent of walking to the machine.
+
+#### Two views of one setting
+
+A conf file and the web portal are two windows onto the same value, so both are held to the same rule. Each of the four settings files above is `0600 root:root`, and the portal pages that change one require a root session — a non-root login is answered with a "root privilege required" page instead. Editing `/etc/mqtt/mqtt.conf` and saving the MQTT form are the same privilege; see [8.5](#85-middleware).
+
+Saving from the portal writes the record store *and* the file, and a service reads the file back at init, so an edit made either way survives a restart of that service.
 
 ---
 ## 4. Task Scheduler
@@ -866,8 +918,8 @@ Services are driven the same way, one level up:
   service start <name>     bring it up from cold
   service stop <name>      real teardown: listener, connections and every tracked task
   service restart <name>   stop, then start
-  service enable <name>    persist "enabled yes" in the service's own conf file
-  service disable <name>   persist "enabled no"
+  service enable <name>    persist "<name> yes" in /etc/service.conf
+  service disable <name>   persist "<name> no"
 ```
 
 All of these except `list` and `status` need root. Ownership is tracked per service rather than per task name, so renaming a task never breaks service control. None of the verbs signal a task: `stop` releases what the service holds, so `service stop SSH` gives up port 22 and closes its sessions.
@@ -1199,7 +1251,9 @@ Mounting happens during `initialize()`, and the table is five slots by default �
 
 Each prefix is named once, in [src/config/VfsConfig.h](src/config/VfsConfig.h): `PROC_MOUNT_PREFIX`, `SYS_MOUNT_PREFIX`, `DEV_MOUNT_PREFIX` and `TMP_MOUNT_PREFIX` beside the `ENABLE_` flag for the backend that answers there, with the root at `FILE_SEPARATOR`. Code that reaches a synthetic node writes `PROC_MOUNT_PREFIX "/mounts"` rather than the path in full, so moving a mount is one edit.
 
-**procfs** nodes are all `0444` and root-owned; writes fail, and a redirect into one says `cannot write <path>` rather than appearing to succeed. `/proc/uptime` gives seconds since boot in the Linux two-number layout, `/proc/version` gives the release and config version, `/proc/meminfo` the free heap and the largest block it can still hand out, `/proc/mounts` a line per mount, and `/proc/stat` the scheduler's cumulative counters. Every running task has a directory of its own — `/proc/<pid>/{stat,cmdline,status}` — and `/proc/net/{route,dev,tcp}` describes the network: the gateway each interface routes through, the traffic each has carried, and every TCP endpoint the stack holds, listening and connected alike. Everything that reads files works on them — `cat`, `head`, `wc`, `grep`, `hexdump`.
+**procfs** nodes are all `0444` and root-owned; writes fail, and a redirect into one says `cannot write <path>` rather than appearing to succeed. `/proc/uptime` gives seconds since boot in the Linux two-number layout, `/proc/version` gives the release and config version, `/proc/meminfo` the free heap and the largest block it can still hand out, `/proc/mounts` a line per mount, and `/proc/stat` the scheduler's cumulative counters. Every running task has a directory of its own — `/proc/<pid>/{stat,cmdline,status}` — and `/proc/net/{route,dev,tcp}` describes the network: the routes each interface offers, the traffic each has carried, and every TCP endpoint the stack holds, listening and connected alike. Everything that reads files works on them — `cat`, `head`, `wc`, `grep`, `hexdump`.
+
+`/proc/net/route` carries one row per route rather than one per interface, in the `route -n` columns with a `Flags` field. An interface that holds a netmask contributes the network it reaches directly — destination `ip & netmask`, no gateway, flag `U` — and one that holds a gateway contributes the default route as well, `0.0.0.0/0.0.0.0` through it, flag `UG`. An access point therefore appears once, for its own subnet, and an interface that is up but has no address yet appears not at all, because it has nowhere to route.
 
 `/proc/net/dev` and `/proc/net/tcp` each fill in only as far as the port can answer. Counters come from the link, and a link that cannot count is left out rather than listed with zeroes that would read as an idle interface — neither ESP core's prebuilt lwIP carries them, since it is compiled with `MIB2_STATS` off. Endpoints come from the stack, and a port that cannot enumerate one leaves the columns empty rather than reporting a device with nothing listening. Both are port capabilities, so a link or stack that can answer fills the node in without anything above changing.
 
@@ -1701,7 +1755,7 @@ Passwords are checked against `/etc/shadow` — the same credentials as serial a
 fedit ~/.ssh/authorized_keys        # paste the line, then !w
 ```
 
-Set either option to `no` to switch that method off — `yes`/`on`/`1` and `no`/`off`/`0` all read the way you would expect, and a word that means neither leaves the option at its default rather than silently turning it off. The same file also carries `enabled`, which decides whether the SSH service starts at all ([§3.10](#310-the-etc-config-surface)). With passwords off, only a holder of an authorised private key gets in:
+Set either option to `no` to switch that method off — `yes`/`on`/`1` and `no`/`off`/`0` all read the way you would expect, and a word that means neither leaves the option at its default rather than silently turning it off. Whether the SSH service starts at all is a separate question, answered by `/etc/service.conf` ([§3.10](#310-the-etc-config-surface)). With passwords off, only a holder of an authorised private key gets in:
 
 ```
 ssh -i ~/.ssh/id_ed25519 pdiStack@<device-ip>
@@ -1897,9 +1951,19 @@ Since every route ends up in one global registry, URI constants have to be uniqu
 
 ### 8.5 Middleware
 
-Three levels. A route registered without one is public. The auth level asks the session handler whether the request carries a live session and, if not, redirects to the configured target so the route never runs. The API level makes the same check but answers `401`, which is what the polling endpoints want — they are consumed by script, not navigated to.
+Four levels. A route registered without one is public. The auth level asks the session handler whether the request carries a live session and, if not, redirects to the configured target so the route never runs. The API level makes the same check but answers `401`, which is what the polling endpoints want — they are consumed by script, not navigated to.
 
-Both guarded levels then apply one more rule: a POST must carry the CSRF token of its own session, or it is refused — `403` on an API route, a redirect on a page. Keeping that check in the middleware rather than in each handler means a newly added form is covered by default; it only has to render the field.
+The root level is the auth level plus one question: is this session root's? If not, the middleware answers with a single shared "root privilege required" page carrying a link home, and the handler never runs. That is what keeps the portal and the filesystem agreeing — a settings file is `0600 root:root`, so the page that edits it is root's too.
+
+```cpp
+register_route(WEB_SERVER_MQTT_GENERAL_CONFIG_ROUTE,
+               [&]() { this->handleMqttGeneralConfigRoute(); },
+               ROOT_AUTH_MIDDLEWARE);
+```
+
+Because the refusal is a *standard* page rather than the controller's own, the middleware can render it, which is why restricting a page costs one enum value and no handler code. Gate the pages that change something, never the menu that reaches them: the GPIO menu stays on the auth level so a non-root user can still get to the pin monitor, and each configuration card behind it refuses on its own. Watching is not configuring.
+
+All guarded levels then apply one more rule: a POST must carry the CSRF token of its own session, or it is refused — `403` on an API route, a redirect on a page. Keeping that check in the middleware rather than in each handler means a newly added form is covered by default; it only has to render the field.
 
 Forms get the field from a single shared helper, `concat_csrf_input_html_tag()`, which sits with the other markup builders and writes its markup from flash-resident constants. Pages that submit through script read the same value with `get_csrf_token()`.
 

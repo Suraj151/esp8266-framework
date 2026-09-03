@@ -47,19 +47,19 @@ public:
       this->m_route_handler->register_route(
           WEB_SERVER_MQTT_MANAGE_CONFIG_ROUTE, [&]()
           { this->handleMqttManageRoute(); },
-          AUTH_MIDDLEWARE);
+          ROOT_AUTH_MIDDLEWARE);
       this->m_route_handler->register_route(
           WEB_SERVER_MQTT_GENERAL_CONFIG_ROUTE, [&]()
           { this->handleMqttGeneralConfigRoute(); },
-          AUTH_MIDDLEWARE);
+          ROOT_AUTH_MIDDLEWARE);
       this->m_route_handler->register_route(
           WEB_SERVER_MQTT_LWT_CONFIG_ROUTE, [&]()
           { this->handleMqttLWTConfigRoute(); },
-          AUTH_MIDDLEWARE);
+          ROOT_AUTH_MIDDLEWARE);
       this->m_route_handler->register_route(
           WEB_SERVER_MQTT_PUBSUB_CONFIG_ROUTE, [&]()
           { this->handleMqttPubSubConfigRoute(); },
-          AUTH_MIDDLEWARE);
+          ROOT_AUTH_MIDDLEWARE);
     }
   }
 
@@ -126,6 +126,8 @@ public:
     __appendUintToBuff(_port, "%d", _mqtt_general_configs.port, 8);
     __appendUintToBuff(_keepalive, "%d", _mqtt_general_configs.keepalive, 8);
 
+    pdiutil::string _clean_value_ro = CHARPTR_WRAP("clean");
+
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
 
     concat_tr_input_html_tags(_page, RODT_ATTR("Host Address:"), RODT_ATTR("hst"), _mqtt_general_configs.host, MQTT_HOST_BUF_SIZE - 1);
@@ -135,7 +137,7 @@ public:
     CONTINUE_SEND_IN_CHUNK(_page);
     concat_tr_input_html_tags(_page, RODT_ATTR("Password:"), RODT_ATTR("pswd"), _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE - 1);
     concat_tr_input_html_tags(_page, RODT_ATTR("Keep Alive:"), RODT_ATTR("kpalv"), _keepalive);
-    concat_tr_input_html_tags(_page, RODT_ATTR("Clean Session:"), RODT_ATTR("cln"), "clean", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.clean_session != 0);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Clean Session:"), RODT_ATTR("cln"), (char *)_clean_value_ro.c_str(), HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.clean_session != 0);
 
     concat_csrf_input_html_tag( _page );
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
@@ -149,7 +151,7 @@ public:
     CONTINUE_SEND_IN_CHUNK(_page);
     concat_tr_input_html_tags(_page, RODT_ATTR("Password:"), RODT_ATTR("pswd"), _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Keep Alive:"), RODT_ATTR("kpalv"), _keepalive, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
-    concat_tr_input_html_tags(_page, RODT_ATTR("Clean Session:"), RODT_ATTR("cln"), "clean", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.clean_session != 0, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Clean Session:"), RODT_ATTR("cln"), (char *)_clean_value_ro.c_str(), HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.clean_session != 0, true);
     CONTINUE_SEND_IN_CHUNK(_page);
 #endif
 
@@ -263,13 +265,14 @@ public:
     this->m_web_resource->m_db_conn->get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
 
     const char *_qos_options[] = {"0", "1", "2"};
+    pdiutil::string _will_retain_value_ro = CHARPTR_WRAP("retain");
 
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
 
     concat_tr_input_html_tags(_page, RODT_ATTR("Will Topic:"), RODT_ATTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE - 1);
     concat_tr_input_html_tags(_page, RODT_ATTR("Will Message:"), RODT_ATTR("wmsg"), _mqtt_lwt_configs.will_message, MQTT_TOPIC_BUF_SIZE - 1);
     concat_tr_select_html_tags(_page, RODT_ATTR("Will QoS:"), RODT_ATTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos);
-    concat_tr_input_html_tags(_page, RODT_ATTR("Will Retain:"), RODT_ATTR("wrtn"), "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_lwt_configs.will_retain != 0);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Will Retain:"), RODT_ATTR("wrtn"), (char *)_will_retain_value_ro.c_str(), HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_lwt_configs.will_retain != 0);
 
     concat_csrf_input_html_tag( _page );
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
@@ -279,7 +282,7 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("Will Topic:"), RODT_ATTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Will Message:"), RODT_ATTR("wmsg"), _mqtt_lwt_configs.will_message, MQTT_TOPIC_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_select_html_tags(_page, RODT_ATTR("Will QoS:"), RODT_ATTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos, 0, true);
-    concat_tr_input_html_tags(_page, RODT_ATTR("Will Retain:"), RODT_ATTR("wrtn"), "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_lwt_configs.will_retain != 0, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Will Retain:"), RODT_ATTR("wrtn"), (char *)_will_retain_value_ro.c_str(), HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_lwt_configs.will_retain != 0, true);
     CONTINUE_SEND_IN_CHUNK(_page);
 #endif
 
@@ -392,12 +395,16 @@ public:
     char _publish_freq[10];
     memset(_publish_freq, 0, 10);
     __appendUintToBuff(_publish_freq, "%d", _mqtt_pubsub_configs.publish_frequency, 8);
-    strcpy(_topic_label, "Topic0:");
-    strcpy(_topic_name, "ptpc0");
-    strcpy(_qos_label, "QoS0:");
-    strcpy(_qos_name, "pqos0");
-    strcpy(_retain_label, "Retain0:");
-    strcpy(_retain_name, "prtn0");
+    pdiutil::string _topic_label_ro = CHARPTR_WRAP("Topic0:"), _topic_name_ro = CHARPTR_WRAP("ptpc0");
+    pdiutil::string _qos_label_ro = CHARPTR_WRAP("QoS0:"), _qos_name_ro = CHARPTR_WRAP("pqos0");
+    pdiutil::string _retain_label_ro = CHARPTR_WRAP("Retain0:"), _retain_name_ro = CHARPTR_WRAP("prtn0");
+    pdiutil::string _retain_value_ro = CHARPTR_WRAP("retain");
+    strcpy(_topic_label, _topic_label_ro.c_str());
+    strcpy(_topic_name, _topic_name_ro.c_str());
+    strcpy(_qos_label, _qos_label_ro.c_str());
+    strcpy(_qos_name, _qos_name_ro.c_str());
+    strcpy(_retain_label, _retain_label_ro.c_str());
+    strcpy(_retain_name, _retain_name_ro.c_str());
 
     concat_tr_heading_html_tags(_page, RODT_ATTR("Publish Topics"), 3, RODT_ATTR("2"));
     for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++)
@@ -414,13 +421,13 @@ public:
 
       concat_tr_input_html_tags(_page, _topic_label, _topic_name, _mqtt_pubsub_configs.publish_topics[i].topic, MQTT_TOPIC_BUF_SIZE - 1);
       concat_tr_select_html_tags(_page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.publish_topics[i].qos);
-      concat_tr_input_html_tags(_page, _retain_label, _retain_name, "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0);
+      concat_tr_input_html_tags(_page, _retain_label, _retain_name, (char *)_retain_value_ro.c_str(), HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0);
 
 #else
 
       concat_tr_input_html_tags(_page, _topic_label, _topic_name, _mqtt_pubsub_configs.publish_topics[i].topic, MQTT_TOPIC_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
       concat_tr_select_html_tags(_page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.publish_topics[i].qos, 0, true);
-      concat_tr_input_html_tags(_page, _retain_label, _retain_name, "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0, true);
+      concat_tr_input_html_tags(_page, _retain_label, _retain_name, (char *)_retain_value_ro.c_str(), HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0, true);
 
 #endif
       CONTINUE_SEND_IN_CHUNK(_page);
@@ -489,7 +496,10 @@ public:
     bool _is_posted = false;
 
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
-    if (this->m_web_resource->m_server->hasArg("ptpc0") && this->m_web_resource->m_server->hasArg("pqos0"))
+    pdiutil::string _pub_topic_arg = CHARPTR_WRAP("ptpc0"), _pub_qos_arg = CHARPTR_WRAP("pqos0");
+    pdiutil::string _pub_retain_arg = CHARPTR_WRAP("prtn0");
+
+    if (this->m_web_resource->m_server->hasArg(_pub_topic_arg.c_str()) && this->m_web_resource->m_server->hasArg(_pub_qos_arg.c_str()))
     {
 
       mqtt_pubsub_config_table *_mqtt_pubsub_configs = pdiutil::safe_new<mqtt_pubsub_config_table>();
@@ -500,13 +510,13 @@ public:
 
         char _topic_name[10];
         memset(_topic_name, 0, 10);
-        strcpy(_topic_name, "ptpc0");
+        strcpy(_topic_name, _pub_topic_arg.c_str());
         char _qos_name[10];
         memset(_qos_name, 0, 10);
-        strcpy(_qos_name, "pqos0");
+        strcpy(_qos_name, _pub_qos_arg.c_str());
         char _retain_name[10];
         memset(_retain_name, 0, 10);
-        strcpy(_retain_name, "prtn0");
+        strcpy(_retain_name, _pub_retain_arg.c_str());
 
         pdiutil::string retain_flag = CHARPTR_WRAP("retain");
 

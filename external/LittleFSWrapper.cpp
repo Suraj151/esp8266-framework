@@ -1090,16 +1090,24 @@ pdi_err_t LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath
     }
 
     // Copy the content from source file to destination file
-    lfs_size_t filesize = lfs_file_size(&m_lfs, &sourceFile); 
+    lfs_size_t filesize = lfs_file_size(&m_lfs, &sourceFile);
+    int copyOrErr = 0;
     for (lfs_size_t i = 0; i < filesize; i += m_lfscfg.read_size) {
         lfs_size_t chunk = lfs_min(m_lfscfg.read_size, filesize - i);
-        lfs_file_read(&m_lfs, &sourceFile, buffer, chunk);
-        lfs_file_write(&m_lfs, &destFile, buffer, chunk);
+        copyOrErr = lfs_file_read(&m_lfs, &sourceFile, buffer, chunk);
+        if (copyOrErr < 0) break;
+        copyOrErr = lfs_file_write(&m_lfs, &destFile, buffer, chunk);
+        if (copyOrErr < 0) break;
     }
 
     // Close the files
     lfs_file_close(&m_lfs, &sourceFile);
     lfs_file_close(&m_lfs, &destFile);
+
+    if (copyOrErr < 0) {
+        lfs_remove(&m_lfs, destPath);
+        return lfsToPdiErr(copyOrErr);
+    }
 
     // Fresh entry: stamp ctime/mtime, then carry over source perms if present.
     stampCreate(destPath, false);

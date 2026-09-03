@@ -13,6 +13,7 @@ created Date    : 1st June 2019
 #if defined(ENABLE_OTA_SERVICE)
 
 #include "OtaServiceProvider.h"
+#include <helpers/FeatureConfigFiles.h>
 
 #ifdef ENABLE_DEVICE_IOT
 #include <service_provider/iot/DeviceIotServiceProvider.h>
@@ -61,6 +62,10 @@ bool OtaServiceProvider::initService(void *arg)
   {
     this->m_http_client->SetClient(_client);
   }
+
+#ifdef ENABLE_OTA_CONFIG_FILE
+  syncOtaConfigFile();
+#endif
 
   this->serviceSetInterval([&]()
                            { this->handleOta(); },

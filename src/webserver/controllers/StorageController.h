@@ -432,13 +432,14 @@ public:
 		jsonresp += CHARPTR_WRAP("\",\"tsvg\":\"");
 
 		// Build trash svg element 
+		pdiutil::string _trash_colour_ro = CHARPTR_WRAP("#797979");
 		memset(tempbuffer, 0, tempbufferlen);
 		concat_svg_tag(
 			tempbuffer, 
 			SVG_ICON48_1616_PATH_TRASH,
 			nullptr,
 			nullptr,
-			16,16, "#797979"
+			16,16, (char *)_trash_colour_ro.c_str()
 		);
 
 		jsonresp += tempbuffer;

@@ -77,7 +77,9 @@ void TlsServerInterface::close() {
         tcp_recv(m_clientPcb, nullptr);
         tcp_poll(m_clientPcb, nullptr, 0);
         tcp_err(m_clientPcb, nullptr);
-        tcp_close(m_clientPcb);
+        if (ERR_OK != tcp_close(m_clientPcb)) {
+            tcp_abort(m_clientPcb);
+        }
         m_clientPcb = nullptr;
     }
     if (m_serverPcb) {

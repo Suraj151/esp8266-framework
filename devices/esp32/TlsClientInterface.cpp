@@ -740,8 +740,8 @@ bool TlsClientInterface::setKeepAlive(uint16_t, uint16_t, uint16_t) {
 void TlsClientInterface::setNoDelay(bool noDelay) {
     TCP_GUARD_BEGIN
     if (m_pcb) {
-        if (noDelay) m_pcb->so_options |= TF_NODELAY;
-        else         m_pcb->so_options &= ~TF_NODELAY;
+        if (noDelay) tcp_nagle_disable(m_pcb);
+        else         tcp_nagle_enable(m_pcb);
     }
     TCP_GUARD_END
 }
@@ -759,7 +759,10 @@ bool TlsClientInterface::availableforwrite(uint32_t size) {
         TCP_GUARD_END
         return false;
     }
-    tcp_output(m_pcb);
+    if (nullptr != m_pcb->unsent && 0 == (m_pcb->flags & TF_RTO)) {
+        tcp_output(m_pcb);
+    }
+
     uint32_t availablebuff = tcp_sndbuf(m_pcb);
     uint32_t queuelen = tcp_sndqueuelen(m_pcb);
     TCP_GUARD_END

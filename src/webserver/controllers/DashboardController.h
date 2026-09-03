@@ -263,11 +263,13 @@ class DashboardController : public Controller {
 			pdiutil::vector<wifi_station_info_t> _stations;
 			__i_wifi.getApsConnectedStations(_stations);
 
+			pdiutil::string _mac_fmt_ro = CHARPTR_WRAP("%02X:%02X:%02X:%02X:%02X:%02X");
+
 			for (uint32_t _idx = 0; _idx < _stations.size(); _idx++)
 			{
 				char _macstr[20];
 				memset(_macstr, 0, sizeof(_macstr));
-				__sprintf(_macstr, "%02X:%02X:%02X:%02X:%02X:%02X",
+				__sprintf(_macstr, _mac_fmt_ro.c_str(),
 					_stations[_idx].bssid[0], _stations[_idx].bssid[1], _stations[_idx].bssid[2],
 					_stations[_idx].bssid[3], _stations[_idx].bssid[4], _stations[_idx].bssid[5]);
 

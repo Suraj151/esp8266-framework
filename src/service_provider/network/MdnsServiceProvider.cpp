@@ -182,7 +182,8 @@ void MdnsServiceProvider::buildHostname() {
   uint8_t mac[6] = {0};
   __i_wifi.macAddress(mac);
   char buf[MDNS_HOSTNAME_MAXLEN];
-  __snprintf(buf, sizeof(buf), "%s%02x%02x%02x", MDNS_HOSTNAME_PREFIX, mac[3], mac[4], mac[5]);
+  pdiutil::string _host_fmt_ro = CHARPTR_WRAP("%s%02x%02x%02x");
+  __snprintf(buf, sizeof(buf), _host_fmt_ro.c_str(), MDNS_HOSTNAME_PREFIX, mac[3], mac[4], mac[5]);
   m_hostname = buf;
 
 #ifdef ENABLE_STORAGE_SERVICE
@@ -395,6 +396,8 @@ void MdnsServiceProvider::onUdpPacket(void *arg) {
   uint16_t qdcount = ((uint16_t)b[4] << 8) | b[5];
   uint16_t off = 12;
 
+  pdiutil::string _services_label_ro = CHARPTR_WRAP("_services"), _dnssd_label_ro = CHARPTR_WRAP("_dns-sd");
+
   for (uint16_t q = 0; q < qdcount && off < len; q++) {
 
     // collect the QNAME labels (offset+len into the packet)
@@ -428,8 +431,8 @@ void MdnsServiceProvider::onUdpPacket(void *arg) {
 
     // service enumeration : _services._dns-sd._udp.local
     if (n == 4 &&
-        labelEqualsCI(b + lblOff[0], lblLen[0], "_services") &&
-        labelEqualsCI(b + lblOff[1], lblLen[1], "_dns-sd") &&
+        labelEqualsCI(b + lblOff[0], lblLen[0], _services_label_ro.c_str()) &&
+        labelEqualsCI(b + lblOff[1], lblLen[1], _dnssd_label_ro.c_str()) &&
         labelEqualsCI(b + lblOff[2], lblLen[2], "_udp") &&
         (qtype == MDNS_TYPE_PTR || qtype == MDNS_TYPE_ANY)) {
       sendServiceEnumeration();

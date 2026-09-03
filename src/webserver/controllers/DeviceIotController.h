@@ -48,7 +48,7 @@ public:
 			this->m_route_handler->register_route(
 				WEB_SERVER_DEVICE_REGISTER_CONFIG_ROUTE, [&]()
 				{ this->handleDeviceRegisterConfigRoute(); },
-				AUTH_MIDDLEWARE);
+				ROOT_AUTH_MIDDLEWARE);
 		}
 	}
 

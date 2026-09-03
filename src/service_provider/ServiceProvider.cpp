@@ -27,6 +27,25 @@ void ServiceProvider::getServiceConfigPath(pdiutil::string &_out)
 {
   _out.clear();
 
+#ifdef ENABLE_STORAGE_SERVICE
+  pdiutil::string name;
+  getServiceConfigName(name);
+
+  if (!name.empty())
+  {
+    buildConfigPath(name.c_str(), _out);
+  }
+#endif
+}
+
+/**
+ * The service's own name in the form its config carries, which is the key the
+ * enable state is listed under and the stem of its settings file.
+ */
+void ServiceProvider::getServiceConfigName(pdiutil::string &_out)
+{
+  _out.clear();
+
   if (nullptr == m_service_name)
   {
     return;
@@ -42,11 +61,7 @@ void ServiceProvider::getServiceConfigPath(pdiutil::string &_out)
   name[len] = '\0';
   __tolowercase(name, sizeof(name));
 
-  _out = CHARPTR_WRAP(SERVICE_CONFIG_DIR_ROOT);
-  _out += name;
-  _out += FILE_SEPARATOR;
-  _out += name;
-  _out += CHARPTR_WRAP(SERVICE_CONFIG_FILE_SUFFIX);
+  _out = name;
 }
 
 /**
@@ -56,11 +71,11 @@ void ServiceProvider::getServiceConfigPath(pdiutil::string &_out)
 bool ServiceProvider::loadServiceEnabled()
 {
 #ifdef ENABLE_STORAGE_SERVICE
-  pdiutil::string path, value;
-  pdiutil::string key = CHARPTR_WRAP(SERVICE_CONFIG_KEY_ENABLED);
-  getServiceConfigPath(path);
+  pdiutil::string key, value;
+  pdiutil::string path = CHARPTR_WRAP(SERVICE_ENABLE_CONFIG_FILE);
+  getServiceConfigName(key);
 
-  if (!path.empty() && getConfigValue(path.c_str(), key.c_str(), value))
+  if (!key.empty() && getConfigValue(path.c_str(), key.c_str(), value))
   {
     m_service_enabled = configValueAsBool(value, true);
   }
@@ -81,21 +96,21 @@ bool ServiceProvider::setServiceEnabled(bool _enabled)
   }
 
 #ifdef ENABLE_STORAGE_SERVICE
-  pdiutil::string path;
-  getServiceConfigPath(path);
-  if (path.empty())
+  pdiutil::string key;
+  getServiceConfigName(key);
+  if (key.empty())
   {
     return false;
   }
 
-  pdiutil::string header = CHARPTR_WRAP(SERVICE_CONFIG_HEADER);
+  pdiutil::string path = CHARPTR_WRAP(SERVICE_ENABLE_CONFIG_FILE);
+  pdiutil::string header = CHARPTR_WRAP(SERVICE_ENABLE_CONFIG_HEADER);
   pdiutil::vector<config_kv_t> defaults;
   if (!ensureConfigFile(path.c_str(), defaults, header.c_str()))
   {
     return false;
   }
 
-  pdiutil::string key = CHARPTR_WRAP(SERVICE_CONFIG_KEY_ENABLED);
   pdiutil::string value = configBoolAsValue(_enabled);
   if (!setConfigValue(path.c_str(), key.c_str(), value.c_str()))
   {

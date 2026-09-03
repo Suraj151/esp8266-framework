@@ -269,25 +269,41 @@ def proc_net_route(t):
     if "Iface" not in out:
         raise Skip("this build has no /proc/net/route")
 
-    rows = [line for line in out.splitlines() if line.strip() and "Iface" not in line]
+    rows = [line.split() for line in out.splitlines()
+            if line.strip() and "Iface" not in line]
+    rows = [parts for parts in rows if len(parts) >= 5]
     if not rows:
         raise Skip("no interface is up to route through")
 
-    addresses = t.run("net ip")
-    gateway = None
-    for row in rows:
-        parts = row.split()
-        if len(parts) >= 3:
-            gateway = parts[2]
-            break
+    onlink = [parts for parts in rows if parts[4] == "U"]
+    if not onlink:
+        raise AssertionError("no interface offered an on-link route:\n%s" % out)
 
-    if gateway is None:
-        raise AssertionError("a route row carried no gateway:\n%s" % out)
-    if gateway == "0.0.0.0":
-        raise Skip("the interface that is up has no gateway")
+    # an on-link row reaches its network directly, so it names no gateway and
+    # its destination is the interface address masked by the netmask
+    for parts in onlink:
+        if parts[2] != "0.0.0.0":
+            raise AssertionError("an on-link route named a gateway:\n%s" % out)
+        if parts[3] == "0.0.0.0":
+            raise AssertionError("an on-link route carried no netmask:\n%s" % out)
 
-    expect_any(IPV4.findall(addresses) or ["0.0.0.0"], addresses,
-               "the shell reports an address to compare against")
+        ip = t.run("cat /sys/class/net/%s/ip" % parts[0]).strip()
+        mask = t.run("cat /sys/class/net/%s/netmask" % parts[0]).strip()
+        if IPV4.match(ip) and IPV4.match(mask):
+            expected = ".".join(str(int(a) & int(b))
+                                for a, b in zip(ip.split("."), mask.split(".")))
+            if parts[1] != expected:
+                raise AssertionError(
+                    "%s routes %s but its address masks to %s:\n%s"
+                    % (parts[0], parts[1], expected, out))
+
+    # a default route is the one row that names a gateway, and only an
+    # interface that has one may carry it
+    for parts in [p for p in rows if p[4] == "UG"]:
+        if parts[1] != "0.0.0.0" or parts[3] != "0.0.0.0":
+            raise AssertionError("a default route was not 0.0.0.0/0:\n%s" % out)
+        if parts[2] == "0.0.0.0":
+            raise AssertionError("a default route named no gateway:\n%s" % out)
 
 
 @test("dev lists only interfaces that can count", needs=("cat",), mounts=("/proc",))

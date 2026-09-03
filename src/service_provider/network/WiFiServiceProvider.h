@@ -88,6 +88,10 @@ public:
   uint16_t m_reconnect_attempt = 0;
   uint32_t m_ping_busy_since = 0;
 
+  // Whether the station and the access point are allowed to come up at all.
+  bool m_sta_enabled = true;
+  bool m_ap_enabled = true;
+
 protected:
   /**
    * @var	iWiFiInterface*|&WiFi wifi

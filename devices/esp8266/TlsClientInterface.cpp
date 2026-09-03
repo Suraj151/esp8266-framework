@@ -881,7 +881,9 @@ bool TlsClientInterface::availableforwrite(uint32_t size) {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     __lwip_mutex.critical_lock();
     #endif
-    tcp_output(m_pcb);
+    if (nullptr != m_pcb->unsent && 0 == (m_pcb->flags & TF_RTO)) {
+        tcp_output(m_pcb);
+    }
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     __lwip_mutex.critical_unlock();
     #endif

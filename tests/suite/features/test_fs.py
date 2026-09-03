@@ -362,6 +362,39 @@ def fedit_cancel_keeps_original(t):
         t.run("rm %s" % path)
 
 
+@test("fedit keeps the permissions of the file it saves",
+      needs=("fedit", "echo", "chmod", "ls", "rm"), mounts=("/",), slow=True)
+def fedit_save_keeps_permissions(t):
+    """
+    The editor rebuilds the file through a scratch copy and renames it into
+    place, which is the move that loses metadata. A config holding a secret is
+    0600, and an edit must not be what opens it up: /etc/shadow and the ssh host
+    keys go through this same path.
+    """
+    from ..driver.shell import PROMPT
+
+    path = "feperm.txt"
+    t.workspace("/wt_feperm")
+    t.run("echo secret > %s" % path)
+    t.run("chmod 600 %s" % path)
+
+    expect_in("-rw-------", t.run("ls"), "the file starts unreadable to others")
+
+    t.shell.send_line("fedit %s" % path)
+    t.shell.expect("ESC", t.timeout)
+    t.shell.drain(0.5)
+    t.shell.send_raw("X")
+    t.shell.drain(0.5)
+    t.shell.send_raw("\x03")
+    t.shell.expect("save", t.timeout)
+    t.shell.send_line("!w")
+    t.shell.expect("saved", t.timeout)
+    t.shell.expect(PROMPT, t.timeout)
+
+    expect_in("-rw-------", t.run("ls"),
+              "the saved file kept its permissions")
+
+
 @test("cp copies a file across mounts",
       needs=("cp", "echo", "cat", "rm"), mounts=("/", "/tmp"))
 def cp_across_mounts(t):

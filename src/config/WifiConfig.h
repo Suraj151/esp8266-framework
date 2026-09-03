@@ -48,6 +48,15 @@ typedef struct {
 
 extern __status_wifi_t __status_wifi;
 
+/**
+ * enable/disable the wifi /etc/wifi/wifi.conf settings file here. each entry it
+ * needs costs a filesystem block, so it is left to the board whether there is
+ * room for one.
+ */
+#ifdef ENABLE_STORAGE_SERVICE
+// #define ENABLE_WIFI_CONFIG_FILE
+#endif
+
 struct wifi_configs {
 
   // Default Constructor
@@ -74,6 +83,9 @@ struct wifi_configs {
     memcpy(ap_local_ip, DEFAULT_AP_LOCAL_IP, 4);
     memcpy(ap_gateway, DEFAULT_AP_GATEWAY, 4);
     memcpy(ap_subnet, DEFAULT_AP_SUBNET, 4);
+
+    sta_enable = true;
+    ap_enable = true;
   }
 
   char sta_ssid[WIFI_CONFIGS_BUF_SIZE];
@@ -88,6 +100,9 @@ struct wifi_configs {
   uint8_t ap_local_ip[4];
   uint8_t ap_gateway[4];
   uint8_t ap_subnet[4];
+
+  bool sta_enable;
+  bool ap_enable;
 };
 
 // const wifi_configs PROGMEM _wifi_config_defaults = {

@@ -28,6 +28,11 @@ created Date    : 1st June 2019
 
 #define MQTT_INITIALIZE_DURATION   MILLISECOND_DURATION_5000
 
+#ifndef MQTT_PAYLOAD_BUF_SIZE
+#define MQTT_PAYLOAD_BUF_SIZE 500
+#endif
+
+
 /**
  * enable/disable mqtt default payload for publish if user not assigned explicitely
  */
@@ -38,6 +43,15 @@ created Date    : 1st June 2019
  * enable/disable mqtt config modification here
  */
 #define ALLOW_MQTT_CONFIG_MODIFICATION
+
+/**
+ * enable/disable the mqtt /etc/mqtt/mqtt.conf settings file here. each entry it
+ * needs costs a filesystem block, so it is left to the board whether there is
+ * room for one.
+ */
+#ifdef ENABLE_STORAGE_SERVICE
+// #define ENABLE_MQTT_CONFIG_FILE
+#endif
 
 enum MQTT_CONFIG_TYPE : uint8_t {
   MQTT_GENERAL_CONFIG,

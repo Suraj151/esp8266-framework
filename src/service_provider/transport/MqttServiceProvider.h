@@ -19,8 +19,6 @@ created Date    : 1st June 2019
 #endif
 #include <transports/mqtt/MqttClient.h>
 
-#define MQTT_PAYLOAD_BUF_SIZE 400
-
 typedef pdiutil::function<void(char *, uint16_t)> MqttPublishDataCallback;
 typedef MqttDataCallback MqttSubscribeDataCallback;
 

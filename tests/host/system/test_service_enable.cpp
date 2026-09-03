@@ -55,6 +55,10 @@ void clearProbeConf()
     {
         fs->deleteDirectory(PROBE_DIR);
     }
+    if (fs->isFileExist(SERVICE_ENABLE_CONFIG_FILE))
+    {
+        fs->deleteFile(SERVICE_ENABLE_CONFIG_FILE);
+    }
     fs->endPrivileged();
 }
 
@@ -93,8 +97,23 @@ TEST(serviceenable, disabling_a_service_writes_its_config)
     ASSERT_FALSE(probe.isServiceEnabled());
 
     pdiutil::string value;
-    ASSERT_TRUE(getConfigValue(PROBE_CONF, SERVICE_CONFIG_KEY_ENABLED, value));
+    ASSERT_TRUE(getConfigValue(SERVICE_ENABLE_CONFIG_FILE, "probe", value));
     ASSERT_STREQ(value.c_str(), CONFIG_BOOL_NO);
+
+    clearProbeConf();
+}
+
+TEST(serviceenable, the_enable_state_is_not_kept_in_the_feature_config)
+{
+    pditest::mountedVfs();
+    clearProbeConf();
+    BorrowedSlot slot;
+    ProbeService probe(false);
+
+    ASSERT_TRUE(probe.setServiceEnabled(false));
+
+    VfsDispatcher *fs = pditest::mountedVfs();
+    ASSERT_FALSE(fs->isFileExist(PROBE_CONF));
 
     clearProbeConf();
 }
@@ -171,8 +190,7 @@ TEST(serviceenable, a_config_written_by_hand_is_honoured)
     clearProbeConf();
     BorrowedSlot slot;
 
-    fs->createDirectory(PROBE_DIR);
-    fs->createFile(PROBE_CONF, "# hand written\r\nenabled off\r\n");
+    fs->createFile(SERVICE_ENABLE_CONFIG_FILE, "# hand written\r\nprobe off\r\n");
 
     ProbeService probe(false);
     ASSERT_FALSE(probe.loadServiceEnabled());
@@ -186,8 +204,7 @@ TEST(serviceenable, an_unreadable_value_leaves_the_service_running)
     clearProbeConf();
     BorrowedSlot slot;
 
-    fs->createDirectory(PROBE_DIR);
-    fs->createFile(PROBE_CONF, "enabled perhaps\r\n");
+    fs->createFile(SERVICE_ENABLE_CONFIG_FILE, "probe perhaps\r\n");
 
     ProbeService probe(false);
     ASSERT_TRUE(probe.loadServiceEnabled());

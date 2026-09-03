@@ -70,4 +70,15 @@ created Date    : 16th Aug 2026
 #define ENABLE_CMD_SERVICE
 #endif
 
+/**
+ * feature settings files this device keeps under /etc. a host has no block
+ * budget to protect, so every one of them is on and stays covered by the tests.
+ */
+#if !defined(PDI_NO_STORAGE_SERVICE) && !defined(PDI_NO_FEATURE_CONFIG_FILES)
+#define ENABLE_WIFI_CONFIG_FILE
+#define ENABLE_MQTT_CONFIG_FILE
+#define ENABLE_OTA_CONFIG_FILE
+#define ENABLE_EMAIL_CONFIG_FILE
+#endif
+
 #endif // _PDI_POSIX_DEVICE_CONFIG_H_
