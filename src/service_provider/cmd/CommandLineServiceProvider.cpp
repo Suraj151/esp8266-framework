@@ -13,6 +13,7 @@ created Date    : 1st June 2019
 #if defined(ENABLE_CMD_SERVICE)
 
 #include "CommandLineServiceProvider.h"
+#include "ShellCompletion.h"
 #include <service_provider/session/SessionManager.h>
 #ifdef ENABLE_STORAGE_SERVICE
 #include <service_provider/session/FileWriteStream.h>
@@ -474,7 +475,6 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
 #ifdef ENABLE_STORAGE_SERVICE      
       session->m_historyIdx = -1;
 #endif
-      session->m_autoCompleteIdx = -1;
       return CMD_ERROR_AGAIN;
     }
 
@@ -589,113 +589,35 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
     }else{
 
       // auto complete command
-      if( inseq == CMD_TERM_INSEQ_TAB && session->m_linebuf.size() > 0 ){
+      if( inseq == CMD_TERM_INSEQ_TAB ){
 
-        pdiutil::string _cmdtosearch = session->m_linebuf;
-        pdiutil::vector<pdiutil::string> matchedCmds;
-        pdiutil::string::size_type argStartIndex = session->m_linebuf.find(CMD_OPTION_SEPERATOR_SPACE);
+        shell_complete_result_t completed =
+          ShellCompletion::complete(session->m_linebuf, session->m_cursor, m_terminal);
 
-        if( session->m_autoCompleteIdx == -1 ){
-          session->m_prevCmdSize = session->m_linebuf.size();
-        }
+        // a listing leaves the line scrolled away, so it is drawn again under
+        // a fresh prompt with the cursor put back where it was
+        if( SHELL_COMPLETE_LISTED == completed ){
 
-        if( argStartIndex != pdiutil::string::npos ){
-          session->m_prevCmdSize = argStartIndex;
-        }
+          startInteraction();
+          m_terminal->write(session->m_linebuf.c_str());
 
-        if( session->m_prevCmdSize != (int16_t)session->m_linebuf.size() ){
-          _cmdtosearch = session->m_linebuf.substr(0, session->m_prevCmdSize);
-        }
-
-        for (int16_t i = 0; i < CommandBase::CommandRegistry().size(); i++){
-
-          if(CommandBase::isCommandMatch(CommandBase::CommandRegistry()[i].cmdname, _cmdtosearch.c_str(), true)){
-
-            matchedCmds.push_back(pdiutil::string(CommandBase::CommandRegistry()[i].cmdname));
+          int16_t back = (int16_t)session->m_linebuf.size() - session->m_cursor;
+          if( back > 0 ){
+            m_terminal->csi_cursor_move_left(back);
           }
         }
 
-        if( matchedCmds.size() > 0 ){
-
-          if( argStartIndex == pdiutil::string::npos ){
-
-            session->m_autoCompleteIdx = (session->m_autoCompleteIdx + 1) % (matchedCmds.size());
-
-            // clear current line
-            m_terminal->csi_cursor_move_left(session->m_linebuf.size());
-            m_terminal->csi_erase_in_line(0);
-
-            // copy command to terminal buffer
-            session->m_linebuf = matchedCmds[session->m_autoCompleteIdx];
-            session->m_cursor = session->m_linebuf.size();
-            
-            m_terminal->write(session->m_linebuf.c_str());
-          }else{
-
-            #ifdef ENABLE_STORAGE_SERVICE
-            pdiutil::string _matchcmd = session->m_linebuf.substr(0, argStartIndex);
-            pdiutil::string _argtosearch = session->m_linebuf.substr(argStartIndex);
-            _argtosearch.erase(0, _argtosearch.find_first_not_of(' '));
-            if( session->m_autoCompleteIdx == -1 ){
-              session->m_prevArgSize = _argtosearch.size();
-            }
-            _argtosearch = _argtosearch.substr(0, session->m_prevArgSize);
-            pdiutil::vector<file_info_t> itemlist;
-            int resultCode = __i_fs.getDirFileList(SessionManager::getPWD().c_str(), itemlist, _argtosearch.c_str());
-
-            if(resultCode >= 0 && itemlist.size() > 0){
-
-              session->m_autoCompleteIdx = (session->m_autoCompleteIdx + 1) % (itemlist.size());
-
-              // clear current line
-              m_terminal->csi_cursor_move_left(session->m_linebuf.size());
-              m_terminal->csi_erase_in_line(0);
-
-              // copy command to terminal buffer
-              session->m_linebuf = _matchcmd + CMD_OPTION_SEPERATOR_SPACE + pdiutil::string(itemlist[session->m_autoCompleteIdx].m_name);
-              session->m_cursor = session->m_linebuf.size();
-
-              m_terminal->write(session->m_linebuf.c_str());
-            }else{
-
-              session->m_autoCompleteIdx = -1;
-            }
-
-            for (file_info_t &item : itemlist) {
-              pdiutil::safe_delete_array(item.m_name);
-            }
-            itemlist.clear();
-            #else
-            session->m_autoCompleteIdx = -1;  
-            #endif
-          }
-
-          return CMD_ERROR_HOLD_BUFFER;
-        }else{
-
-          session->m_autoCompleteIdx = -1;
-        }
-      }else{
-
-        session->m_autoCompleteIdx = -1;
+        return CMD_ERROR_HOLD_BUFFER;
       }
       
 #ifdef ENABLE_STORAGE_SERVICE      // reset index as we are in middle of command execution
       session->m_historyIdx = -1;
 #endif
-
-      // asking for a completion never runs the line. nothing matched, or there
-      // was nothing typed to match, so the line is left exactly as it is
-      // instead of falling through and being executed.
-      if( inseq == CMD_TERM_INSEQ_TAB ){
-        return CMD_ERROR_HOLD_BUFFER;
-      }
     }
   }else{
 #ifdef ENABLE_STORAGE_SERVICE    // reset index as we are in middle of command execution
     session->m_historyIdx = -1;
 #endif
-    session->m_autoCompleteIdx = -1;
   }
 
 

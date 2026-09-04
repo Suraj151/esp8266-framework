@@ -17,6 +17,9 @@ created Date    : 30th Aug 2026
 
 #include <service_provider/ServiceProvider.h>
 #include <helpers/ConfigHelper.h>
+#ifdef ENABLE_HTTP_SERVER
+#include <webserver/WebServer.h>
+#endif
 
 #ifdef ENABLE_STORAGE_SERVICE
 
@@ -38,8 +41,10 @@ struct ProbeService : public ServiceProvider
    it back rather than leaving the real service unreachable. */
 struct BorrowedSlot
 {
-    BorrowedSlot() : m_saved(ServiceProvider::getService(SERVICE_DATABASE)) {}
-    ~BorrowedSlot() { ServiceProvider::m_services[SERVICE_DATABASE] = m_saved; }
+    BorrowedSlot(service_t which = SERVICE_DATABASE)
+        : m_which(which), m_saved(ServiceProvider::getService(which)) {}
+    ~BorrowedSlot() { ServiceProvider::m_services[m_which] = m_saved; }
+    service_t m_which;
     ServiceProvider *m_saved;
 };
 
@@ -211,5 +216,25 @@ TEST(serviceenable, an_unreadable_value_leaves_the_service_running)
 
     clearProbeConf();
 }
+
+#ifdef ENABLE_HTTP_SERVER
+
+/**
+ * The main loop serves web clients on every pass whether the service started
+ * or not, so a disabled one has to survive being asked.
+ */
+TEST(serviceenable, serving_clients_is_safe_while_the_http_service_is_down)
+{
+    pditest::mountedVfs();
+    BorrowedSlot slot(SERVICE_HTTP_SERVER);
+
+    // never started, so it holds no listener at all
+    HttpServer fresh;
+    fresh.handle_clients();
+
+    ASSERT_TRUE(SERVICE_STATE_ACTIVE != fresh.getServiceState());
+}
+
+#endif
 
 #endif

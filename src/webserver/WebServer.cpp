@@ -27,7 +27,7 @@ Created Date    : 1st June 2019
  */
 HttpServer::HttpServer() : 
   m_server(nullptr),
-  ServiceProvider(SERVICE_HTTP_SERVER, RODT_ATTR("HTTP Server"))
+  ServiceProvider(SERVICE_HTTP_SERVER, RODT_ATTR("HTTPServer"))
 {
 }
 
@@ -113,6 +113,12 @@ bool HttpServer::initService(void *arg)
  */
 void HttpServer::handle_clients()
 {
+  // a service that never started has no listener to serve, and the loop calls
+  // this on every pass whether it started or not
+  if (nullptr == this->m_server) {
+    return;
+  }
+
   this->m_server->handleClient();
 }
 

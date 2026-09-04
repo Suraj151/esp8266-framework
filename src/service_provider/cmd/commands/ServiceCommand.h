@@ -82,6 +82,13 @@ struct ServiceCommand : public CommandBase {
 	bool needauth() override { return true; }
 #endif
 
+	/**
+	 * The subcommand comes first and every argument after it names a service.
+	 */
+	cmd_complete_t completionFor(uint8_t argindex) const override {
+		return 0 == argindex ? CMD_COMPLETE_NONE : CMD_COMPLETE_SERVICE;
+	}
+
 	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE

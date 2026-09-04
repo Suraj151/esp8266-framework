@@ -676,6 +676,15 @@ enum cmd_term_inseq_t : uint8_t {
     CMD_TERM_INSEQ_MAX
 };
 
+/*
+ * enumeration for what an argument of a command completes to
+ */
+enum cmd_complete_t : uint8_t {
+    CMD_COMPLETE_PATH = 0,
+    CMD_COMPLETE_SERVICE,
+    CMD_COMPLETE_NONE
+};
+
 /* escape sequence start chars */
 #define TERMINAL_ESCAPE_SEQ "\033["
 
@@ -979,15 +988,14 @@ enum session_state_t : uint8_t {
 
 struct session_t {
     session_t() : m_sid(0), m_state(SESSION_STATE_FREE), m_terminal(nullptr), m_loginAt(0), m_lastActivityAt(0),
-                  m_cursor(0), m_lastEol(0),
+                  m_cursor(0), m_lastEol(0)
 #ifdef ENABLE_STORAGE_SERVICE
-                  m_historyIdx(-1), m_prevHistorySize(0), m_prevArgSize(0),
-                  m_umask(FILE_UMASK_DEFAULT),
+                  , m_historyIdx(-1), m_prevHistorySize(0)
+                  , m_umask(FILE_UMASK_DEFAULT)
 #endif
 #ifdef ENABLE_AUTH_SERVICE
-                  m_uid(0), m_gid(0),
+                  , m_uid(0), m_gid(0)
 #endif
-                  m_autoCompleteIdx(-1), m_prevCmdSize(0)
 #ifdef ENABLE_CMD_SERVICE
                   , m_fdtable(nullptr), m_lastExit(PDI_OK)
 #endif
@@ -1008,7 +1016,6 @@ struct session_t {
         m_historyIdx = -1;
         m_prevHistorySize = 0;
         m_origTypedPrefix.clear();
-        m_prevArgSize = 0;
         m_cwd.clear();
         m_lastCwd.clear();
         m_umask = FILE_UMASK_DEFAULT;
@@ -1019,8 +1026,6 @@ struct session_t {
         m_uid = 0;
         m_gid = 0;
 #endif
-        m_autoCompleteIdx = -1;
-        m_prevCmdSize = 0;
 #ifdef ENABLE_CMD_SERVICE
         m_fdtable = nullptr;
         m_lastExit = PDI_OK;
@@ -1040,7 +1045,6 @@ struct session_t {
     int16_t m_historyIdx;
     int16_t m_prevHistorySize;
     pdiutil::string m_origTypedPrefix;
-    int16_t m_prevArgSize;
     pdiutil::string m_cwd;
     pdiutil::string m_lastCwd;
     uint16_t m_umask;
@@ -1051,8 +1055,6 @@ struct session_t {
     uint16_t m_uid;
     uint16_t m_gid;
 #endif
-    int16_t m_autoCompleteIdx;
-    int16_t m_prevCmdSize;
 #ifdef ENABLE_CMD_SERVICE
     fd_table_t *m_fdtable;
 

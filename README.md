@@ -702,6 +702,8 @@ email yes
 
 The key is the service's own name, lowercased. That keeps the whole enable surface to a single filesystem entry however many services a build has, and leaves a feature's own conf holding only its settings.
 
+A service name is therefore one word. It is what you type at `service`, whose arguments split on spaces, and it is the key in a file whose lines split at the first space — so a name with a space in it is a name you can read in `service list` and neither type nor persist.
+
 ```
 service list                # SERVICE  STATE  ENABLED  TASKS  R/S/Z
 service status MQTT         # state, enabled, and the file its settings come from
@@ -1510,7 +1512,7 @@ Line editing happens in-process, so the CLI recognises control sequences byte by
 | ↑, ↓ | walk history (needs storage) |
 | Home, End | jump to line start or end |
 | Page Up, Page Down | scroll long output |
-| Tab | complete, cycling through matching command names |
+| Tab | complete the word under the cursor; again to list the candidates |
 | Esc | cancel the line; inside `fedit`, open the save/cancel/delete menu |
 | Ctrl+C, Ctrl+Z | abort the running command |
 
@@ -1519,6 +1521,21 @@ Clients disagree about what Enter is: a raw serial terminal sends `\n`, telnet s
 Only real characters reach the line. Control bytes the editor has no meaning for, and the stray `0xff` a board can emit as it comes out of reset, are dropped rather than typed — so a line that starts arriving mid-reset is still the line you meant.
 
 A long-running command receives these mid-execution by overriding `executeTermInputAction`.
+
+**Completion.** Tab completes the word the cursor is in, and the word is found through the same tokenizer the parser uses, so the rest of the line is left exactly as typed and completion works mid-line as well as at the end. The first press types as much as every candidate agrees on; a single match is finished off and followed by a space. When nothing more can be typed, a second press lists the candidates in columns below and redraws the prompt and the line.
+
+What is offered depends on where the word sits. A word in command position — the start of the line, or after `|`, `&&` or `;` — completes against the command names. A redirect target completes against paths. Anything else is an argument, and the command decides what its arguments name by overriding `completionFor`:
+
+```cpp
+/* argument 0 is the subcommand, everything after it names a service */
+cmd_complete_t completionFor(uint8_t argindex) const override {
+    return 0 == argindex ? CMD_COMPLETE_NONE : CMD_COMPLETE_SERVICE;
+}
+```
+
+Commands that say nothing complete paths, which suits most of them. A path is completed one component at a time: the word splits at its last `/`, the leading part names the directory to read, and a directory match gains a trailing `/` so the next component can be typed straight away. On a board with no filesystem there is no grammar to read the line with, so completion there offers command names and nothing else.
+
+An empty line completes nothing. Every command would match, and a console has nothing to page a screenful of them with.
 
 ### 7.4 The command contract
 

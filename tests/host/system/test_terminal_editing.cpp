@@ -255,23 +255,34 @@ TEST(termedit, tab_completes_a_command_prefix)
 
     shell.type("upt");
     shell.type(KEY_TAB);
-    ASSERT_STREQ(shell.lineBuffer().c_str(), "uptime");
+
+    // the one match is finished off and a space follows it, so the next word
+    // can be typed straight away
+    ASSERT_STREQ(shell.lineBuffer().c_str(), "uptime ");
 
     shell.type(KEY_CTRL_C);
 }
 
-TEST(termedit, tab_cycles_through_the_matches)
+/**
+ * Several matches share a start, so the shared part is typed and no more. A
+ * second ask has nothing left to add and shows what is on offer instead.
+ */
+TEST(termedit, tab_types_what_every_match_agrees_on_then_lists_them)
 {
     pditest::Shell shell;
 
     shell.type("k");
     shell.type(KEY_TAB);
-    std::string first = shell.lineBuffer();
-    shell.type(KEY_TAB);
-    std::string second = shell.lineBuffer();
 
-    ASSERT_TRUE(first.length() > 1);
-    ASSERT_STRNE(first.c_str(), second.c_str());
+    std::string completed = shell.lineBuffer();
+    ASSERT_STREQ(completed.c_str(), "kill");
+
+    shell.terminal().forget();
+    shell.type(KEY_TAB);
+
+    // the line is left exactly as it was, and the candidates are written below
+    ASSERT_STREQ(shell.lineBuffer().c_str(), "kill");
+    ASSERT_TRUE(shell.terminal().captured().find("killall") != std::string::npos);
 
     shell.type(KEY_CTRL_C);
 }
@@ -305,6 +316,95 @@ TEST(termedit, tab_on_an_empty_line_does_nothing)
     ASSERT_EQ(shell.result(), CMD_ERROR_HOLD_BUFFER);
     ASSERT_EQ(shell.lineBuffer().length(), 0u);
     ASSERT_EQ(shell.terminal().captured().length(), 0u);
+}
+
+/**
+ * Builds a directory whose entries share a start, so a completion has
+ * something to agree on and something to stop at.
+ */
+static void makeCompletionDir()
+{
+    if (!__i_fs.isDirectory("/tabdir"))
+    {
+        __i_fs.createDirectory("/tabdir");
+    }
+    __i_fs.writeFile("/tabdir/alpha.txt", "a", 1, false);
+    __i_fs.writeFile("/tabdir/alphabet.txt", "a", 1, false);
+}
+
+/**
+ * A path is completed one component at a time, so the leading directories are
+ * followed rather than searched for in the working directory.
+ */
+TEST(termedit, tab_descends_into_the_directory_the_argument_names)
+{
+    pditest::Shell shell;
+    makeCompletionDir();
+
+    shell.type("cat /tabdir/al");
+    shell.type(KEY_TAB);
+
+    // both entries start "alpha" and disagree after it, so that is as far as
+    // the completion can go
+    ASSERT_STREQ(shell.lineBuffer().c_str(), "cat /tabdir/alpha");
+
+    shell.type(KEY_CTRL_C);
+}
+
+/**
+ * Completion works on the argument the cursor is in, not only on the first
+ * one, and what is already typed before it survives.
+ */
+TEST(termedit, tab_completes_a_later_argument_and_keeps_the_earlier_one)
+{
+    pditest::Shell shell;
+    makeCompletionDir();
+
+    shell.type("cp /tabdir/alpha.txt /tabdir/al");
+    shell.type(KEY_TAB);
+
+    ASSERT_STREQ(shell.lineBuffer().c_str(), "cp /tabdir/alpha.txt /tabdir/alpha");
+
+    shell.type(KEY_CTRL_C);
+}
+
+/**
+ * A command says what its arguments name, so the service command offers
+ * services where another command would have offered files.
+ */
+TEST(termedit, tab_offers_services_to_the_service_command)
+{
+    pditest::Shell shell;
+
+    // whichever service the build registered first is the one to ask for
+    pdiutil::string name;
+    for (uint8_t i = 0; i < SERVICE_MAX && name.empty(); i++)
+    {
+        ServiceProvider *s = ServiceProvider::getService((service_t)i);
+        if (nullptr == s || nullptr == s->m_service_name) continue;
+
+        char buf[SERVICE_NAME_MAX];
+        memset(buf, 0, SERVICE_NAME_MAX);
+        uint32_t len = strlen_ro(s->m_service_name);
+        if (len > SERVICE_NAME_MAX - 1) len = SERVICE_NAME_MAX - 1;
+        memcpy_ro(buf, s->m_service_name, len);
+        name = buf;
+    }
+    ASSERT_TRUE(!name.empty());
+
+    shell.type("service start ");
+    shell.type(name.substr(0, 1).c_str());
+    shell.terminal().forget();
+    shell.type(KEY_TAB);
+
+    // a path completion would have searched the working directory for that
+    // letter, found nothing, and left the line untouched
+    std::string typed = std::string("service start ") + name[0];
+    ASSERT_TRUE(shell.lineBuffer().find(typed) == 0);
+    ASSERT_TRUE(shell.lineBuffer().length() > typed.length() ||
+                shell.terminal().captured().find(name.c_str()) != std::string::npos);
+
+    shell.type(KEY_CTRL_C);
 }
 
 TEST(termedit, tab_after_an_argument_that_matches_no_file_keeps_the_line)

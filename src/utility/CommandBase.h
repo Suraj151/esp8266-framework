@@ -777,6 +777,12 @@ typedef struct CommandBase {
     virtual pdi_err_t execute(cmd_term_inseq_t terminputaction) = 0;
 
     /**
+     * What the argument at this position names, so the line editor knows what to
+     * offer for it. Paths suit most commands, which is why that is the default.
+     */
+    virtual cmd_complete_t completionFor(uint8_t argindex) const { return CMD_COMPLETE_PATH; }
+
+    /**
      * @brief Executes the terminal input action.
      * @param terminputaction The terminal input action to execute.
      * @return The result of the command execution.

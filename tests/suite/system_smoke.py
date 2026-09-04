@@ -46,7 +46,7 @@ def services_start(shell):
     shell.wait_for_boot(timeout=30)
     banner = shell.transcript
     for service in ("DB", "Serial", "WiFi", "GPIO", "FactoryReset", "Auth",
-                    "UserStore", "HTTP Server", "Telnet", "SSH", "CMD"):
+                    "UserStore", "HTTPServer", "Telnet", "SSH", "CMD"):
         expect_in("Starting %s Service" % service, banner, "service startup")
 
 
