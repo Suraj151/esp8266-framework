@@ -99,6 +99,18 @@ bool GpioServiceProvider::initService(void *arg){
   this->serviceSetInterval( [&]() { this->handleGpioOperations(); }, GPIO_OPERATION_DURATION, __i_dvc_ctrl.millis_now() );
   this->serviceSetInterval( [&]() { this->enable_update_gpio_table_from_copy(); }, GPIO_TABLE_UPDATE_DURATION, __i_dvc_ctrl.millis_now() );
 
+  iTerminalInterface *line = serviceBootLine();
+  if( nullptr != line ){
+    uint8_t configured = 0;
+    for( uint8_t i = 0; i < MAX_GPIO_PINS; i++ ){
+      if( OFF != this->m_gpio_config_copy.gpio_mode[i] ) configured++;
+    }
+    line->write((uint32_t)configured);
+    line->write_ro(RODT_ATTR(" of "));
+    line->write((uint32_t)MAX_GPIO_PINS);
+    line->writeln_ro(RODT_ATTR(" pins configured"));
+  }
+
   return ServiceProvider::initService(arg);
 }
 

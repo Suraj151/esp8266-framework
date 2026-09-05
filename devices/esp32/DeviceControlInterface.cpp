@@ -23,6 +23,7 @@ created Date    : 1st Jan 2024
 
 #include <Update.h>
 #include <esp_timer.h>
+#include <esp_mac.h>
 
 #ifdef ENABLE_PROGRAM_EXEC
 #include "ProgramLoaderInterface.h"
@@ -562,7 +563,43 @@ uint32_t DeviceControlInterface::getDeviceId()
  */
 pdiutil::string DeviceControlInterface::getDeviceMac()
 {
-    return pdiutil::string( WiFi.macAddress().c_str() );
+    uint8_t mac[6];
+    memset(mac, 0, sizeof(mac));
+
+    if (ESP_OK != esp_read_mac(mac, ESP_MAC_WIFI_STA)) {
+        return pdiutil::string( WiFi.macAddress().c_str() );
+    }
+
+    return BytesToMacString(mac, sizeof(mac));
+}
+
+/**
+ * Fills in what this port can report about the hardware it runs on, leaving
+ * untouched whatever it has no answer for.
+ */
+void DeviceControlInterface::getDeviceInfo(device_info_t &_out)
+{
+    _out.m_model = pdiutil::string( ESP.getChipModel() );
+    _out.m_platform_version = pdiutil::string( ESP.getSdkVersion() );
+    _out.m_cpu_freq_mhz = ESP.getCpuFreqMHz();
+    _out.m_flash_size = ESP.getFlashChipSize();
+    _out.m_cores = ESP.getChipCores();
+
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON:   _out.m_restart_reason = CHARPTR_WRAP("power-on"); break;
+        case ESP_RST_EXT:       _out.m_restart_reason = CHARPTR_WRAP("external pin"); break;
+        case ESP_RST_SW:        _out.m_restart_reason = CHARPTR_WRAP("software restart"); break;
+        case ESP_RST_PANIC:     _out.m_restart_reason = CHARPTR_WRAP("exception or panic"); break;
+        case ESP_RST_INT_WDT:   _out.m_restart_reason = CHARPTR_WRAP("interrupt watchdog"); break;
+        case ESP_RST_TASK_WDT:  _out.m_restart_reason = CHARPTR_WRAP("task watchdog"); break;
+        case ESP_RST_WDT:       _out.m_restart_reason = CHARPTR_WRAP("watchdog"); break;
+        case ESP_RST_DEEPSLEEP: _out.m_restart_reason = CHARPTR_WRAP("deep sleep exit"); break;
+        case ESP_RST_BROWNOUT:  _out.m_restart_reason = CHARPTR_WRAP("brownout"); break;
+        case ESP_RST_SDIO:      _out.m_restart_reason = CHARPTR_WRAP("sdio"); break;
+        case ESP_RST_USB:       _out.m_restart_reason = CHARPTR_WRAP("usb peripheral"); break;
+        case ESP_RST_JTAG:      _out.m_restart_reason = CHARPTR_WRAP("jtag"); break;
+        default:                _out.m_restart_reason = CHARPTR_WRAP("unknown"); break;
+    }
 }
 
 /**

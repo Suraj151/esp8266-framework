@@ -124,7 +124,7 @@ TEST(servicestart, a_service_holding_a_task_is_not_running_by_that_alone)
 
     probe.serviceSetInterval([]() {}, 1000, 0);
 
-    ASSERT_EQ((int)probe.getServiceState(), (int)SERVICE_STATE_INACTIVE);
+    ASSERT_EQ((int)probe.getServiceState(), (int)SERVICE_STATE_BOOT);
     ASSERT_TRUE(sh.run("service start Probe").find("already running") == std::string::npos);
     ASSERT_EQ((int)probe.m_started, 1);
 }
@@ -246,7 +246,7 @@ TEST(servicedeps, a_dependency_that_is_not_active_is_reported_as_unmet)
         }
     } probe;
 
-    ASSERT_EQ((int)dep.getServiceState(), (int)SERVICE_STATE_INACTIVE);
+    ASSERT_EQ((int)dep.getServiceState(), (int)SERVICE_STATE_BOOT);
     ASSERT_TRUE(probe.findUnmetServiceDependency() == &dep);
 }
 
@@ -333,13 +333,38 @@ TEST(servicedeps, more_dependencies_than_the_cap_are_refused_rather_than_overrun
     ASSERT_EQ((int)probe.getServiceDependencies(one, 0), 0);
 }
 
-TEST(servicestate, a_service_starts_out_inactive)
+TEST(servicestate, a_service_starts_out_never_booted)
 {
     pditest::mountedVfs();
     BorrowedSlot slot;
     LifecycleProbeService probe;
 
-    ASSERT_EQ((int)probe.getServiceState(), (int)SERVICE_STATE_INACTIVE);
+    ASSERT_EQ((int)probe.getServiceState(), (int)SERVICE_STATE_BOOT);
+}
+
+TEST(servicestate, a_stopped_service_is_no_longer_in_its_boot_state)
+{
+    pditest::mountedVfs();
+    BorrowedSlot slot;
+    LifecycleProbeService probe;
+
+    probe.startService();
+    probe.stopService();
+    probe.startService();
+
+    ASSERT_EQ((int)probe.getServiceState(), (int)SERVICE_STATE_ACTIVE);
+    ASSERT_TRUE(SERVICE_STATE_BOOT != probe.getServiceState());
+}
+
+TEST(servicestate, a_failed_start_still_leaves_the_boot_state_behind)
+{
+    pditest::mountedVfs();
+    BorrowedSlot slot;
+    LifecycleProbeService probe;
+    probe.m_refuse = true;
+
+    ASSERT_TRUE(!probe.startService());
+    ASSERT_TRUE(SERVICE_STATE_BOOT != probe.getServiceState());
 }
 
 TEST(servicestate, a_start_that_works_records_active)

@@ -116,6 +116,15 @@ bool MdnsServiceProvider::initService(void *arg) {
     ensureServerCertificate();
   }
 
+  iTerminalInterface *line = serviceBootLine();
+  if (nullptr != line) {
+    line->write_ro(RODT_ATTR("responding for "));
+    line->write(m_hostname.c_str());
+    line->write_ro(RODT_ATTR(".local, advertising "));
+    line->write((uint32_t)m_service_count);
+    line->writeln_ro(RODT_ATTR(" services"));
+  }
+
   return ServiceProvider::initService(arg);
 }
 

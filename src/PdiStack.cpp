@@ -98,12 +98,60 @@ void PDIStack::initialize(){
   if (nullptr != terminal) {
     terminal->writeln();
     terminal->writeln();
-		terminal->writeln_ro(RODT_ATTR("Starting PDIStack !"));
-		terminal->write_ro(RODT_ATTR("Release : "));
-    terminal->writeln(RELEASE);
-		terminal->write_ro(RODT_ATTR("Config : "));
+		terminal->with_timestamp()->writeln_ro(RODT_ATTR(" Starting PDIStack !"));
+		terminal->with_timestamp()->write_ro(RODT_ATTR(" Release: "));
+    terminal->write(RELEASE);
+		terminal->write_ro(RODT_ATTR(", config "));
     terminal->writeln(CONFIG_VERSION);
+
+    device_info_t info;
+    __i_dvc_ctrl.getDeviceInfo(info);
+
+    if (!info.m_model.empty()) {
+      terminal->with_timestamp()->write_ro(RODT_ATTR(" Machine: "));
+      terminal->write(info.m_model.c_str());
+      if (info.m_cores > 0) {
+        terminal->write_ro(RODT_ATTR(", "));
+        terminal->write((uint32_t)info.m_cores);
+        terminal->write_ro(RODT_ATTR(" core(s)"));
+      }
+      if (info.m_cpu_freq_mhz > 0) {
+        terminal->write_ro(RODT_ATTR(" @ "));
+        terminal->write(info.m_cpu_freq_mhz);
+        terminal->write_ro(RODT_ATTR(" MHz"));
+      }
+      terminal->writeln();
+    }
+
+    if (!info.m_platform_version.empty()) {
+      terminal->with_timestamp()->write_ro(RODT_ATTR(" Platform: "));
+      terminal->writeln(info.m_platform_version.c_str());
+    }
+
+    if (info.m_flash_size > 0) {
+      terminal->with_timestamp()->write_ro(RODT_ATTR(" Flash: "));
+      terminal->write(info.m_flash_size);
+      terminal->writeln_ro(RODT_ATTR(" bytes"));
+    }
+
+    terminal->with_timestamp()->write_ro(RODT_ATTR(" Memory: "));
+    terminal->write(__i_dvc_ctrl.get_free_heap());
+    terminal->write_ro(RODT_ATTR(" free, largest block "));
+    terminal->writeln(__i_dvc_ctrl.get_max_free_block());
+
+    terminal->with_timestamp()->write_ro(RODT_ATTR(" Device: id "));
+    terminal->write(__i_dvc_ctrl.getDeviceId());
+    pdiutil::string mac = __i_dvc_ctrl.getDeviceMac();
+    if (!mac.empty()) {
+      terminal->write_ro(RODT_ATTR(", mac "));
+      terminal->write(mac.c_str());
+    }
     terminal->writeln();
+
+    if (!info.m_restart_reason.empty()) {
+      terminal->with_timestamp()->write_ro(RODT_ATTR(" Restart reason: "));
+      terminal->writeln(info.m_restart_reason.c_str());
+    }
   }
 
   // Set the terminal interface for the service providers
@@ -120,9 +168,7 @@ void PDIStack::initialize(){
 
   // start the syslog sink first so subsequent services' SysLog lines are persisted
   #ifdef ENABLE_SYSLOG_SERVICE
-  if (__syslog_service.isServiceEnabled()) {
-    __syslog_service.startService();
-  }
+  __syslog_service.startService();
   #endif
 
   __database_service.startService();
@@ -132,42 +178,29 @@ void PDIStack::initialize(){
   #endif
 
   #ifdef ENABLE_WIFI_SERVICE
-  if (__wifi_service.isServiceEnabled()) {
-    __wifi_service.startService();
-    registerWiFiNetifs();
-  }
+  __wifi_service.startService();
   #endif
 
   #ifdef ENABLE_OTA_SERVICE
-  if (__ota_service.isServiceEnabled()) {
-    __ota_service.startService();
-  }
+  __ota_service.startService();
   #endif
 
   #ifdef ENABLE_GPIO_SERVICE
-  if (__gpio_service.isServiceEnabled()) {
-    __gpio_service.startService();
-  }
+  __gpio_service.startService();
   #endif
 
   #ifdef ENABLE_MQTT_SERVICE
-  if (__mqtt_service.isServiceEnabled()) {
-    __mqtt_service.startService();
-  }
+  __mqtt_service.startService();
   #endif
 
   #ifdef ENABLE_EMAIL_SERVICE
-  if (__email_service.isServiceEnabled()) {
-    __email_service.startService();
-  }
+  __email_service.startService();
   #endif
 
   __factory_reset.startService();
 
   #ifdef ENABLE_DEVICE_IOT
-  if (__device_iot_service.isServiceEnabled()) {
-    __device_iot_service.startService();
-  }
+  __device_iot_service.startService();
   #endif
 
   #ifdef ENABLE_AUTH_SERVICE
@@ -183,27 +216,19 @@ void PDIStack::initialize(){
   #endif
 
   #ifdef ENABLE_MDNS_SERVICE
-  if (__mdns_service.isServiceEnabled()) {
-    __mdns_service.startService();
-  }
+  __mdns_service.startService();
   #endif
 
   #ifdef ENABLE_HTTP_SERVER
-  if (__web_server.isServiceEnabled()) {
-    __web_server.startService();
-  }
+  __web_server.startService();
   #endif
 
   #ifdef ENABLE_TELNET_SERVICE
-  if (__telnet_service.isServiceEnabled()) {
-    __telnet_service.startService();
-  }
+  __telnet_service.startService();
   #endif
 
   #ifdef ENABLE_SSH_SERVICE
-  if (__sshserver_service.isServiceEnabled()) {
-    __sshserver_service.startService();
-  }
+  __sshserver_service.startService();
   #endif
 
   #ifdef ENABLE_CMD_SERVICE

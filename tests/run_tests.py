@@ -376,6 +376,14 @@ def run_device_interleaved(specs, feature, verbose, timeout, username, password,
         if probe:
             say("%s%s: %s%s" % (DIM, scheme, caps.summary(), RESET))
 
+        # A transport that connected but named no commands did not answer help,
+        # so it is a dead lane rather than a limited one. Carrying it makes the
+        # run report the transport count it was asked for while a third of the
+        # tests land on a shell that cannot run them.
+        if not caps.commands:
+            raise ShellError("%s connected but answered no commands, so it is "
+                             "not a usable lane" % scheme)
+
         peer_factory = None
         if scheme in ("ssh", "telnet"):
             def peer_factory(peer_password=None, _spec=spec):

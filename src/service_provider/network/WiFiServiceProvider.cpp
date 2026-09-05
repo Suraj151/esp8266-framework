@@ -12,6 +12,8 @@ created Date    : 1st June 2019
 #if defined(ENABLE_WIFI_SERVICE)
 
 #include "WiFiServiceProvider.h"
+#include <interface/pdi/impl/modules/netif/WiFiNetif.h>
+#include <interface/pdi/impl/modules/netif/NetifRegistry.h>
 #ifdef ENABLE_STORAGE_SERVICE
 #include <helpers/FeatureConfigFiles.h>
 #endif
@@ -80,6 +82,41 @@ bool WiFiServiceProvider::initService( void *arg ){
     this->configure_wifi_access_point( &_wifi_credentials );
   }else{
     this->m_wifi->enableAP(false);
+  }
+
+  // the interfaces go into the registry once in the service's life, so a
+  // restart does not attempt them again
+  if( SERVICE_STATE_BOOT == getServiceState() ){
+    registerWiFiNetifs();
+  }
+
+  iTerminalInterface *line = serviceBootLine();
+  if( nullptr != line ){
+    if( this->m_sta_enabled ){
+      line->write_ro(RODT_ATTR("station "));
+      line->write(_wifi_credentials.sta_ssid);
+    }else{
+      line->write_ro(RODT_ATTR("station off"));
+    }
+    if( this->m_ap_enabled ){
+      line->write_ro(RODT_ATTR(", access point "));
+      line->write(_wifi_credentials.ap_ssid);
+    }else{
+      line->write_ro(RODT_ATTR(", access point off"));
+    }
+    line->writeln();
+
+    line = serviceBootLine();
+    if( nullptr != line ){
+      line->write_ro(RODT_ATTR("interfaces"));
+      for( uint8_t i = 0; i < __netif_registry.count(); i++ ){
+        iNetifInterface *netif = __netif_registry.at(i);
+        if( nullptr == netif || nullptr == netif->name() ) continue;
+        line->write_ro(RODT_ATTR(" "));
+        line->write(netif->name());
+      }
+      line->writeln();
+    }
   }
 
   // routine to check wifi and internet connectivity

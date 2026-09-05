@@ -71,6 +71,14 @@ bool OtaServiceProvider::initService(void *arg)
                            { this->handleOta(); },
                            OTA_API_CHECK_DURATION, __i_dvc_ctrl.millis_now());
 
+  iTerminalInterface *line = serviceBootLine();
+  if (nullptr != line)
+  {
+    line->write_ro(RODT_ATTR("checking for firmware every "));
+    line->write((uint32_t)OTA_API_CHECK_DURATION);
+    line->writeln_ro(RODT_ATTR(" ms"));
+  }
+
   return ServiceProvider::initService(arg);
 }
 

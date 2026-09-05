@@ -96,7 +96,7 @@ class ServiceProvider{
     /**
      * ServiceProvider constructor.
      */
-    ServiceProvider(service_t st, const char *_svc_name) : m_service_name(_svc_name), m_service_t(st), m_service_routine_task_id(-1), m_service_task_count(0), m_service_enabled(true), m_service_state(SERVICE_STATE_INACTIVE) {
+    ServiceProvider(service_t st, const char *_svc_name) : m_service_name(_svc_name), m_service_t(st), m_service_routine_task_id(-1), m_service_task_count(0), m_service_enabled(true), m_service_state(SERVICE_STATE_BOOT) {
       m_services[st] = this;
       for (uint8_t i = 0; i < MAX_SERVICE_TASKS; i++) {
         m_service_task_ids[i] = -1;
@@ -120,12 +120,35 @@ class ServiceProvider{
      * init service
      */
     virtual bool initService(void *arg = nullptr){
-      if(nullptr != m_terminal){
-        m_terminal->with_timestamp()->write_ro(RODT_ATTR(" Starting "));
-        m_terminal->write_ro(m_service_name);
-        m_terminal->writeln_ro(RODT_ATTR(" Service"));
-      }
       return true;
+    }
+
+    /**
+     * Opens an indented line beneath this service's boot banner, or nullptr when
+     * there is no terminal to report to or the service has started before.
+     */
+    iTerminalInterface *serviceBootLine(){
+      if(nullptr == m_terminal || SERVICE_STATE_BOOT != m_service_state) return nullptr;
+      m_terminal->with_timestamp()->write_ro(RODT_ATTR("   "));
+      return m_terminal;
+    }
+
+    /**
+     * Writes one timestamped line naming this service, what is happening to it,
+     * and the reason in brackets where there is one.
+     */
+    void announceService(const char *_action, const char *_reason = nullptr){
+      if(nullptr != m_terminal){
+        m_terminal->with_timestamp()->write_ro(_action);
+        m_terminal->write_ro(m_service_name);
+        m_terminal->write_ro(RODT_ATTR(" Service"));
+        if(nullptr != _reason){
+          m_terminal->write_ro(RODT_ATTR(" ("));
+          m_terminal->write_ro(_reason);
+          m_terminal->write_ro(RODT_ATTR(")"));
+        }
+        m_terminal->putln();
+      }
     }
 
     /**
@@ -133,8 +156,24 @@ class ServiceProvider{
      * that did not come up says so instead of reading as never started.
      */
     bool startService(void *arg = nullptr){
+      if(!isServiceEnabled()){
+        announceService(RODT_ATTR(" [ SKIP ] Skipping "), RODT_ATTR("disabled"));
+        m_service_state = SERVICE_STATE_INACTIVE;
+        return false;
+      }
+      announceService(RODT_ATTR(" Starting "));
       bool _started = initService(arg);
       m_service_state = _started ? SERVICE_STATE_ACTIVE : SERVICE_STATE_FAILED;
+      if(nullptr != m_terminal){
+        m_terminal->with_timestamp();
+        if(_started){
+          m_terminal->write_ro(RODT_ATTR(" [  OK  ] Started "));
+        }else{
+          m_terminal->write_ro(RODT_ATTR(" [FAILED] Failed to start "));
+        }
+        m_terminal->write_ro(m_service_name);
+        m_terminal->writeln_ro(RODT_ATTR(" Service"));
+      }
       return _started;
     }
 

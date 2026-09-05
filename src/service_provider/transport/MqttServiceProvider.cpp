@@ -67,6 +67,11 @@ bool MqttServiceProvider::initService( void *arg ){
 
   this->handleMqttConfigChange();
 
+  iTerminalInterface *line = serviceBootLine();
+  if( nullptr != line ){
+    line->writeln_ro(RODT_ATTR("client ready"));
+  }
+
   return ServiceProvider::initService(arg);
 }
 

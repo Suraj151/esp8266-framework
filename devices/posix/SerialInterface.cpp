@@ -9,7 +9,9 @@ created Date    : 16th Aug 2026
 ******************************************************************************/
 
 #include "SerialInterface.h"
+#include <utility/DataTypeConversions.h>
 #include <errno.h>
+#include <time.h>
 #include <poll.h>
 #include <string.h>
 #include <unistd.h>
@@ -184,6 +186,32 @@ int8_t UARTSerial::connected()
 void UARTSerial::setTimeout(uint32_t timeout)
 {
     m_timeout = timeout;
+}
+
+/**
+ * @brief With timestamp will print timestamp first
+ * derived class should implement this function to print timestamp
+ * @param None
+ * @return this
+ */
+iTerminalInterface* UARTSerial::with_timestamp()
+{
+    static uint64_t s_started = 0;
+
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    uint64_t elapsed = ((uint64_t)now.tv_sec * 1000000ULL) + ((uint64_t)now.tv_nsec / 1000ULL);
+    if (0 == s_started) s_started = elapsed;
+
+    char tembuff[21];
+    MicrosToTimeString(elapsed - s_started, tembuff, sizeof(tembuff));
+
+    write('[');
+    write_pad(tembuff, 15, true);
+    write(']');
+
+    return this;
 }
 
 void UARTSerial::flush(int16_t flushtype)

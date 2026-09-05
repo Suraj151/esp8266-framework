@@ -352,6 +352,72 @@ void Uint32ToString(uint32_t val, char *pString, uint8_t _maxlen, uint8_t _padma
 }
 
 /**
+ * @brief Converts an unsigned 64-bit integer to a decimal string.
+ *
+ * @param val The unsigned 64-bit integer to convert.
+ * @param pString The buffer to store the resulting string.
+ * @param _maxlen The maximum length of the string buffer.
+ * @param _padmax The number of padding characters to add.
+ */
+void Uint64ToString(uint64_t val, char *pString, uint8_t _maxlen, uint8_t _padmax)
+{
+    if (nullptr == pString || _maxlen == 0) return;
+    memset(pString, 0, _maxlen);
+
+    char tmp[21];                   // "18446744073709551615" + NUL fits
+    int tpos = sizeof(tmp);
+    if (val == 0) {
+        tmp[--tpos] = '0';
+    } else {
+        while (val > 0 && tpos > 0) {
+            tmp[--tpos] = '0' + (char)(val % 10);
+            val /= 10;
+        }
+    }
+
+    int len = (int)sizeof(tmp) - tpos;
+    if (len > _maxlen - 1) len = _maxlen - 1;
+    memcpy(pString, &tmp[tpos], len);
+    for (int l = len; l < _padmax && l < _maxlen - 1; l++)
+        pString[l] = ' ';
+}
+
+/**
+ * @brief Renders a microsecond count as seconds and a fraction of the given length.
+ *
+ * @param val The microsecond count to render.
+ * @param pString The buffer to store the resulting string.
+ * @param _maxlen The maximum length of the string buffer.
+ * @param _fraclen The number of fractional digits to keep.
+ */
+void MicrosToTimeString(uint64_t val, char *pString, uint8_t _maxlen, uint8_t _fraclen)
+{
+    if (nullptr == pString || _maxlen == 0) return;
+    memset(pString, 0, _maxlen);
+
+    if (_fraclen > 6) _fraclen = 6;
+
+    char secs[21];
+    Uint64ToString(val / 1000000ULL, secs, sizeof(secs));
+    uint32_t frac = (uint32_t)(val % 1000000ULL);
+
+    uint8_t pos = 0;
+    for (uint8_t i = 0; secs[i] != 0 && pos < _maxlen - 1; i++) {
+        pString[pos++] = secs[i];
+    }
+
+    if (0 == _fraclen) return;
+
+    if (pos < _maxlen - 1) pString[pos++] = '.';
+
+    uint32_t div = 100000;
+    for (uint8_t d = 0; d < _fraclen && pos < _maxlen - 1; d++) {
+        pString[pos++] = '0' + (char)((frac / div) % 10);
+        div /= 10;
+    }
+}
+
+/**
  * @brief Converts an unsigned 32-bit integer to a hexadecimal string (no "0x" prefix).
  *
  * @param val The unsigned 32-bit integer to convert.
@@ -397,6 +463,36 @@ void BytesToHexString(const uint8_t *bytes, uint8_t bytelen, char *out)
         out[i*2 + 1] = kHex[ bytes[i]       & 0x0F];
     }
     out[bytelen*2] = '\0';
+}
+
+/**
+ * @brief Renders a hardware address as hex bytes joined by a separator.
+ *
+ * @param bytes Source byte array.
+ * @param bytelen Number of bytes in the address.
+ * @param separator Character placed between bytes, none when zero.
+ * @param cap True for uppercase hex digits.
+ * @return The rendered address, empty when there is nothing to render.
+ */
+pdiutil::string BytesToMacString(const uint8_t *bytes, uint8_t bytelen, char separator, bool cap)
+{
+    pdiutil::string out;
+    if (nullptr == bytes || 0 == bytelen) return out;
+
+    pdiutil::string digits;
+    if (cap) {
+        digits = CHARPTR_WRAP("0123456789ABCDEF");
+    } else {
+        digits = CHARPTR_WRAP("0123456789abcdef");
+    }
+
+    for (uint8_t i = 0; i < bytelen; i++) {
+        if (0 != separator && i > 0) out += separator;
+        out += digits[(bytes[i] >> 4) & 0x0F];
+        out += digits[bytes[i] & 0x0F];
+    }
+
+    return out;
 }
 
 /**

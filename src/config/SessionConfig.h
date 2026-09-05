@@ -75,4 +75,26 @@ created Date    : 18th July 2026
 #define PDI_STREAM_TAIL_LINES_MAX 32
 #endif
 
+#ifndef ENV_FILE_PATH
+#define ENV_FILE_PATH "/.env"
+#endif
+
+#ifndef ENV_NAME_MAX
+#define ENV_NAME_MAX 32
+#endif
+
+#ifndef ENV_VALUE_MAX
+#define ENV_VALUE_MAX 128
+#endif
+
+#ifndef ENV_SESSION_MAX
+#define ENV_SESSION_MAX 8
+#endif
+
+#define ENV_KEY_HOME "HOME"
+#define ENV_KEY_PWD "PWD"
+#define ENV_KEY_USER "USER"
+#define ENV_KEY_UID "UID"
+#define ENV_KEY_HOSTNAME "HOSTNAME"
+
 #endif

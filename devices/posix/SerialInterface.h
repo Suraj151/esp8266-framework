@@ -56,6 +56,14 @@ public:
   void flush(int16_t flushtype = FLUSH_TX) override;
 
   /**
+   * @brief With timestamp will print timestamp first
+   * derived class should implement this function to print timestamp
+   * @param None
+   * @return this
+   */
+  iTerminalInterface* with_timestamp() override;
+
+  /**
    * @brief Point the terminal at another pair of descriptors. Closes nothing;
    *        ownership of the descriptors stays with the caller.
    */

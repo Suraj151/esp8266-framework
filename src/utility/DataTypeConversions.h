@@ -109,6 +109,24 @@ void Int64ToString(int64_t val, char *pString, uint8_t _maxlen, uint8_t _padmax 
 void Uint32ToString(uint32_t val, char *pString, uint8_t _maxlen, uint8_t _padmax = 0);
 
 /**
+ * @brief Converts an unsigned 64-bit integer to a decimal string.
+ * @param val The unsigned 64-bit integer to convert.
+ * @param pString The buffer to store the resulting string.
+ * @param _maxlen The maximum length of the string buffer.
+ * @param _padmax The number of padding characters to add (default is 0).
+ */
+void Uint64ToString(uint64_t val, char *pString, uint8_t _maxlen, uint8_t _padmax = 0);
+
+/**
+ * @brief Renders a microsecond count as seconds and a fraction of the given length.
+ * @param val The microsecond count to render.
+ * @param pString The buffer to store the resulting string.
+ * @param _maxlen The maximum length of the string buffer.
+ * @param _fraclen The number of fractional digits to keep (default is 6).
+ */
+void MicrosToTimeString(uint64_t val, char *pString, uint8_t _maxlen, uint8_t _fraclen = 6);
+
+/**
  * @brief Converts an unsigned 32-bit integer to a hexadecimal string (no "0x" prefix).
  * @param val The unsigned 32-bit integer to convert.
  * @param pString The buffer to store the resulting string.
@@ -124,6 +142,16 @@ void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap = 
  * @param out Destination buffer, must hold at least (bytelen*2 + 1) bytes.
  */
 void BytesToHexString(const uint8_t *bytes, uint8_t bytelen, char *out);
+
+/**
+ * @brief Renders a hardware address as hex bytes joined by a separator.
+ * @param bytes Source byte array.
+ * @param bytelen Number of bytes in the address.
+ * @param separator Character placed between bytes, none when zero (default is ':').
+ * @param cap True for uppercase hex digits (default is true).
+ * @return The rendered address, empty when there is nothing to render.
+ */
+pdiutil::string BytesToMacString(const uint8_t *bytes, uint8_t bytelen, char separator = ':', bool cap = true);
 
 /**
  * @brief Renders a permission bitmask in the ten character `ls -l` form.

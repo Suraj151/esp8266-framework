@@ -147,6 +147,7 @@ struct LogoutCommand : public CommandBase {
 	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 		__auth_service.setAuthorized(false);
+		Environment::clearSession();
 
 		#ifdef ENABLE_STORAGE_SERVICE
 		SessionManager::setPWD(__i_fs.getHomeDirectory());

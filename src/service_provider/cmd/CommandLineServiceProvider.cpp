@@ -15,6 +15,7 @@ created Date    : 1st June 2019
 #include "CommandLineServiceProvider.h"
 #include "ShellCompletion.h"
 #include <service_provider/session/SessionManager.h>
+#include <service_provider/session/Environment.h>
 #ifdef ENABLE_STORAGE_SERVICE
 #include <service_provider/session/FileWriteStream.h>
 #include <service_provider/session/FileReadStream.h>
@@ -148,6 +149,9 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   HelpCommand::RegisterCommand();
   UptimeCommand::RegisterCommand();
   EchoCommand::RegisterCommand();
+  EnvCommand::RegisterCommand();
+  ExportCommand::RegisterCommand();
+  UnsetCommand::RegisterCommand();
   DateCommand::RegisterCommand();
   TimedatectlCommand::RegisterCommand();
 
@@ -175,6 +179,10 @@ CommandLineServiceProvider::~CommandLineServiceProvider()
  */
 bool CommandLineServiceProvider::initService(void *arg)
 {
+
+#ifdef ENABLE_STORAGE_SERVICE
+  Environment::ensureBaseFile();
+#endif
 
   if( nullptr != m_terminal ){
 

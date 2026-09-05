@@ -64,6 +64,27 @@ void __append_padded(pdiutil::string &_out, const char *_str, uint32_t _width, b
 void __append_padded_num(pdiutil::string &_out, int64_t _value, uint32_t _width, bool _prepad = false, char _pad = ' ');
 
 /**
+ * @brief Whether the character is a letter.
+ * @param c The character to test.
+ * @return True when the character is a to z in either case.
+ */
+bool __is_alpha(char c);
+
+/**
+ * @brief Whether the character is a decimal digit.
+ * @param c The character to test.
+ * @return True when the character is 0 to 9.
+ */
+bool __is_digit(char c);
+
+/**
+ * @brief Whether the character is a letter or a decimal digit.
+ * @param c The character to test.
+ * @return True when the character is alphanumeric.
+ */
+bool __is_alnum(char c);
+
+/**
  * @brief Trims leading and trailing whitespace from a string.
  * @param str The string to trim.
  * @param _overflow_limit The maximum length of the string (default is 300).

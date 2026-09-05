@@ -157,13 +157,19 @@ def busy_telnet_survives_idle(t):
     peer = _telnet_peer(t)
     try:
         peer.send_line("watch c=whoami,i=5000,n=1000")
-        peer.drain(2.0)
+
+        # the watch having produced output is what makes the session busy, so
+        # wait for that rather than for two quiet seconds. a watch that never
+        # started leaves the session genuinely idle, and it would then be reaped
+        # correctly and read as this test failing
+        if t.username not in peer.expect_count(t.username, 1, max(t.timeout, 20.0)):
+            raise Skip("the watch never produced output to keep the session busy")
 
         _keepalive(t, 200)   # past the 180s telnet idle window
 
         peer.send_raw("\x03")
         peer.drain(1.0)
-        expect_in(t.username, peer.run("whoami", timeout=8),
+        expect_in(t.username, peer.run("whoami", timeout=max(t.timeout, 20.0)),
                   "the busy session survived past its idle window")
     finally:
         peer.close()

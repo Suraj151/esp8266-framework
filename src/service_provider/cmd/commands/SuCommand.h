@@ -99,6 +99,7 @@ struct SuCommand : public CommandBase {
 		}
 
 		__auth_service.setAuthorized(true);
+		Environment::clearSession();
 
 #ifdef ENABLE_STORAGE_SERVICE
 		user_record_t rec;

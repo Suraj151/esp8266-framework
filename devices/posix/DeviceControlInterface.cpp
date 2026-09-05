@@ -15,9 +15,11 @@ created Date    : 16th Aug 2026
 #include <interface/pdi/impl/modules/netif/NetifRegistry.h>
 #endif
 
+#include <unistd.h>
+#include <sys/utsname.h>
+
 #ifndef MOCK_DEVICE_TEST
 #include <stdlib.h>
-#include <unistd.h>
 
 namespace {
   char **g_saved_argv = nullptr;
@@ -251,6 +253,27 @@ uint32_t DeviceControlInterface::getDeviceId()
 pdiutil::string DeviceControlInterface::getDeviceMac()
 {
     return pdiutil::string(PDI_POSIX_MAC);
+}
+
+/**
+ * Fills in what this port can report about the hardware it runs on, leaving
+ * untouched whatever it has no answer for.
+ */
+void DeviceControlInterface::getDeviceInfo(device_info_t &_out)
+{
+    struct utsname host;
+    memset(&host, 0, sizeof(host));
+
+    if (0 == uname(&host)) {
+        _out.m_model = pdiutil::string(host.machine);
+        _out.m_platform_version = pdiutil::string(host.sysname);
+        _out.m_platform_version += CHARPTR_WRAP(" ");
+        _out.m_platform_version += pdiutil::string(host.release);
+    }
+
+    int32_t cores = (int32_t)sysconf(_SC_NPROCESSORS_ONLN);
+    _out.m_cores = cores > 0 ? (uint8_t)cores : 1;
+    _out.m_restart_reason = CHARPTR_WRAP("process start");
 }
 
 bool DeviceControlInterface::isDeviceFactoryRequested()

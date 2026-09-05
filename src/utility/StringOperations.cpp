@@ -225,8 +225,41 @@ char *__strtrim_val(char *str, char _val, uint16_t _overflow_limit)
 }
 
 /**
+ * @brief Whether the character is a letter.
+ *
+ * @param c The character to test.
+ * @return True when the character is a to z in either case.
+ */
+bool __is_alpha(char c)
+{
+    return ('a' <= c && 'z' >= c) || ('A' <= c && 'Z' >= c);
+}
+
+/**
+ * @brief Whether the character is a decimal digit.
+ *
+ * @param c The character to test.
+ * @return True when the character is 0 to 9.
+ */
+bool __is_digit(char c)
+{
+    return '0' <= c && '9' >= c;
+}
+
+/**
+ * @brief Whether the character is a letter or a decimal digit.
+ *
+ * @param c The character to test.
+ * @return True when the character is alphanumeric.
+ */
+bool __is_alnum(char c)
+{
+    return __is_alpha(c) || __is_digit(c);
+}
+
+/**
  * @brief Trims whitespace from both ends of a string.
- * 
+ *
  * This function removes leading and trailing whitespace from a string.
  *
  * @param str The string to trim.

@@ -57,6 +57,15 @@ bool SyslogServiceProvider::initService(void *arg) {
   }
 #endif
 
+  iTerminalInterface *line = serviceBootLine();
+  if (nullptr != line) {
+    line->write_ro(RODT_ATTR("writing to "));
+    line->write_ro(RODT_ATTR(SYSLOG_DIR));
+    line->write_ro(RODT_ATTR(", capped at "));
+    line->write((uint32_t)SYSLOG_FILE_MAX_SIZE);
+    line->writeln_ro(RODT_ATTR(" bytes per level"));
+  }
+
   return ServiceProvider::initService(arg);
 }
 

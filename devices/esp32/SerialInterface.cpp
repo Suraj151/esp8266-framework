@@ -9,6 +9,8 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "SerialInterface.h"
+#include <utility/DataTypeConversions.h>
+#include <esp_timer.h>
 
 
 // extern int __heap_start, *__brkval; int v; 
@@ -211,14 +213,13 @@ void UARTSerial::flush(int16_t flushtype)
  */
 iTerminalInterface* UARTSerial::with_timestamp()
 {
-  char tembuff[15];
-  memset(tembuff, 0, 15);
-  __sprintf(tembuff, "%lu", millis());
-  
+  char tembuff[21];
+  MicrosToTimeString((uint64_t)esp_timer_get_time(), tembuff, sizeof(tembuff));
+
   write('[');
-  write_pad(tembuff, 10, true);
+  write_pad(tembuff, 15, true);
   write(']');
-  
+
   return this;
 }
 

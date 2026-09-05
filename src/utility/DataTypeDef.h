@@ -409,6 +409,21 @@ struct wifi_station_info_t {
 };
 
 /**
+ * @struct device_info_t
+ * @brief What a port can report about the hardware the stack is running on.
+ */
+struct device_info_t {
+    pdiutil::string m_model; ///< board or chip the port identifies itself as
+    pdiutil::string m_platform_version; ///< version of the platform layer beneath the stack
+    pdiutil::string m_restart_reason; ///< why the device last came up
+    uint32_t m_cpu_freq_mhz; ///< processor clock in MHz
+    uint32_t m_flash_size; ///< program storage in bytes
+    uint8_t m_cores; ///< processor cores available
+
+    device_info_t() : m_cpu_freq_mhz(0), m_flash_size(0), m_cores(0) {}
+};
+
+/**
  * @struct ping_stats_t
  * @brief Summary of a ping run.
  */
@@ -506,9 +521,10 @@ enum TaskState : uint8_t {
 typedef enum TaskState task_state_t;
 
 enum ServiceState : uint8_t {
-    SERVICE_STATE_INACTIVE = 0, ///< Never started, or stopped and released
+    SERVICE_STATE_INACTIVE = 0, ///< Stopped and released whatever it held
     SERVICE_STATE_ACTIVE,       ///< Started and holding whatever it acquired
-    SERVICE_STATE_FAILED        ///< Its own start reported that it did not come up
+    SERVICE_STATE_FAILED,       ///< Its own start reported that it did not come up
+    SERVICE_STATE_BOOT          ///< Constructed and never started even once
 };
 typedef enum ServiceState service_state_t;
 
@@ -1029,6 +1045,7 @@ struct session_t {
 #ifdef ENABLE_CMD_SERVICE
         m_fdtable = nullptr;
         m_lastExit = PDI_OK;
+        m_env.clear();
 #endif
     }
 
@@ -1061,6 +1078,10 @@ struct session_t {
     // Result of the last command this session ran to completion, PDI_OK until
     // one has. A command still running leaves it alone.
     pdi_err_t m_lastExit;
+
+    // Variables set in this session, which outrank the base environment file
+    // and are gone when the session ends.
+    pdiutil::vector<config_kv_t> m_env;
 #endif
 };
 

@@ -84,8 +84,17 @@ bool TelnetServiceProvider::initService(void *arg) {
         this->serviceSetInterval( [&]() {
             this->handle();
         }, 1, __i_dvc_ctrl.millis_now() );
+
+        iTerminalInterface *line = serviceBootLine();
+        if(nullptr != line){
+            line->write_ro(RODT_ATTR("listening on port "));
+            line->write((uint32_t)(arg ? *(uint16_t*)arg : TELNET_DEFAULT_PORT));
+            line->write_ro(RODT_ATTR(", "));
+            line->write((uint32_t)TELNET_MAX_SESSIONS);
+            line->writeln_ro(RODT_ATTR(" session slots"));
+        }
     }
-    
+
     return started && ServiceProvider::initService(arg);
 }
 

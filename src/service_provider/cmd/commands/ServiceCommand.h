@@ -206,6 +206,12 @@ private:
 			return PDI_OK;
 		}
 
+		if( !svc->isServiceEnabled() ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("it is disabled, enable it first"));
+			return CMD_ERROR_PERM;
+		}
+
 		ServiceProvider *unmet = svc->findUnmetServiceDependency();
 		if( nullptr != unmet ){
 			m_terminal->putln();
@@ -242,6 +248,12 @@ private:
 		if( ownsThisSession(svc) ){
 			m_terminal->putln();
 			m_terminal->writeln_ro(RODT_ATTR("this service carries the session you are typing on"));
+			return CMD_ERROR_PERM;
+		}
+
+		if( !svc->isServiceEnabled() ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("it is disabled, enable it first"));
 			return CMD_ERROR_PERM;
 		}
 

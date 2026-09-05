@@ -273,7 +273,7 @@ def interrupt_waiting_command(t):
     t.shell.answer("su", "user: ", t.timeout)
 
     t.shell.send_raw(CTRL_C)
-    out = t.shell.drain(0.6, 8.0)
+    out = t.shell.expect_count("CmdErr : -3609", 1, max(t.timeout, 8.0))
 
     # CMD_ERROR_CANCELED — the interrupt reached the command rather than the
     # line editor, at the first of its prompts as well as the masked one
@@ -313,7 +313,11 @@ def type_ahead_survives_a_command(t):
     settle(t)
 
     t.shell.send_raw("ps\n" "echo aheadmark\n")
-    seen = t.shell.drain(1.0, max(t.timeout, 20.0))
+
+    # both occurrences are the event being waited for, not a quiet line: ps can
+    # take long enough on a loaded board that the gap before echo runs looks
+    # like the end of the output
+    seen = t.shell.expect_count("aheadmark", 2, max(t.timeout, 20.0))
 
     expect_in("aheadmark", seen, "the line typed while ps ran")
 

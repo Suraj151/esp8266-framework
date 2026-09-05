@@ -322,6 +322,20 @@ pdiutil::string DeviceControlInterface::getDeviceMac()
 }
 
 /**
+ * Fills in what this port can report about the hardware it runs on, leaving
+ * untouched whatever it has no answer for.
+ */
+void DeviceControlInterface::getDeviceInfo(device_info_t &_out)
+{
+    _out.m_model = CHARPTR_WRAP("ESP8266EX");
+    _out.m_platform_version = pdiutil::string( ESP.getSdkVersion() );
+    _out.m_restart_reason = pdiutil::string( ESP.getResetReason().c_str() );
+    _out.m_cpu_freq_mhz = (uint32_t)ESP.getCpuFreqMHz();
+    _out.m_flash_size = ESP.getFlashChipSize();
+    _out.m_cores = 1;
+}
+
+/**
  * check whether device factory reset is requested
  */
 bool DeviceControlInterface::isDeviceFactoryRequested()

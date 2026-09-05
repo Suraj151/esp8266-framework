@@ -20,6 +20,8 @@ What comes out of the box is closer to a small system than to a sketch template:
 
 **Commands join up.** Output pipes from one command into the next and redirects to and from files, so `ps | grep ssh`, `cat /proc/meminfo > /tmp/mem.txt` and `wc < /home/notes.txt` all mean what they mean on a desktop — see [§7.7](#77-pipes-and-redirection).
 
+**Variables the shell reads.** `export NAME=value` sets one for the session, `/.env` holds what every session shares, and `$NAME` expands the way it does in a shell — quoting included. `PWD`, `USER`, `UID` and `HOSTNAME` are answered from the live session rather than stored, so they cannot go stale — see [§7.14](#714-environment-variables).
+
 **A filesystem with users.** Several backends mount into one tree and are routed by longest prefix: LittleFS at the root, a read-only `/proc` of live system nodes covering memory, mounts, a directory per running task and the network under `/proc/net`, a writable `/sys` where GPIO pins and network interfaces are files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with `null`/`zero`/`random`, and a RAM-backed `/tmp`. Permissions, ownership and per-session umask are enforced in the VFS layer, so `/etc/passwd` and `/etc/shadow` mean what they say and two logged-in users genuinely see different access.
 
 **Settings that live in files.** WiFi, MQTT, OTA and email keep theirs in `/etc/<feature>/<feature>.conf` — plain `key value` text you can `cat`, edit with `fedit`, pull off over SFTP and diff between two devices, rather than something you reflash for. Which services run is a separate flat `/etc/service.conf`. Each settings file is `0600 root:root` and the portal page that edits one demands a root session, so the file and the browser agree on who may change what — see [§3.10](#310-the-etc-config-surface).
@@ -76,12 +78,16 @@ Details in [§6.2.11 Storage](#6211-storage-interface-init-no-provider).
 
 <table>
   <tr>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-boot.png" width="100%"></td>
     <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ls.png" width="100%"></td>
-    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ssh.png" width="100%"></td>
   </tr>
   <tr>
     <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ps.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-service.png" width="100%"></td>
+  </tr>
+  <tr>
     <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-usradd.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ssh.png" width="100%"></td>
   </tr>
   <tr>
     <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-net.png" width="100%"></td>
@@ -1143,7 +1149,7 @@ Persisted configuration always goes through the database service accessors, neve
 
 The base also offers `signalAllServiceTasks(sig)`, `countServiceTasks(...)` and the task-id iterators; those are what the `service` command renders.
 
-A new service is runtime-toggleable for free. The base reads `enabled` from `/etc/x/x.conf` before anything starts and `PDIStack::initialize` gates the `startService` call on `isServiceEnabled()`. Override `getServiceConfigPath` only if the feature genuinely cannot use the derived path. Override `isEssentialService()` to return true only if the device genuinely cannot be recovered without the service; that puts it beyond the reach of `service disable` *and* of a hand-edited conf file.
+A new service is runtime-toggleable for free. The base reads `enabled` from `/etc/x/x.conf` before anything starts, and `startService` itself refuses when the service is disabled, so no caller has to remember the check. Override `getServiceConfigPath` only if the feature genuinely cannot use the derived path. Override `isEssentialService()` to return true only if the device genuinely cannot be recovered without the service; that puts it beyond the reach of `service disable` *and* of a hand-edited conf file.
 
 ### 6.2 Service reference
 
@@ -1163,7 +1169,7 @@ Opens the serial port at the configured baud and hooks its input handler into th
 
 #### 6.2.4 `WiFiServiceProvider` — `__wifi_service`
 
-Configures the access point from the WiFi table, starts a station scan, and keeps a connectivity check running every five seconds. NAPT, when enabled, is switched on by a one-shot scheduled after the station link comes up.
+Configures the access point from the WiFi table, starts a station scan, and keeps a connectivity check running every five seconds. NAPT, when enabled, is switched on by a one-shot scheduled after the station link comes up. It also puts `wlan0` and `ap0` into the netif registry that backs `/proc/net` and `/sys/class/net`, once in the service's life rather than on every start, so a restart does not attempt them again.
 
 The shell surface is `net ip`, `net scansta` and `net connsta,<ssid>,<pass>`; the portal has a WiFi page whose editability is governed by `ALLOW_WIFI_CONFIG_MODIFICATION`.
 
@@ -1669,12 +1675,12 @@ Not implemented yet: `;`, `&&` and `||`. They need a per-command exit status, wh
 | cls | | Clear the screen. |
 | cd \<dir> | | Change directory; `~` and `-` work. |
 | login | u=, p= | Interactive login, or inline with both options. |
-| logout | | End the session — serial returns to the prompt, telnet and SSH close. |
+| logout | | End the session — serial returns to the prompt, telnet and SSH close. The working directory and the session's variables reset either way, so the next login starts clean on a terminal that outlives the login. |
 | whoami | | The session's username. |
 | id | | `uid=N(name) gid=N`. |
 | who | | Active sessions across all channels: user, tty, sid, login time, idle. |
 | groups | | The current user's primary group. |
-| su u=\<user> p=\<pass> | u, p | Switch user in this session, prompting when arguments are omitted. On success the identity, uid, gid and home directory all follow. |
+| su [\<user> [\<pass>]] | | Switch user in this session, prompting when arguments are omitted. On success the identity, uid, gid and home directory all follow, and the session's environment starts clean. |
 | passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c | Change your own password; prompts in three echo-suppressed phases when arguments are omitted. |
 | useradd u=\<user> p=\<pass> | u, p | Root only. Next free uid, gid equal to uid, home `/`. Writes both user files. |
 | userdel u=\<user> | u | Root only. Removes from both files; refuses root and self. |
@@ -1695,6 +1701,9 @@ Not implemented yet: `;`, `&&` and `||`. They need a per-command exit status, wh
 | watch | c=, i=, n= | Run a command repeatedly. Options are comma separated, as every other command's are, so `;` stays the shell's own command separator. e.g. **watch c=net ip,i=3000,n=10**. Quote the inner command when it carries a comma of its own — **watch c="login u=a,p=b",i=3000** — and the quotes bound the value rather than ending it |
 | db status \| list \| verify \| save \| restore | positional | Inspect the config record store: which medium is live and how full it is, one line per record, a checksum pass over all of them, and saving or restoring the defaults tier. Never prints a record's contents. See [§5.10](#510-from-the-terminal). |
 | iot \<option> | setid, getid, sethost, gethost | Device unique id and IoT host. |
+| env | | Every variable this session can see, one `NAME=value` per line, each from the tier that wins. See [§7.14](#714-environment-variables). |
+| export \<name>=\<value> | | Set a variable for this session. Names the session answers for itself are refused. e.g. **export GREETING=hello** |
+| unset \<name> | | Drop a variable from this session, leaving `/.env` alone. |
 | help | | Every registered command with its usage line. Works before login. |
 | uptime | | `up Xd Yh Zm Ws`. |
 | tls q=1,t=,l=,n=,i= | | On-device certificate generation, ESP32 with cert generation enabled. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
@@ -1851,6 +1860,45 @@ idf.py elf                       # → build/hello_world.app.elf
 ```
 
 What makes the output loadable is two lines in the project's top-level `CMakeLists.txt`: `include(elf_loader)` and `project_elf(<name>)`. Upload the result and run it.
+
+### 7.14 Environment variables
+
+A variable can come from three places, and a lookup takes the first one that carries it:
+
+```
+  $NAME
+    │
+    ├─ 1. derived     PWD, USER, UID, HOSTNAME — answered from the session itself
+    ├─ 2. session     set with export, gone when the session ends
+    └─ 3. base file   /.env, shared by every session and kept across reboots
+```
+
+`env` prints all three merged, `export NAME=value` sets one for this session, and `unset NAME` drops it again. A session variable shadows the base file, so dropping it uncovers the file's value rather than deleting it. The base file is edited like any other config — `fedit /.env` — and is created with `HOME` on first boot.
+
+**The first tier is resolved, never stored.** `PWD`, `USER`, `UID` and `HOSTNAME` are facts the session already knows, so they are read at lookup time and assigning them is refused:
+
+```
+pdiStack@12580169:(/): export PWD=/nope
+the session answers for that name, it cannot be set
+```
+
+That is what keeps them honest — a stored `PWD` would be wrong the moment anyone ran `cd`, and two sources of truth for one fact is the thing worth avoiding, not the extra lookup.
+
+The shell expands `$NAME` wherever it expands `$?`, with the same quoting rules: a single-quoted run is literal, a double-quoted one still expands, and a name the environment does not carry expands to nothing rather than erroring.
+
+```
+pdiStack@12580169:(/): export GREETING=hello
+pdiStack@12580169:(/): echo $USER at $HOSTNAME
+pdiStack at pdi-bff549
+pdiStack@12580169:(/): echo pre$GREETING-post
+prehello-post
+pdiStack@12580169:(/): echo '$GREETING'
+$GREETING
+```
+
+A name is a letter or underscore followed by letters, digits or underscores. A session holds `ENV_SESSION_MAX` variables, eight by default; names and values are bounded by `ENV_NAME_MAX` and `ENV_VALUE_MAX`. The base file needs storage, so a board without a filesystem keeps the first two tiers and simply has none.
+
+The session tier ends with the login. `logout` and `su` both clear it, which matters most on the serial console: telnet and SSH close their channel and release the session with it, while the serial terminal outlives every login on it, so without an explicit reset one user's variables would follow the next one in. Only the session tier is dropped — the base file is untouched, so clearing uncovers `/.env` rather than deleting from it.
 
 ---
 ## 8. Web Server

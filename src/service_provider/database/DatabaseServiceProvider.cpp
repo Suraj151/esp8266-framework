@@ -127,6 +127,20 @@ bool DatabaseServiceProvider::initService(void *arg)
   this->serviceSetInterval( factoryResetOnInvalidConfigs, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
   #endif
 
+  iTerminalInterface *line = serviceBootLine();
+  if (nullptr != line)
+  {
+    if (0 == _unregistered)
+    {
+      line->writeln_ro(RODT_ATTR("every config table registered"));
+    }
+    else
+    {
+      line->write((uint32_t)_unregistered);
+      line->writeln_ro(RODT_ATTR(" config tables did not register"));
+    }
+  }
+
   return ServiceProvider::initService(arg);
 }
 

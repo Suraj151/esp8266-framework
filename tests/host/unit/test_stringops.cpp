@@ -10,6 +10,7 @@ created Date    : 16th Aug 2026
 
 #include <pditest.h>
 #include <utility/StringOperations.h>
+#include <utility/DataTypeConversions.h>
 
 TEST(stringops, strstr_finds_substring_at_start)
 {
@@ -403,4 +404,80 @@ TEST(stringops, append_padded_appends_rather_than_replacing)
     __append_padded(out, "y", 3);
     __append_padded(out, "z", 2);
     ASSERT_TRUE(out == pdiutil::string("xy  z "));
+}
+
+TEST(conversions, mac_string_defaults_to_uppercase_and_colons)
+{
+    const uint8_t mac[6] = {0x84, 0x0D, 0x8E, 0xBF, 0xF5, 0x49};
+    ASSERT_TRUE(BytesToMacString(mac, 6) == pdiutil::string("84:0D:8E:BF:F5:49"));
+}
+
+TEST(conversions, mac_string_honours_lowercase)
+{
+    const uint8_t mac[6] = {0x84, 0x0D, 0x8E, 0xBF, 0xF5, 0x49};
+    ASSERT_TRUE(BytesToMacString(mac, 6, ':', false) == pdiutil::string("84:0d:8e:bf:f5:49"));
+}
+
+TEST(conversions, mac_string_honours_another_separator)
+{
+    const uint8_t mac[6] = {0x84, 0x0D, 0x8E, 0xBF, 0xF5, 0x49};
+    ASSERT_TRUE(BytesToMacString(mac, 6, '-') == pdiutil::string("84-0D-8E-BF-F5-49"));
+}
+
+TEST(conversions, mac_string_joins_nothing_when_separator_is_zero)
+{
+    const uint8_t mac[3] = {0xBF, 0xF5, 0x49};
+    ASSERT_TRUE(BytesToMacString(mac, 3, 0) == pdiutil::string("BFF549"));
+}
+
+TEST(conversions, mac_string_keeps_leading_zero_of_a_byte)
+{
+    const uint8_t mac[2] = {0x00, 0x0A};
+    ASSERT_TRUE(BytesToMacString(mac, 2) == pdiutil::string("00:0A"));
+}
+
+TEST(conversions, mac_string_is_empty_for_nothing_to_render)
+{
+    const uint8_t mac[1] = {0x01};
+    ASSERT_TRUE(BytesToMacString(mac, 0).empty());
+    ASSERT_TRUE(BytesToMacString(nullptr, 6).empty());
+}
+
+TEST(conversions, micros_render_as_seconds_and_six_digits)
+{
+    char buf[24];
+    MicrosToTimeString(4201489ULL, buf, sizeof(buf));
+    ASSERT_STREQ(buf, "4.201489");
+}
+
+TEST(conversions, micros_below_a_second_keep_their_leading_zeros)
+{
+    char buf[24];
+    MicrosToTimeString(33708ULL, buf, sizeof(buf));
+    ASSERT_STREQ(buf, "0.033708");
+}
+
+TEST(conversions, micros_fraction_length_is_selectable)
+{
+    char buf[24];
+    MicrosToTimeString(4201489ULL, buf, sizeof(buf), 3);
+    ASSERT_STREQ(buf, "4.201");
+    MicrosToTimeString(4201489ULL, buf, sizeof(buf), 0);
+    ASSERT_STREQ(buf, "4");
+}
+
+TEST(conversions, micros_render_beyond_a_32_bit_count)
+{
+    char buf[24];
+    MicrosToTimeString(9000000000ULL, buf, sizeof(buf));
+    ASSERT_STREQ(buf, "9000.000000");
+}
+
+TEST(conversions, uint64_renders_past_the_32_bit_ceiling)
+{
+    char buf[24];
+    Uint64ToString(4294967296ULL, buf, sizeof(buf));
+    ASSERT_STREQ(buf, "4294967296");
+    Uint64ToString(0ULL, buf, sizeof(buf));
+    ASSERT_STREQ(buf, "0");
 }

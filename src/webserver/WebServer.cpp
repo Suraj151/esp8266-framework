@@ -98,6 +98,20 @@ bool HttpServer::initService(void *arg)
   this->m_server->begin(HTTP_DEFAULT_PORT);
   #endif
 
+  iTerminalInterface *line = serviceBootLine();
+  if (nullptr != line) {
+    line->write_ro(RODT_ATTR("listening on port "));
+    #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+    line->write((uint32_t)HTTPS_DEFAULT_PORT);
+    line->write_ro(RODT_ATTR(" over tls, "));
+    #else
+    line->write((uint32_t)HTTP_DEFAULT_PORT);
+    line->write_ro(RODT_ATTR(", "));
+    #endif
+    line->write((uint32_t)Controller::ControllerRegistry().size());
+    line->writeln_ro(RODT_ATTR(" controllers"));
+  }
+
   // LogI("HTTP server started!\n");
 
   bStatus = ServiceProvider::initService(arg);

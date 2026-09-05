@@ -70,6 +70,12 @@ public:
   virtual iTerminalInterface* getTerminal(terminal_types_t terminal=TERMINAL_TYPE_SERIAL) = 0;
   virtual void handleEvents() { } // handle device specific events if any
 
+  /**
+   * Fills in what this port can report about the hardware it runs on, leaving
+   * untouched whatever it has no answer for.
+   */
+  virtual void getDeviceInfo(device_info_t &_out) { }
+
   // below are the utility interface dependencies which needs to be satisfy
   // virtual void wait(uint64_t timeoutms) = 0;
   // virtual uint32_t millis_now() = 0;

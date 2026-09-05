@@ -10,6 +10,8 @@ created Date    : 26th Aug 2026
 
 #include "ShellParser.h"
 #include <utility/DataTypeConversions.h>
+#include <utility/StringOperations.h>
+#include <service_provider/session/Environment.h>
 
 #if defined(ENABLE_CMD_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
 
@@ -194,6 +196,23 @@ void ShellParser::expand(const char *src, int16_t len, pdi_err_t lastexit, pdiut
 
       out += number;
       i++;
+      continue;
+    }
+
+    // a name after $ is a variable, and one the environment does not carry
+    // expands to nothing the way a shell leaves an unset name empty
+    if ('$' == c && !insingle && (i + 1) < len &&
+        (__is_alpha(src[i + 1]) || '_' == src[i + 1])) {
+
+      int16_t nameend = i + 1;
+      while (nameend < len && (__is_alnum(src[nameend]) || '_' == src[nameend])) nameend++;
+
+      pdiutil::string name(src + i + 1, nameend - (i + 1));
+      pdiutil::string value;
+      Environment::get(name.c_str(), value);
+
+      out += value;
+      i = nameend - 1;
       continue;
     }
 

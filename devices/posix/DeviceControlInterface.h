@@ -74,6 +74,12 @@ public:
   uint32_t getDeviceId() override;
   pdiutil::string getDeviceMac() override;
   bool isDeviceFactoryRequested() override;
+
+  /**
+   * Fills in what this port can report about the hardware it runs on, leaving
+   * untouched whatever it has no answer for.
+   */
+  void getDeviceInfo(device_info_t &_out) override;
   iTerminalInterface *getTerminal(terminal_types_t terminal = TERMINAL_TYPE_SERIAL) override;
 
   // util methods

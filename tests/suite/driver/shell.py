@@ -170,6 +170,39 @@ class Shell(object):
         self._buffer = ""
         return seen
 
+    def expect_count(self, needle, count=1, timeout=DEFAULT_TIMEOUT):
+        """
+        Read until `needle` has appeared `count` times, and return everything
+        read whether it did or not.
+
+        This is drain's answer for anything the caller then asserts on. Draining
+        stops at the first gap in the output and treats that gap as the end,
+        which is only true when the target is idle between writes; a board doing
+        inline computation goes quiet in the middle of the work and its later
+        output lands after the drain has already given up. Waiting for the text
+        itself makes the timeout a ceiling on failure rather than the measure of
+        completion, so a slow target is slow rather than wrong.
+
+        Not raising on the ceiling is deliberate: the caller's own assertion
+        says what was expected and is a better failure message than a timeout.
+        """
+        deadline = time.time() + timeout
+        while True:
+            clean = strip_ansi(self._buffer)
+            if clean.count(needle) >= count:
+                self._buffer = ""
+                return clean
+
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                self._buffer = ""
+                return clean
+
+            chunk = self._recv(min(remaining, 0.2))
+            if chunk:
+                self._buffer += chunk
+                self._log += chunk
+
     def answer(self, line, pattern, timeout=DEFAULT_TIMEOUT, retries=1):
         """
         Reply to a prompt and wait for what should follow.

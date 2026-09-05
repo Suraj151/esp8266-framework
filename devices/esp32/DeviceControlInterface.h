@@ -83,6 +83,12 @@ public:
   bool isDeviceFactoryRequested() override;
   iTerminalInterface* getTerminal(terminal_types_t terminal=TERMINAL_TYPE_SERIAL) override;
 
+  /**
+   * Fills in what this port can report about the hardware it runs on, leaving
+   * untouched whatever it has no answer for.
+   */
+  void getDeviceInfo(device_info_t &_out) override;
+
   // util methods
   void wait(double timeoutms) override;
   uint32_t millis_now() override;
