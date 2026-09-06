@@ -4,10 +4,6 @@ One C++ codebase that runs on an ESP32, an ESP8266 or an Arduino UNO. Applicatio
 
 What comes out of the box is closer to a small system than to a sketch template: a WiFi captive portal and web UI, an HTTP/HTTPS server, MQTT, OTA, an SSH server with SFTP and scp, Telnet, SMTP, a virtual filesystem with users and permissions, a task scheduler with three execution models, and a Linux-flavoured shell sitting on top of all of it.
 
-<p align="center">
-  <img width="500" src="https://github.com/Suraj151/pdi-framework/blob/master/doc/pdi-framework.jpg">
-</p>
-
 ## What it can do
 
 **Portability is the whole point.** Services depend on abstract interfaces, not on vendor SDKs. Supporting a new board means writing an adapter for the interfaces that board can actually offer; the services, the portal and the shell come along unchanged. Anything a board can't do is switched off at compile time rather than stubbed at runtime.
@@ -89,19 +85,19 @@ Details in [§6.2.12 Storage](#6212-storage-interface-init-no-provider).
 <table>
   <tr>
     <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-boot.png" width="100%"></td>
-    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ls.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ls-1.png" width="100%"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ps.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ps-1.png" width="100%"></td>
     <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-service.png" width="100%"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-usradd.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-usradd-1.png" width="100%"></td>
     <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ssh.png" width="100%"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-net.png" width="100%"></td>
-    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-help.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-net-1.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-help-1.png" width="100%"></td>
   </tr>
   <tr>
     <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/portal_home_menu.png" width="100%"></td>
