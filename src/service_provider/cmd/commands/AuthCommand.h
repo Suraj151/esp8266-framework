@@ -148,6 +148,9 @@ struct LogoutCommand : public CommandBase {
 
 		__auth_service.setAuthorized(false);
 		Environment::clearSession();
+		#ifdef ENABLE_SCRIPT_RUNNER
+		ScriptRunner::clearSession();
+		#endif
 
 		#ifdef ENABLE_STORAGE_SERVICE
 		SessionManager::setPWD(__i_fs.getHomeDirectory());

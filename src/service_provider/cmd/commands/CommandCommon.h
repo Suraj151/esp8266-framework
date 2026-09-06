@@ -14,6 +14,9 @@ created Date    : 1st June 2019
 #include <config/Config.h>
 #include <service_provider/session/SessionManager.h>
 #include <service_provider/session/Environment.h>
+#ifdef ENABLE_SCRIPT_RUNNER
+#include <service_provider/cmd/ScriptRunner.h>
+#endif
 
 #ifdef ENABLE_AUTH_SERVICE
 #include <service_provider/auth/AuthServiceProvider.h>
@@ -103,6 +106,8 @@ created Date    : 1st June 2019
 #define CMD_NAME_ENV			    "env"
 #define CMD_NAME_EXPORT			    "export"
 #define CMD_NAME_UNSET			    "unset"
+#define CMD_NAME_SOURCE			    "source"
+#define CMD_NAME_TEST			    "test"
 
 #ifdef ENABLE_STORAGE_SERVICE
 /**

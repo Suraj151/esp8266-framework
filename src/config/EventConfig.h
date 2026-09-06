@@ -31,6 +31,11 @@ enum event_name : uint8_t {
   EVENT_WIFI_INTERNET_DOWN,
   EVENT_FACTORY_RESET,
   EVENT_SERIAL_AVAILABLE,
+
+  EVENT_TIME_SYNC,
+  EVENT_TIME_SECOND,
+  EVENT_TIME_MINUTE,
+
   EVENT_NAME_MAX,
 };
 typedef enum event_name event_name_t;

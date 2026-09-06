@@ -52,12 +52,14 @@ PROFILES = {
     "no-cmd": ["PDI_NO_CMD_SERVICE"],
     "no-seal": ["PDI_NO_DB_SEALING"],
     "no-featureconf": ["PDI_NO_FEATURE_CONFIG_FILES"],
+    "no-script": ["PDI_NO_SCRIPT_RUNNER"],
     "minimal": [
         "PDI_NO_NETWORK_SERVICE",
         "PDI_NO_STORAGE_SERVICE",
         "PDI_NO_AUTH_SERVICE",
         "PDI_NO_CMD_SERVICE",
         "PDI_NO_DB_SEALING",
+        "PDI_NO_SCRIPT_RUNNER",
     ],
 }
 

@@ -54,6 +54,10 @@ created Date    : 1st June 2019
 #include "commands/EnvCommand.h"
 #include "commands/ExportCommand.h"
 #include "commands/UnsetCommand.h"
+#include "commands/TestCommand.h"
+#ifdef ENABLE_SCRIPT_RUNNER
+#include "commands/SourceCommand.h"
+#endif
 #include "commands/DateCommand.h"
 #include "commands/TimedatectlCommand.h"
 #include "commands/HostCommand.h"
@@ -113,6 +117,8 @@ public:
 
 private:
 
+	friend class ScriptRunner;
+
 	/**
 	 * @var	pdiutil::vector<cmd_t>	m_cmdlist
 	 */
@@ -154,6 +160,18 @@ private:
 	pdi_err_t runPipeline(const char *line, const ShellParser::Line &parsed, uint16_t index);
 
 #endif
+	/**
+	 * Parses one line and dispatches it, without the history, cleanup and
+	 * prompt that an interactively typed line carries around it.
+	 */
+	pdi_err_t runLine(pdiutil::string &line, bool &named_noent);
+
+	/**
+	 * Releases every command that has finished, leaving the ones still waiting
+	 * for input, running in background, or executing on the stack.
+	 */
+	void reapFinishedCommands();
+
 	cmd_t* getActiveCommandByName(const char* _cmd);
 };
 

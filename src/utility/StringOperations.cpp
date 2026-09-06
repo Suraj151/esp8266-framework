@@ -257,6 +257,11 @@ bool __is_alnum(char c)
     return __is_alpha(c) || __is_digit(c);
 }
 
+bool __is_blank(char c)
+{
+    return ' ' == c || '\t' == c;
+}
+
 /**
  * @brief Trims whitespace from both ends of a string.
  *

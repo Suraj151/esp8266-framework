@@ -97,6 +97,42 @@ uint16_t StringToOctalUint16(const char *pString, uint8_t _len)
     return value;
 }
 
+int32_t StringToInt32(const char *pString, uint8_t _len)
+{
+    if (nullptr == pString)
+    {
+        return 0;
+    }
+
+    bool negative = false;
+    uint8_t n = 0;
+
+    while ((*pString == ' ' || *pString == '"') && n < _len)
+    {
+        pString++;
+        n++;
+    }
+
+    if (n < _len && ('-' == *pString || '+' == *pString))
+    {
+        negative = ('-' == *pString);
+        pString++;
+        n++;
+    }
+
+    int32_t value = 0;
+
+    while ((*pString >= '0' && *pString <= '9') && n < _len)
+    {
+        value *= 10;
+        value += *pString - '0';
+        pString++;
+        n++;
+    }
+
+    return negative ? -value : value;
+}
+
 uint32_t StringToUint32(const char *pString, uint8_t _len)
 {
     if (nullptr == pString)
@@ -624,6 +660,39 @@ static uint8_t EpochFmtWidth(const char *fmt)
 }
 
 /**
+ * Breaks an epoch down into the calendar fields, so everything that reads the
+ * clock reads one instant rather than converting its own.
+ */
+void EpochToDateTime(uint32_t epoch, datetime_t &out)
+{
+    uint32_t sec_of_day = epoch % 86400u;
+    uint32_t days = epoch / 86400u;
+
+    out.m_hour   = (uint8_t)(sec_of_day / 3600u);
+    out.m_minute = (uint8_t)((sec_of_day % 3600u) / 60u);
+    out.m_second = (uint8_t)(sec_of_day % 60u);
+
+    out.m_weekday = (uint8_t)((days + 4u) % 7u);
+
+    // Civil-from-days (Howard Hinnant). Shift epoch (1970-01-01) to an era
+    // starting 0000-03-01 so month arithmetic becomes uniform.
+    int32_t z = (int32_t)days + 719468;
+    int32_t era = (z >= 0 ? z : z - 146096) / 146097;
+    uint32_t doe = (uint32_t)(z - era * 146097);              // [0, 146096]
+    uint32_t yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365; // [0, 399]
+    int32_t y = (int32_t)yoe + era * 400;
+    uint32_t doy = doe - (365*yoe + yoe/4 - yoe/100);         // [0, 365]
+    uint32_t mp  = (5*doy + 2) / 153;                         // [0, 11]
+    uint32_t d   = doy - (153*mp + 2)/5 + 1;                  // [1, 31]
+    uint32_t m   = mp < 10 ? mp + 3 : mp - 9;                 // [1, 12]
+    if (m <= 2) y += 1;
+
+    out.m_year  = (uint16_t)((y < 0) ? 0 : y);
+    out.m_month = (uint8_t)m;
+    out.m_day   = (uint8_t)d;
+}
+
+/**
  * @brief Converts a Unix epoch (seconds since 1970-01-01 UTC) into a
  *        human-readable string using a strftime-style format. epoch == 0
  *        renders as a dash padded to the format's rendered width.
@@ -658,27 +727,15 @@ void EpochToDateTimeString(uint32_t epoch, char *pString, uint8_t _maxlen,
         return;
     }
 
-    uint32_t sec_of_day = epoch % 86400u;
-    uint32_t days = epoch / 86400u;
+    datetime_t parts;
+    EpochToDateTime(epoch, parts);
 
-    uint32_t hh = sec_of_day / 3600u;
-    uint32_t mm = (sec_of_day % 3600u) / 60u;
-    uint32_t ss = sec_of_day % 60u;
-
-    // Civil-from-days (Howard Hinnant). Shift epoch (1970-01-01) to an era
-    // starting 0000-03-01 so month arithmetic becomes uniform.
-    int32_t z = (int32_t)days + 719468;
-    int32_t era = (z >= 0 ? z : z - 146096) / 146097;
-    uint32_t doe = (uint32_t)(z - era * 146097);              // [0, 146096]
-    uint32_t yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365; // [0, 399]
-    int32_t y = (int32_t)yoe + era * 400;
-    uint32_t doy = doe - (365*yoe + yoe/4 - yoe/100);         // [0, 365]
-    uint32_t mp  = (5*doy + 2) / 153;                         // [0, 11]
-    uint32_t d   = doy - (153*mp + 2)/5 + 1;                  // [1, 31]
-    uint32_t m   = mp < 10 ? mp + 3 : mp - 9;                 // [1, 12]
-    if (m <= 2) y += 1;
-
-    uint32_t yr = (y < 0) ? 0 : (uint32_t)y;
+    uint32_t hh = parts.m_hour;
+    uint32_t mm = parts.m_minute;
+    uint32_t ss = parts.m_second;
+    uint32_t d  = parts.m_day;
+    uint32_t m  = parts.m_month;
+    uint32_t yr = parts.m_year;
 
     uint8_t pos = 0;
     while (*fmt && (uint8_t)(pos + 1) < _maxlen) {

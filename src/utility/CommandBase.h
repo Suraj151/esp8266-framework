@@ -136,6 +136,7 @@ typedef struct CommandBase {
     uint16_t m_iterations;
     static CommandExecutionInterface *m_cmdexecinterface;  ///< Interface for command execution.
     bool m_runinbackground;
+    bool m_executing;
 
     /**
      * @brief The registry of every command known to the build.
@@ -378,6 +379,14 @@ typedef struct CommandBase {
     }
 
     /**
+     * True while this command's own execution is still on the stack, so that
+     * a line run from inside it cannot delete it from under itself.
+     */
+    bool isExecuting(){
+        return m_executing;
+    }
+
+    /**
      * @brief Stop running in background.
      * @return True if the command stopped running in background, false otherwise.
      */
@@ -498,6 +507,7 @@ typedef struct CommandBase {
 
     pdi_err_t executeCommand(char *_args, int16_t _len, bool _waiting_option = false, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE){
         m_result = CMD_ERROR_UNSET;
+        m_executing = true;
         if(_args != nullptr){
             if( !_waiting_option ){
                 int16_t cmd_max_len = _len;
@@ -632,6 +642,7 @@ typedef struct CommandBase {
             ClearOptions();
             m_iterations = 0;
         }
+        m_executing = false;
         return m_result;
     }
 
@@ -651,6 +662,7 @@ typedef struct CommandBase {
         m_optionseparator = CMD_OPTION_SEPERATOR_COMMA;
         m_iterations = 0;
         m_runinbackground = false;
+        m_executing = false;
     }
 
     /**
@@ -670,11 +682,12 @@ typedef struct CommandBase {
      * @param res The result of the command execution.
      */
     void ResultToTerminal(pdi_err_t res){
-        if( nullptr != m_terminal && 
-            CMD_ERROR_AGAIN != res && 
-            CMD_ERROR_INTR != res && 
-            PDI_OK != res && 
-            !isWaitingForOption() 
+        if( nullptr != m_terminal &&
+            CMD_ERROR_AGAIN != res &&
+            CMD_ERROR_INTR != res &&
+            CMD_RESULT_FALSE != res &&
+            PDI_OK != res &&
+            !isWaitingForOption()
         ){
             m_terminal->writeln();
             m_terminal->write_ro(RODT_ATTR("CmdErr : "));

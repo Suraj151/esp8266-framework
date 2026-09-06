@@ -16,6 +16,9 @@ created Date    : 1st June 2019
 #include "ShellCompletion.h"
 #include <service_provider/session/SessionManager.h>
 #include <service_provider/session/Environment.h>
+#ifdef ENABLE_SCRIPT_RUNNER
+#include "ScriptRunner.h"
+#endif
 #ifdef ENABLE_STORAGE_SERVICE
 #include <service_provider/session/FileWriteStream.h>
 #include <service_provider/session/FileReadStream.h>
@@ -152,6 +155,10 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   EnvCommand::RegisterCommand();
   ExportCommand::RegisterCommand();
   UnsetCommand::RegisterCommand();
+  TestCommand::RegisterCommand();
+  #ifdef ENABLE_SCRIPT_RUNNER
+  SourceCommand::RegisterCommand();
+  #endif
   DateCommand::RegisterCommand();
   TimedatectlCommand::RegisterCommand();
 
@@ -523,6 +530,83 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
 }
 
 /**
+ * Releases every command that has finished, leaving the ones still waiting
+ * for input, running in background, or executing on the stack.
+ */
+void CommandLineServiceProvider::reapFinishedCommands()
+{
+  for (int16_t i = static_cast<int16_t>(m_cmdlist.size()) - 1; i >= 0; i--){
+
+    if(nullptr != m_cmdlist[i] && !m_cmdlist[i]->isWaitingForOption() && !m_cmdlist[i]->isRunningInBackground() &&
+       !m_cmdlist[i]->isExecuting()){
+
+      pdiutil::safe_delete(m_cmdlist[i]);
+      m_cmdlist.erase(m_cmdlist.begin() + i);
+    }
+  }
+}
+
+/**
+ * Parses one line and dispatches it, without the history, cleanup and
+ * prompt that an interactively typed line carries around it.
+ */
+pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named_noent)
+{
+  pdi_err_t res = CMD_ERROR_NOENT;
+
+  #if defined(ENABLE_STORAGE_SERVICE)
+  ShellParser::Line parsed = ShellParser::parse(line.c_str(), (int16_t)line.size());
+
+  if( parsed.m_malformed ){
+
+    m_terminal->writeln();
+    m_terminal->writeln_ro(RODT_ATTR("syntax error"));
+    res = CMD_ERROR_INVAL;
+  }else if( parsed.isPlain() && !ShellParser::expandable(line.c_str(), (int16_t)line.size()) ){
+
+    // one command, nothing to wire up and nothing to expand, so run it
+    // where it lies rather than copying the line
+    cmd_t* cmd_to_exec = getCommandToExecute(line.c_str());
+
+    res = ( nullptr != cmd_to_exec ) ?
+          cmd_to_exec->executeCommand((char*)line.c_str(), line.size()) :
+          (pdi_err_t)CMD_ERROR_NOENT;
+  }else{
+
+    for( uint16_t p = 0; p < parsed.m_pipelines.size(); p++ ){
+
+      if( !ShellParser::shouldRun(parsed.m_pipelines[p].m_join, res) ){
+        continue;
+      }
+
+      res = runPipeline(line.c_str(), parsed, p);
+
+      // a command that stopped for input owns the terminal, so what
+      // follows on the line cannot run behind it
+      if( CMD_ERROR_AGAIN == res || CMD_ERROR_HOLD_BUFFER == res ){
+        break;
+      }
+
+      // $? is the status of the last command that finished, so a segment
+      // later on the same line has to see this one
+      SessionManager::setLastExit(res);
+    }
+
+    named_noent = true;
+  }
+  #else
+  cmd_t* cmd_to_exec = getCommandToExecute(line.c_str());
+
+  if(nullptr != cmd_to_exec){
+
+    res = cmd_to_exec->executeCommand((char*)line.c_str(), line.size());
+  }
+  #endif
+
+  return res;
+}
+
+/**
  * execute command provided or in list available
  *
  * @param pdiutil::string* cmd
@@ -642,54 +726,7 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
       res = m_cmdlist[waitingCmdIndex]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
     }else{
 
-      #if defined(ENABLE_STORAGE_SERVICE)
-      ShellParser::Line parsed = ShellParser::parse(cmd->c_str(), (int16_t)cmd->size());
-
-      if( parsed.m_malformed ){
-
-        m_terminal->writeln();
-        m_terminal->writeln_ro(RODT_ATTR("syntax error"));
-        res = CMD_ERROR_INVAL;
-      }else if( parsed.isPlain() && !ShellParser::expandable(cmd->c_str(), (int16_t)cmd->size()) ){
-
-        // one command, nothing to wire up and nothing to expand, so run it
-        // where it lies rather than copying the line
-        cmd_t* cmd_to_exec = getCommandToExecute(cmd->c_str());
-
-        res = ( nullptr != cmd_to_exec ) ?
-              cmd_to_exec->executeCommand((char*)cmd->c_str(), cmd->size()) :
-              (pdi_err_t)CMD_ERROR_NOENT;
-      }else{
-
-        for( uint16_t p = 0; p < parsed.m_pipelines.size(); p++ ){
-
-          if( !ShellParser::shouldRun(parsed.m_pipelines[p].m_join, res) ){
-            continue;
-          }
-
-          res = runPipeline(cmd->c_str(), parsed, p);
-
-          // a command that stopped for input owns the terminal, so what
-          // follows on the line cannot run behind it
-          if( CMD_ERROR_AGAIN == res || CMD_ERROR_HOLD_BUFFER == res ){
-            break;
-          }
-
-          // $? is the status of the last command that finished, so a segment
-          // later on the same line has to see this one
-          SessionManager::setLastExit(res);
-        }
-
-        reported_noent = true;
-      }
-      #else
-      cmd_t* cmd_to_exec = getCommandToExecute(cmd->c_str());
-
-      if(nullptr != cmd_to_exec){
-
-        res = cmd_to_exec->executeCommand((char*)cmd->c_str(), cmd->size());
-      }
-      #endif
+      res = runLine(*cmd, reported_noent);
     }
 
     // for (int16_t i = 0; !is_executing_lastcommand && i < m_cmdlist.size(); i++){
@@ -793,7 +830,18 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
         m_cmdlist[i]->stopRunningInBackground();
       }
     }
+    #ifdef ENABLE_SCRIPT_RUNNER
+    ScriptRunner::clearSession();
+    #endif
   }
+
+  #ifdef ENABLE_SCRIPT_RUNNER
+  // whatever the script stopped for has been answered, so it carries on before
+  // the prompt is drawn and before this call reaps what it leaves behind
+  if( ScriptRunner::pending() && getCommandWaitingForUserInput() < 0 ){
+    res = ScriptRunner::resume();
+  }
+  #endif
 
   #ifdef ENABLE_AUTH_SERVICE
   bool isWaitingForUserAuth = false;
@@ -829,14 +877,7 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
   }
 
   // Clean up executed commands.
-  for (int16_t i = static_cast<int16_t>(m_cmdlist.size()) - 1; i >= 0; i--){
-
-    if(nullptr != m_cmdlist[i] && !m_cmdlist[i]->isWaitingForOption() && !m_cmdlist[i]->isRunningInBackground()){
-
-      pdiutil::safe_delete(m_cmdlist[i]);
-      m_cmdlist.erase(m_cmdlist.begin() + i);
-    }
-  }
+  reapFinishedCommands();
 
   // the line is answered, so this is what the session last exited with
   SessionManager::setLastExit(res);
@@ -958,7 +999,7 @@ void CommandLineServiceProvider::releaseSession(session_t *session)
 
   for (int16_t i = static_cast<int16_t>(m_cmdlist.size()) - 1; i >= 0; i--){
 
-    if(nullptr != m_cmdlist[i] && m_cmdlist[i]->m_owner == session){
+    if(nullptr != m_cmdlist[i] && m_cmdlist[i]->m_owner == session && !m_cmdlist[i]->isExecuting()){
 
       pdiutil::safe_delete(m_cmdlist[i]);
       m_cmdlist.erase(m_cmdlist.begin() + i);

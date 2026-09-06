@@ -107,4 +107,6 @@ created Date    : 1st Jan 2026
 // devices/esp8266/esp8266_device_config.h
 #define DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK
 
+#define DEVICE_SUPPORTS_NTP
+
 #endif // _ESP8266_DEVICE_CONFIG_H_

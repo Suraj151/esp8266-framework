@@ -49,6 +49,14 @@ uint64_t StringToUint64(const char *pString, uint8_t _len = 32);
 uint32_t StringToUint32(const char *pString, uint8_t _len = 32);
 
 /**
+ * @brief Converts a string to a signed 32-bit integer.
+ * @param pString The string to convert.
+ * @param _len The maximum length of the string (default is 32).
+ * @return The converted signed 32-bit integer.
+ */
+int32_t StringToInt32(const char *pString, uint8_t _len = 32);
+
+/**
  * @brief Converts a string to an unsigned 16-bit integer.
  * @param pString The string to convert.
  * @param _len The maximum length of the string (default is 32).
@@ -220,6 +228,12 @@ extern const char __g_month_abbr[13][4];
  */
 void EpochToDateTimeString(uint32_t epoch, char *pString, uint8_t _maxlen,
                            const char *fmt = "%Y-%m-%d %H:%M:%S");
+
+/**
+ * Breaks an epoch down into the calendar fields, so everything that reads the
+ * clock reads one instant rather than converting its own.
+ */
+void EpochToDateTime(uint32_t epoch, datetime_t &out);
 
 /**
  * @brief Counts the number of digits in a signed 32-bit integer.

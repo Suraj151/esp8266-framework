@@ -486,7 +486,11 @@ typedef enum upgrade_status upgrade_status_t;
  * Contains task details such as ID, duration, priority, and callback function.
  */
 
-#define DEFAULT_TASK_PRIORITY 0
+#define MAX_TASK_PRIORITY 99
+#define HIGH_TASK_PRIORITY ((MAX_TASK_PRIORITY * 3) / 4)
+#define MEDIUM_TASK_PRIORITY (MAX_TASK_PRIORITY / 2)
+#define LOW_TASK_PRIORITY 10
+#define DEFAULT_TASK_PRIORITY LOW_TASK_PRIORITY
 
 #ifdef ENABLE_CONTEXTUAL_EXECUTION
 // forward declaration
@@ -561,6 +565,8 @@ struct task_t {
     pdiutil::millis_t m_created_ms;             ///< Timestamp of registration
     uint32_t m_run_count;                       ///< Times the callback has fired
     uint64_t m_total_exec_us;                   ///< Cumulative execution time (µs) since registration
+    uint64_t m_vruntime;                        ///< Service already taken, charged against the task's weight
+    uint32_t m_weight;                          ///< What that charge is divided by, held rather than recomputed every run
     uint8_t m_pending_sig;                      ///< Pending signal number to consume on next tick (SIG_NONE = idle)
     bool m_stoppable;                           ///< false = ignore SIG_STOP / SIG_CONT (e.g. exec'd programs)
     CallBackVoidPointerArgFn m_finalizer;       ///< Teardown hook run once when the task is reaped (natural exit or kill), given the task itself
@@ -588,6 +594,8 @@ struct task_t {
         m_created_ms = 0;
         m_run_count = 0;
         m_total_exec_us = 0;
+        m_vruntime = 0;
+        m_weight = 1;
         m_pending_sig = SIG_NONE;
         m_stoppable = true;
         m_finalizer = nullptr;
@@ -617,6 +625,8 @@ struct task_t {
         m_created_ms = t.m_created_ms;
         m_run_count = t.m_run_count;
         m_total_exec_us = t.m_total_exec_us;
+        m_vruntime = t.m_vruntime;
+        m_weight = t.m_weight;
         m_pending_sig = t.m_pending_sig;
         m_stoppable = t.m_stoppable;
         m_finalizer = t.m_finalizer;
@@ -646,6 +656,8 @@ struct task_t {
             m_created_ms = t.m_created_ms;
             m_run_count = t.m_run_count;
             m_total_exec_us = t.m_total_exec_us;
+            m_vruntime = t.m_vruntime;
+            m_weight = t.m_weight;
             m_pending_sig = t.m_pending_sig;
             m_stoppable = t.m_stoppable;
             m_finalizer = t.m_finalizer;
@@ -835,6 +847,26 @@ struct config_kv_t {
     pdiutil::string m_value;
 };
 
+/**
+ * One instant, broken down once so that everything reading the clock reads the
+ * same one. m_epoch is UTC; every field below it is local time, which is what
+ * the shell and the file listings already show.
+ */
+struct datetime_t {
+    datetime_t() : m_valid(false), m_epoch(0), m_year(0), m_month(0), m_day(0),
+                   m_hour(0), m_minute(0), m_second(0), m_weekday(0) {}
+
+    bool m_valid;                   ///< whether the clock is trustworthy yet
+    pdiutil::epoch_time_t m_epoch;  ///< seconds since the epoch, UTC
+    uint16_t m_year;
+    uint8_t m_month;                ///< 1-12
+    uint8_t m_day;                  ///< 1-31
+    uint8_t m_hour;                 ///< 0-23
+    uint8_t m_minute;               ///< 0-59
+    uint8_t m_second;               ///< 0-59
+    uint8_t m_weekday;              ///< 0-6, Sunday 0
+};
+
 struct vfs_mount_t {
     vfs_mount_t() : m_backend(nullptr), m_type(VFS_TYPE_UNKNOWN), m_prefix_len(0) {
         m_prefix[0] = '\0';
@@ -994,6 +1026,34 @@ struct fd_table_t {
 };
 #endif
 
+#ifdef ENABLE_SCRIPT_RUNNER
+enum script_block_kind_t : uint8_t {
+    SCRIPT_BLOCK_IF = 0,
+    SCRIPT_BLOCK_WHILE,
+    SCRIPT_BLOCK_FOR
+};
+
+struct script_block_t {
+    script_block_t() : m_kind(SCRIPT_BLOCK_IF), m_taken(false), m_skipping(false),
+                       m_head(0), m_passes(0) {}
+
+    script_block_kind_t m_kind;
+    bool m_taken;
+    bool m_skipping;
+    int32_t m_head;
+    uint32_t m_passes;
+};
+
+struct script_frame_t {
+    script_frame_t() : m_line(0), m_loop_passes(0) {}
+
+    pdiutil::string m_path;
+    int32_t m_line;
+    uint32_t m_loop_passes;
+    pdiutil::vector<script_block_t> m_blocks;
+};
+#endif
+
 enum session_state_t : uint8_t {
     SESSION_STATE_FREE = 0,
     SESSION_STATE_PRELOGIN,
@@ -1014,6 +1074,9 @@ struct session_t {
 #endif
 #ifdef ENABLE_CMD_SERVICE
                   , m_fdtable(nullptr), m_lastExit(PDI_OK)
+#ifdef ENABLE_SCRIPT_RUNNER
+                  , m_script_exitonprompt(true)
+#endif
 #endif
     {}
 
@@ -1046,6 +1109,10 @@ struct session_t {
         m_fdtable = nullptr;
         m_lastExit = PDI_OK;
         m_env.clear();
+#ifdef ENABLE_SCRIPT_RUNNER
+        m_scripts.clear();
+        m_script_exitonprompt = true;
+#endif
 #endif
     }
 
@@ -1082,6 +1149,13 @@ struct session_t {
     // Variables set in this session, which outrank the base environment file
     // and are gone when the session ends.
     pdiutil::vector<config_kv_t> m_env;
+
+#ifdef ENABLE_SCRIPT_RUNNER
+    // Scripts this session has open, innermost last, so one that stops for
+    // input is picked up where it left off.
+    pdiutil::vector<script_frame_t> m_scripts;
+    bool m_script_exitonprompt;
+#endif
 #endif
 };
 

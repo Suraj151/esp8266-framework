@@ -42,6 +42,20 @@ created Date    : 1st June 2019
 #endif
 #define MAX_FACTORY_RESET_CALLBACKS	MAX_SCHEDULABLE_TASKS
 
+#ifndef TASK_PRIORITY_WEIGHT_MIN
+#define TASK_PRIORITY_WEIGHT_MIN 50
+#endif
+#ifndef TASK_PRIORITY_WEIGHT_MAX
+#define TASK_PRIORITY_WEIGHT_MAX 100
+#endif
+
+#define TASK_WEIGHT_LEVELS (MAX_TASK_PRIORITY + 1)  /* one ladder step per priority */
+#define TASK_WEIGHT_NOMINAL 1024
+#define TASK_WEIGHT_SPAN 9            /* natural log of the ladder's lightest to heaviest */
+#define TASK_WEIGHT_STEP_NUM (TASK_WEIGHT_LEVELS + TASK_WEIGHT_SPAN)
+#define TASK_WEIGHT_STEP_DEN TASK_WEIGHT_LEVELS
+#define TASK_WEIGHT_DEADLINE_BOOST 4  /* a deadline task is charged this much less */
+
 /**
  * highest task id handed out before ids start again from one
  */

@@ -21,8 +21,10 @@ created Date    : 1st Jan 2024
 #include "WiFiInterface.cpp"
 #include "HttpServerInterface.cpp"
 #endif
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef DEVICE_SUPPORTS_NTP
 #include "NtpInterface.cpp"
+#endif
+#ifdef ENABLE_NETWORK_SERVICE
 #include "PingInterface.cpp"
 #include "TcpClientInterface.cpp"
 #include "TcpServerInterface.cpp"

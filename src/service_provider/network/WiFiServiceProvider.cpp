@@ -126,7 +126,7 @@ bool WiFiServiceProvider::initService( void *arg ){
     this->reconfigure_wifi_access_point();
     #endif
     this->handleInternetConnectivity();
-  }, WIFI_CONNECTIVITY_CHECK_DURATION, 0, __i_dvc_ctrl.millis_now(), -1 );
+  }, WIFI_CONNECTIVITY_CHECK_DURATION, DEFAULT_TASK_PRIORITY, __i_dvc_ctrl.millis_now() );
 
   // __task_scheduler.setInterval( [&]() {
   //   this->handleInternetConnectivity();

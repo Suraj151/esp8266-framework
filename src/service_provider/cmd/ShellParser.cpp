@@ -17,10 +17,6 @@ created Date    : 26th Aug 2026
 
 namespace {
 
-  bool isBlank(char c) {
-    return ' ' == c || '\t' == c;
-  }
-
   // Where an operator starts, so a word knows where to end.
   bool isOperatorStart(char c) {
     return '|' == c || '&' == c || ';' == c || '<' == c || '>' == c;
@@ -43,7 +39,7 @@ bool ShellParser::tokenize(const char *line, int16_t len, pdiutil::vector<Token>
 
   while (i < len) {
 
-    while (i < len && isBlank(line[i])) i++;
+    while (i < len && __is_blank(line[i])) i++;
     if (i >= len) break;
 
     Token token;
@@ -86,7 +82,7 @@ bool ShellParser::tokenize(const char *line, int16_t len, pdiutil::vector<Token>
 
       char c = line[i];
 
-      if (isBlank(c)) break;
+      if (__is_blank(c)) break;
 
       if ('\\' == c) {
         i += ((i + 1) < len) ? 2 : 1;

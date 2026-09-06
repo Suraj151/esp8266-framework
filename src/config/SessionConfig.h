@@ -97,4 +97,32 @@ created Date    : 18th July 2026
 #define ENV_KEY_UID "UID"
 #define ENV_KEY_HOSTNAME "HOSTNAME"
 
+#ifndef RC_LOCAL_FILE_PATH
+#define RC_LOCAL_FILE_PATH "/etc/rc.local"
+#endif
+
+/* nested scripts open at once, the top level one and what it sources */
+#ifndef SCRIPT_MAX_DEPTH
+#define SCRIPT_MAX_DEPTH 3
+#endif
+
+#define SCRIPT_COMMENT_CHAR '#'
+#define SCRIPT_UID_DIRECTIVE "UID"
+
+#ifndef SCRIPT_BLOCK_MAX
+#define SCRIPT_BLOCK_MAX 8
+#endif
+
+#ifndef SCRIPT_LOOP_MAX
+#define SCRIPT_LOOP_MAX 1000
+#endif
+
+#define SCRIPT_KEYWORD_IF "if"
+#define SCRIPT_KEYWORD_ELSE "else"
+#define SCRIPT_KEYWORD_FI "fi"
+#define SCRIPT_KEYWORD_WHILE "while"
+#define SCRIPT_KEYWORD_DONE "done"
+#define SCRIPT_KEYWORD_FOR "for"
+#define SCRIPT_KEYWORD_IN "in"
+
 #endif

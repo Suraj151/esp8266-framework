@@ -147,6 +147,41 @@ public:
     bool setTaskNice(pdiutil::task_id_t _id, int8_t _nice);
 
     /**
+     * @brief Choose how a task is scored against the others, for one that is
+     *        wanted on time rather than merely eventually.
+     * @return true if the task was found and updated.
+     */
+    bool setTaskPolicy(pdiutil::task_id_t _id, task_policy_t _policy);
+
+    /**
+     * @brief Change a registered task's priority.
+     * @return true if the task was found and updated.
+     */
+    bool setTaskPriority(pdiutil::task_id_t _id, pdiutil::task_priority_t _priority);
+
+    /**
+     * @brief Set the priority on a task record, keeping its weight in step.
+     */
+    static void setTaskPriority(task_t& _t, pdiutil::task_priority_t _priority);
+
+    /**
+     * @brief Set the policy on a task record, keeping its weight in step.
+     */
+    static void setTaskPolicy(task_t& _t, task_policy_t _policy);
+
+    /**
+     * @brief Set the nice value on a task record, keeping its weight in step.
+     */
+    static void setTaskNice(task_t& _t, int8_t _nice);
+
+    /**
+     * @brief The weight a task's service is divided by, so a heavier one is
+     *        charged less for the same run and comes up again sooner.
+     * @return the weight, never zero.
+     */
+    static uint32_t taskWeight(const task_t& _t);
+
+    /**
      * @brief Look up a task by its ID and find its owning session.
      * @return owner session id, or 0 if not found (kernel).
      */
@@ -350,6 +385,12 @@ private:
      * @brief Break the task execution, sort with priorities and restart the task queue.
      */
     bool m_rebase_start_priotask;
+
+    /**
+     * @var uint64_t m_min_vruntime
+     * @brief Floor a newly registered task starts at, so it cannot arrive owing nothing and monopolise.
+     */
+    uint64_t m_min_vruntime;
 
     /**
      * @var pdiutil::task_id_t m_next_task_id

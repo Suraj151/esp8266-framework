@@ -58,6 +58,25 @@ created Date    : 1st June 2019
 #undef ENABLE_AUTH_SERVICE
 #endif
 
+#ifndef TZ_Asia_Kolkata
+#define TZ_Asia_Kolkata "IST-5:30"
+#endif
+
+#ifndef TZ
+#define TZ              5.5    // (utc+) TZ in hours
+#endif
+#define TZ_MN           ((TZ)*60)
+#define TZ_SEC          ((TZ)*3600)
+
+#ifndef DST_MN
+#define DST_MN          0      // use 60mn for summer time in some countries
+#endif
+#define DST_SEC         ((DST_MN)*60)
+
+#ifndef NTP_SERVER1
+#define NTP_SERVER1     "pool.ntp.org"
+#endif
+
 /**
  * enable/disable gpio service here
  */
@@ -78,6 +97,15 @@ created Date    : 1st June 2019
 
 #if defined(ENABLE_PROGRAM_EXEC) && (!defined(DEVICE_SUPPORTS_PROGRAM_EXEC) || !defined(ENABLE_STORAGE_SERVICE))
 #undef ENABLE_PROGRAM_EXEC
+#endif
+
+/* enable/disable running a file of shell lines as a script */
+#ifndef PDI_NO_SCRIPT_RUNNER
+#define ENABLE_SCRIPT_RUNNER
+#endif
+
+#if defined(ENABLE_SCRIPT_RUNNER) && (!defined(ENABLE_CMD_SERVICE) || !defined(ENABLE_STORAGE_SERVICE))
+#undef ENABLE_SCRIPT_RUNNER
 #endif
 
 /**

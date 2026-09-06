@@ -9,6 +9,9 @@ created Date    : 1st June 2019
 ******************************************************************************/
 #include "PdiStack.h"
 #include <utility/EventUtil.h>
+#ifdef ENABLE_SCRIPT_RUNNER
+#include <service_provider/cmd/ScriptRunner.h>
+#endif
 
 #if defined(ENABLE_STORAGE_SERVICE) && defined(ENABLE_PROCFS)
 #include <interface/pdi/impl/modules/storage/ProcFs.h>
@@ -166,6 +169,8 @@ void PDIStack::initialize(){
     if (nullptr != svc) svc->loadServiceEnabled();
   }
 
+  __time_service.startService();
+
   // start the syslog sink first so subsequent services' SysLog lines are persisted
   #ifdef ENABLE_SYSLOG_SERVICE
   __syslog_service.startService();
@@ -233,6 +238,12 @@ void PDIStack::initialize(){
 
   #ifdef ENABLE_CMD_SERVICE
   __cmd_service.startService();
+  #ifdef ENABLE_SCRIPT_RUNNER
+  {
+    pdiutil::string rclocal = CHARPTR_WRAP(RC_LOCAL_FILE_PATH);
+    ScriptRunner::runScheduledScript(rclocal.c_str());
+  }
+  #endif
   CommandLineServiceProvider::startInteraction();
   #endif
 }

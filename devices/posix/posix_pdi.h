@@ -17,9 +17,9 @@ created Date    : 1st Jan 2024
 #include "WiFiInterface.h"
 #include "HttpServerInterface.h"
 #endif
-// the storage layer stamps file times through the ntp interface, so it comes
-// along whenever either service is on
-#if defined(ENABLE_NETWORK_SERVICE) || defined(ENABLE_STORAGE_SERVICE)
+// the storage layer stamps file times through the ntp interface and the clock
+// reads it, so it comes along wherever the port has one at all
+#ifdef DEVICE_SUPPORTS_NTP
 #include "NtpInterface.h"
 #endif
 #ifdef ENABLE_NETWORK_SERVICE

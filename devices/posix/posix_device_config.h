@@ -54,6 +54,8 @@ created Date    : 16th Aug 2026
 #define DEVICE_SUPPORTS_DB_SEALING
 #endif
 
+#define DEVICE_SUPPORTS_NTP
+
 /**
  * services this device offers. each one is turned on as its host backend lands.
  */

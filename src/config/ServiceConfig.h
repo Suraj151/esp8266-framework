@@ -24,4 +24,8 @@ created Date    : 30th Aug 2026
 #define SERVICE_NAME_MAX 16
 #endif
 
+#ifndef TIME_SERVICE_TICK_MS
+#define TIME_SERVICE_TICK_MS 10
+#endif
+
 #endif

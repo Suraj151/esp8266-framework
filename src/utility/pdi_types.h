@@ -152,8 +152,9 @@ enum pdi_err {
     /* Command service errors (band -3600..-3899). Success is PDI_OK, so every
        code here is a reason a command did not finish successfully. Names follow
        the errno word where one fits, so a reader who knows POSIX knows these.
-       The last two are flow states rather than faults: the command is still
-       running, or the terminal is holding the line for it. */
+       The last three are not faults: the command is still running, the terminal
+       is holding the line for it, or it was asked a question and the answer was
+       no. */
     CMD_ERROR_INVAL                = PDI_ERRBASE_CMD - 1,  ///< EINVAL, bad argument to the command
     CMD_ERROR_ARGS_MISSING         = PDI_ERRBASE_CMD - 2,  ///< a required argument was not given
     CMD_ERROR_NOENT                = PDI_ERRBASE_CMD - 3,  ///< ENOENT, no such command
@@ -168,6 +169,7 @@ enum pdi_err {
     CMD_ERROR_UNSET                = PDI_ERRBASE_CMD - 12, ///< no result recorded yet
     CMD_ERROR_AGAIN                = PDI_ERRBASE_CMD - 13, ///< EAGAIN, the command has not finished
     CMD_ERROR_HOLD_BUFFER          = PDI_ERRBASE_CMD - 14, ///< the terminal is holding the line buffer
+    CMD_RESULT_FALSE               = PDI_ERRBASE_CMD - 15, ///< the command answered no; not a fault
     CMD_ERROR_MAX                  = PDI_ERRBASE_CMD - 299,
 
     /* lwIP passthrough (band -4200..-4499): value = PDI_ERR_FROM_LWIP(err_t),

@@ -205,3 +205,180 @@ TEST(servicetasks, the_boot_scan_actually_sees_service_tasks)
 
     probe.stopService();
 }
+
+TEST(servicetasks, a_priority_above_the_ceiling_is_clamped_to_it)
+{
+    // the ceiling has to bind where the task is taken, the way renice clamps
+    // the nice it is scored against, or it is only advice
+    pdiutil::task_id_t id = __task_scheduler.setInterval([](){}, 1000,
+        __i_dvc_ctrl.millis_now(), (pdiutil::task_priority_t)250);
+    ASSERT_TRUE(id >= 0);
+
+    task_t *t = nullptr;
+    for (uint16_t idx = 0; idx < __task_scheduler.getTaskSlots(); idx++)
+    {
+        task_t *c = __task_scheduler.getTaskByIndex(idx);
+        if (nullptr != c && c->m_task_id == id) { t = c; break; }
+    }
+
+    ASSERT_TRUE(nullptr != t);
+    ASSERT_EQ((int)t->m_task_priority, (int)MAX_TASK_PRIORITY);
+
+    __task_scheduler.remove_task(id);
+}
+
+TEST(servicetasks, a_task_can_be_given_the_deadline_policy)
+{
+    pdiutil::task_id_t id = __task_scheduler.setInterval([](){}, 1000,
+        __i_dvc_ctrl.millis_now(), MAX_TASK_PRIORITY);
+    ASSERT_TRUE(id >= 0);
+
+    ASSERT_TRUE(__task_scheduler.setTaskPolicy(id, TASK_POLICY_DEADLINE));
+
+    task_t *t = nullptr;
+    for (uint16_t idx = 0; idx < __task_scheduler.getTaskSlots(); idx++)
+    {
+        task_t *c = __task_scheduler.getTaskByIndex(idx);
+        if (nullptr != c && c->m_task_id == id) { t = c; break; }
+    }
+
+    ASSERT_TRUE(nullptr != t);
+    ASSERT_EQ((int)t->m_task_policy, (int)TASK_POLICY_DEADLINE);
+
+    // a policy cannot be set on a task that is not there
+    ASSERT_FALSE(__task_scheduler.setTaskPolicy((pdiutil::task_id_t)31000, TASK_POLICY_DEADLINE));
+
+    __task_scheduler.remove_task(id);
+}
+
+TEST(servicetasks, a_task_that_is_rarely_due_does_not_hold_back_one_that_is)
+{
+    int fast = 0;
+    int slow = 0;
+
+    pdiutil::task_id_t slow_id = __task_scheduler.setInterval([&](){ slow++; }, 60000,
+        __i_dvc_ctrl.millis_now());
+    pdiutil::task_id_t fast_id = __task_scheduler.setInterval([&](){ fast++; }, 1,
+        __i_dvc_ctrl.millis_now());
+
+    ASSERT_TRUE(slow_id >= 0);
+    ASSERT_TRUE(fast_id >= 0);
+
+    uint32_t start = __i_dvc_ctrl.millis_now();
+    while ((__i_dvc_ctrl.millis_now() - start) < 300)
+    {
+        __task_scheduler.run();
+    }
+
+    __task_scheduler.remove_task(slow_id);
+    __task_scheduler.remove_task(fast_id);
+
+    ASSERT_EQ(slow, 0);
+    ASSERT_TRUE(fast > 10);
+}
+
+TEST(servicetasks, a_deadline_task_is_served_more_often_than_a_default_one)
+{
+    int deadline_runs = 0;
+    int fifo_runs = 0;
+
+    pdiutil::task_id_t d_id = __task_scheduler.setInterval([&](){
+        deadline_runs++;
+        uint32_t s = __i_dvc_ctrl.millis_now();
+        while ((__i_dvc_ctrl.millis_now() - s) < 1) { }
+    }, 1, __i_dvc_ctrl.millis_now(), MEDIUM_TASK_PRIORITY);
+
+    pdiutil::task_id_t f_id = __task_scheduler.setInterval([&](){
+        fifo_runs++;
+        uint32_t s = __i_dvc_ctrl.millis_now();
+        while ((__i_dvc_ctrl.millis_now() - s) < 1) { }
+    }, 1, __i_dvc_ctrl.millis_now(), MEDIUM_TASK_PRIORITY);
+
+    ASSERT_TRUE(d_id >= 0);
+    ASSERT_TRUE(f_id >= 0);
+    ASSERT_TRUE(__task_scheduler.setTaskPolicy(d_id, TASK_POLICY_DEADLINE));
+
+    uint32_t start = __i_dvc_ctrl.millis_now();
+    while ((__i_dvc_ctrl.millis_now() - start) < 400)
+    {
+        __task_scheduler.run();
+    }
+
+    __task_scheduler.remove_task(d_id);
+    __task_scheduler.remove_task(f_id);
+
+    ASSERT_TRUE(fifo_runs > 0);
+    ASSERT_TRUE(deadline_runs > (fifo_runs * 2));
+}
+
+TEST(servicetasks, round_robin_ignores_priority_where_the_default_policy_does_not)
+{
+    int low_runs = 0;
+    int high_runs = 0;
+
+    pdiutil::task_id_t low_id = __task_scheduler.setInterval([&](){
+        low_runs++;
+        uint32_t s = __i_dvc_ctrl.millis_now();
+        while ((__i_dvc_ctrl.millis_now() - s) < 1) { }
+    }, 1, __i_dvc_ctrl.millis_now(), LOW_TASK_PRIORITY);
+
+    pdiutil::task_id_t high_id = __task_scheduler.setInterval([&](){
+        high_runs++;
+        uint32_t s = __i_dvc_ctrl.millis_now();
+        while ((__i_dvc_ctrl.millis_now() - s) < 1) { }
+    }, 1, __i_dvc_ctrl.millis_now(), HIGH_TASK_PRIORITY);
+
+    ASSERT_TRUE(low_id >= 0);
+    ASSERT_TRUE(high_id >= 0);
+    ASSERT_TRUE(__task_scheduler.setTaskPolicy(low_id, TASK_POLICY_ROUNDROBIN));
+    ASSERT_TRUE(__task_scheduler.setTaskPolicy(high_id, TASK_POLICY_ROUNDROBIN));
+
+    uint32_t start = __i_dvc_ctrl.millis_now();
+    while ((__i_dvc_ctrl.millis_now() - start) < 400)
+    {
+        __task_scheduler.run();
+    }
+
+    __task_scheduler.remove_task(low_id);
+    __task_scheduler.remove_task(high_id);
+
+    ASSERT_TRUE(low_runs > 0);
+    ASSERT_TRUE(high_runs > 0);
+
+    int diff = (low_runs > high_runs) ? (low_runs - high_runs) : (high_runs - low_runs);
+    ASSERT_TRUE(diff <= (low_runs + high_runs) / 4);
+}
+
+TEST(servicetasks, every_single_priority_step_changes_the_weight)
+{
+    task_t lower;
+    task_t upper;
+
+    for (uint8_t p = 0; p < MAX_TASK_PRIORITY; p++)
+    {
+        lower.m_task_priority = p;
+        upper.m_task_priority = (uint8_t)(p + 1);
+
+        ASSERT_TRUE(TaskScheduler::taskWeight(lower) != TaskScheduler::taskWeight(upper));
+    }
+}
+
+TEST(servicetasks, a_renice_of_one_moves_the_cached_weight)
+{
+    pdiutil::task_id_t id = __task_scheduler.setInterval([&](){ }, 1000,
+        __i_dvc_ctrl.millis_now(), LOW_TASK_PRIORITY);
+
+    ASSERT_TRUE(id >= 0);
+
+    int16_t idx = __task_scheduler.is_registered_task(id);
+    ASSERT_TRUE(idx >= 0);
+
+    uint32_t before = __task_scheduler.get_task(id)->m_weight;
+    ASSERT_TRUE(__task_scheduler.setTaskNice(id, -1));
+    uint32_t after = __task_scheduler.get_task(id)->m_weight;
+
+    __task_scheduler.remove_task(id);
+
+    ASSERT_TRUE(before > 0);
+    ASSERT_TRUE(after > before);
+}

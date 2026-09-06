@@ -14,19 +14,27 @@ What comes out of the box is closer to a small system than to a sketch template:
 
 **It runs on your laptop too.** One of those adapters targets plain POSIX, so the same firmware builds as a host process you can ssh into, copy files to and open the portal on. That is how the test suite exercises the framework before a board is involved — see [§17](#17-test-suite).
 
-**Services.** WiFi with captive portal, HTTP/HTTPS web portal, MQTT client, OTA updates, SSH server, Telnet server, SFTP subsystem, SMTP client, GPIO control (locally and over MQTT/HTTP), an NVM-backed configuration database, TLS via BearSSL or mbedTLS, an mDNS/DNS-SD responder, syslog, ESPNOW mesh, authentication with a user store, and a device-IoT hook for your own cloud. Each is a `ServiceProvider` with the same lifecycle, and `service` drives them the way `systemctl` drives units: `list`, `status`, `start`, `stop`, `restart`, `enable`, `disable`. `stop` releases what the service holds, so `service stop SSH` gives up port 22 rather than parking it, and nothing lets you stop the service carrying the session you are typing on.
+**Services.** WiFi with captive portal, HTTP/HTTPS web portal, MQTT client, OTA updates, SSH server, Telnet server, SMTP client, GPIO, an NVM-backed configuration database, an mDNS/DNS-SD responder, syslog, authentication with a user store, the shell itself, and a device-IoT hook for your own cloud. Each is a `ServiceProvider` with the same lifecycle, and `service` drives them the way `systemctl` drives units: `list`, `status`, `start`, `stop`, `restart`, `enable`, `disable`. `stop` releases what the service holds, so `service stop SSH` gives up port 22 rather than parking it, and nothing lets you stop the service carrying the session you are typing on. TLS (BearSSL or mbedTLS), SFTP and scp, and ESPNOW mesh are things services are built on rather than services in their own right, so `service` does not list them.
 
-**A real shell.** The same fifty-odd commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `fedit`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `service`, `exec`, `net`, `host`, `ping`, `date`, `uptime`, `useradd`, `su`, `passwd`, `db`, `sshkgen`, `watch` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
+**GPIO from wherever you are.** Pins are files under `/sys/class/gpio`, so the shell drives them with `echo` and `cat` over serial, Telnet or SSH. The portal has a page for them, and MQTT and HTTP reach them from anywhere the device can be reached — a pin condition can also be routed out to email or an HTTP endpoint.
+
+**Secrets stay secret at rest.** Config records holding a credential are sealed — encrypted and tagged under a key kept in the eeprom — so a copy of the database taken off the device reveals nothing. Syslog can ship each line to a remote collector as well as to `/var/log`.
+
+**A real shell.** The same fifty-odd commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `fedit`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `service`, `exec`, `net`, `host`, `ping`, `date`, `uptime`, `useradd`, `su`, `passwd`, `db`, `sshkgen`, `watch`, `source`, `test` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
 
 **Commands join up.** Output pipes from one command into the next and redirects to and from files, so `ps | grep ssh`, `cat /proc/meminfo > /tmp/mem.txt` and `wc < /home/notes.txt` all mean what they mean on a desktop — see [§7.7](#77-pipes-and-redirection).
 
 **Variables the shell reads.** `export NAME=value` sets one for the session, `/.env` holds what every session shares, and `$NAME` expands the way it does in a shell — quoting included. `PWD`, `USER`, `UID` and `HOSTNAME` are answered from the live session rather than stored, so they cannot go stale — see [§7.14](#714-environment-variables).
 
+**Scripts, and something to run at boot.** A file of shell lines runs with `source <file>`, using the same grammar a typed line uses — pipes, redirects, `&&`, quoting and `$NAME` all work inside one. `if`/`else`/`fi` and `while`/`done` branch and repeat on any command's result, `for`/`done` walks a list of words, and `test` supplies the comparisons: strings, numbers and paths. `/etc/rc.local` runs at the end of boot and names the user it runs as, so a device can bring itself up the way you left it — see [§7.15](#715-shell-scripts-and-etcrclocal).
+
 **A filesystem with users.** Several backends mount into one tree and are routed by longest prefix: LittleFS at the root, a read-only `/proc` of live system nodes covering memory, mounts, a directory per running task and the network under `/proc/net`, a writable `/sys` where GPIO pins and network interfaces are files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with `null`/`zero`/`random`, and a RAM-backed `/tmp`. Permissions, ownership and per-session umask are enforced in the VFS layer, so `/etc/passwd` and `/etc/shadow` mean what they say and two logged-in users genuinely see different access.
 
 **Settings that live in files.** WiFi, MQTT, OTA and email keep theirs in `/etc/<feature>/<feature>.conf` — plain `key value` text you can `cat`, edit with `fedit`, pull off over SFTP and diff between two devices, rather than something you reflash for. Which services run is a separate flat `/etc/service.conf`. Each settings file is `0600 root:root` and the portal page that edits one demands a root session, so the file and the browser agree on who may change what — see [§3.10](#310-the-etc-config-surface).
 
-**Scheduling that scales down and up.** Tasks run inline, cooperatively, or preemptively on a hardware tick, with priorities, POSIX nice values and per-task signals. Where the port supplies a loader, an external program image can be loaded from the filesystem and launched as a background process — `exec <path>` returns a pid you can `ps` and `kill`, no reflash involved.
+**Scheduling that scales down and up.** Tasks run inline, cooperatively, or preemptively on a hardware tick, with priorities, POSIX nice values and per-task signals. Inline selection is weighted virtual runtime behind a due-ness gate — priority changes how fast a task accrues debt for the CPU it uses, rather than granting it a standing advantage, so no task can be starved by a busier one at a higher priority. Where the port supplies a loader, an external program image can be loaded from the filesystem and launched as a background process — `exec <path>` returns a pid you can `ps` and `kill`, no reflash involved.
+
+**One clock, for everything that needs one.** An essential time service ticks every 10 ms, keeps the current instant broken down once, and publishes second, minute and validity-change events other services subscribe to instead of each converting an epoch of its own. On a board that can reach NTP the time is wall clock; on one that cannot it still counts forward from boot and simply never calls itself valid.
 
 **Found on the network without help.** A from-scratch mDNS/DNS-SD responder built straight on lwIP UDP advertises `pdi-<mac>.local` and the services it is listening on, so the device answers to a name and shows up in `avahi-browse -a`. Name lookups walk IP literal, then `/etc/hosts`, then DNS.
 
@@ -61,18 +69,20 @@ Not every board exposes every capability. An Arduino UNO has no WiFi, so the web
 
 ## What's Inside
 
-**Services** — WiFi · HTTP/S server · MQTT · OTA · SSH · Telnet · SFTP · SMTP · GPIO · Serial · Terminal · Database · User store · Auth · TLS · mDNS · Syslog · ESPNOW · Factory reset · Device-IoT.
+**Services** — the ones `service list` shows: Time · WiFi · HTTP/S server · MQTT · OTA · SSH · Telnet · SMTP · GPIO · Serial · Cmd · Database · User store · Auth · mDNS · Syslog · Factory reset · Device-IoT.
 Per-service reference in [§6 Service Providers](#6-service-providers).
+
+**Capabilities services build on**, not services themselves — TLS · SFTP and scp · ESPNOW mesh.
 
 **Utilities** — task scheduler, event bus, queues, string helpers, data converters, crypto, PdiSTL, factory reset.
 Full inventory in [§15 Utility Library](#15-utility-library).
 
 **Storage** — one VFS tree over LittleFS, `/proc`, `/sys`, `/dev` and `/tmp`, with POSIX permissions and multi-user access control.
-Details in [§6.2.11 Storage](#6211-storage-interface-init-no-provider).
+Details in [§6.2.12 Storage](#6212-storage-interface-init-no-provider).
 
 **CLI** — 50+ built-in commands, listed in [§7.8 Built-in command inventory](#78-built-in-command-inventory).
 
-**Extras** — captive portal, GPIO events over MQTT/HTTP/email, NAT on the ESP8266 lwIP port ([§2.4.1](#241-nat-and-mesh)), mesh over ESPNOW.
+**Extras** — captive portal, GPIO events over MQTT/HTTP/email, NAT and mesh over ESPNOW, both on the ESP8266 port ([§2.4.1](#241-nat-and-mesh)).
 
 ## A Peek at the Terminal and Web UI
 
@@ -116,7 +126,7 @@ The **[Detailed Documentation](#detailed-documentation)** below is the in-tree r
 - **[4. Task Scheduler](#4-task-scheduler)** — three modes, four policies, and how to choose.
 - **[5. Database Layer](#5-database-layer)** — record store, storage and eeprom tiers, sealed records, JSON codegen.
 - **[6. Service Providers](#6-service-providers)** — per-service init flow, CLI and web surface, events.
-- **[7. Command Line / Terminal](#7-command-line--terminal)** — full CLI reference and how to add a command.
+- **[7. Command Line / Terminal](#7-command-line--terminal)** — full CLI reference, variables, scripting, and how to add a command.
 - **[8. Web Server](#8-web-server)** — request lifecycle, routes, views, adding a page.
 - **[9. Logger](#9-logger)** — levels, macros, and the zero-cost-when-disabled pattern.
 - **[10. Transports](#10-transports)** — HTTP, MQTT and SMTP client internals.
@@ -259,8 +269,10 @@ setup()
  ├─ PdiStack.initialize()
  │     ├─ device brings up its own features
  │     ├─ terminal acquired and handed to the ServiceProvider base
+ │     ├─ time service starts                (always, every port)
  │     ├─ database service starts            (always)
- │     └─ every enabled service starts       (conditional)
+ │     ├─ every enabled service starts       (conditional)
+ │     └─ /etc/rc.local runs, if present     (script runner)
  │
 loop()
  │
@@ -393,7 +405,7 @@ Both are radio-level capabilities layered onto WiFi rather than regular services
 
 **NAT on ESP8266** rewrites IP-header fields on packets in transit so that clients joining the device's access point reach the upstream network the station link is connected to. From ESP8266 core 2.6.x onward this runs on lwIP v2 (IPv4), selected in the IDE's Tools menu, and is the path in normal use. The older NAPT implementation uses the vendored lwIP 1.4: rename the core's `tools/sdk/lwip` aside, drop this repo's `lwip/` in its place, and pick the "lwIP 1.4 compile from source" variant. Which one is active is a compile-time choice. On the service side, `ENABLE_NAPT` makes the WiFi service schedule a one-shot NAPT enable once the station link is up.
 
-**Mesh over ESPNOW** wraps Espressif's peer-to-peer link-layer protocol into a small API so applications can build broadcasts and hop-distance topologies without touching the driver. It shares the radio with station mode and is configured from the application. Paired with `ENABLE_DYNAMIC_SUBNETTING` and `ENABLE_INTERNET_BASED_CONNECTIONS` on the WiFi service, it gives each node a notion of how many hops it sits from the hub.
+**Mesh over ESPNOW**, on the ESP8266 port, wraps Espressif's peer-to-peer link-layer protocol into a small API so applications can build broadcasts and hop-distance topologies without touching the driver. It shares the radio with station mode and is configured from the application. Paired with `ENABLE_DYNAMIC_SUBNETTING` and `ENABLE_INTERNET_BASED_CONNECTIONS` on the WiFi service, it gives each node a notion of how many hops it sits from the hub.
 
 #### 2.4.2 mDNS and DNS-SD
 
@@ -444,10 +456,11 @@ Board-specific answers live in `<board>_device_config.h`, not in the central con
 | `DEVICE_SUPPORTS_TLS` | esp8266, esp32 | lets `ENABLE_TLS_SERVICE` take effect; ports without it get the flag undefined automatically |
 | `DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION` | esp8266, esp32 | same shape, for the cooperative and preemptive lanes |
 | `DEVICE_SUPPORTS_TLS_CERT_GENERATION` | esp32 | gates on-device certificate generation |
+| `DEVICE_SUPPORTS_NTP` | esp8266, esp32, posix | the port can reach a time server, so the clock can call itself valid; a port without it still keeps time, counted from boot |
 | `MAX_DIGITAL_GPIO_PINS`, `MAX_ANALOG_GPIO_PINS`, `MAX_DB_TABLES` | every port | per-board limits |
 | `ENABLE_NETWORK_SERVICE`, `ENABLE_AUTH_SERVICE`, `ENABLE_STORAGE_SERVICE`, `ENABLE_GPIO_BASIC_ONLY` | every port | per-board defaults — AVR omits network, auth and storage; the ESP ports enable them |
 
-The contract is simple: genuinely per-board facts go in the per-port header, and the central `DeviceConfig.h` carries only cross-board feature flags and the auto-undef chains. A new port sets its `DEVICE_SUPPORTS_*` macros and the optional services fall in line by themselves.
+The contract is simple: genuinely per-board facts go in the per-port header, and the central `DeviceConfig.h` carries the cross-board feature flags, the auto-undef chains, and settings that are a property of the deployment rather than the board — the timezone (`TZ`, `TZ_SEC`, `DST_MN`) and `NTP_SERVER1` among them, so anything wanting local time does not have to reach into the NTP interface for it. A new port sets its `DEVICE_SUPPORTS_*` macros and the optional services fall in line by themselves.
 
 ---
 ## 3. Configuration System
@@ -514,6 +527,7 @@ Every flag acts as a triple gate: which interface the device exposes, which serv
 | `ENABLE_TLS_SERVICE` | off | TLS client and server + `TlsConfig.h`; turns on contextual execution, since TLS runs on its own cooperative task | BearSSL on esp8266, mbedTLS on esp32 | high — see [§12.3](#123-the-expensive-features) |
 | `ENABLE_TLS_CERT_GENERATION` | off, esp32 | the `tls` command and the on-device issuer | TLS service, esp32 | medium |
 | `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` | with cert generation | the mDNS service mints a self-signed cert covering the address and `<host>.local` once the station gets an IP | cert generation, mDNS | one-shot |
+| `ENABLE_SCRIPT_RUNNER` | yes | `source`, control flow and `/etc/rc.local` | cmd + storage | low |
 | `ENABLE_CONTEXTUAL_EXECUTION` | off | cooperative and preemptive lanes | the threading interfaces | high (per-task stacks) |
 | `ENABLE_TIMER_TASK_SCHEDULER` | off | timer-backed scheduler variant | a device timer | depends |
 
@@ -708,6 +722,8 @@ email yes
 
 The key is the service's own name, lowercased. That keeps the whole enable surface to a single filesystem entry however many services a build has, and leaves a feature's own conf holding only its settings.
 
+Not everything under `/etc` is a config file. `/etc/passwd` and `/etc/shadow` are the user store's, `/etc/ssh` holds host keys beside `ssh.conf`, `/etc/hosts` is the resolver's, and `/etc/rc.local` is a script rather than a table of keys — it is read line by line and run, not parsed for settings ([§7.15](#715-shell-scripts-and-etcrclocal)).
+
 A service name is therefore one word. It is what you type at `service`, whose arguments split on spaces, and it is the key in a file whose lines split at the first space — so a name with a space in it is a name you can read in `service list` and neither type nor persist.
 
 ```
@@ -756,16 +772,58 @@ All three coexist. Each pass of `serve()` ticks the lanes in order:
 
 ### 4.2 Policies
 
-Independently of mode, each task carries a policy that decides who goes first when several inline tasks come due on the same tick:
+Independently of mode, each task carries a priority, a nice value and a policy. Together they decide who goes first when several inline tasks come due on the same tick.
 
-| Policy | Selection rule |
-|---|---|
-| FIFO (default) | priority, biased by a logarithmic lateness boost |
-| round robin | equal slices, favouring whoever ran least recently |
-| deadline | earliest deadline first, with double the lateness weight |
-| fair share | favours whoever has consumed the least cumulative CPU |
+Selection runs in three stages, and the first one that separates two tasks decides between them:
 
-All four share the same skeleton: a base term of `effective_priority × 100`, plus `policy_boost × min(floor(log2(ms_late + 1)), cap)`. The logarithmic aging term is what guarantees a ceiling — no low-priority task waits more than about five seconds before its accumulated score overtakes a high-priority one. Policies apply to the inline lane; contextual lanes schedule themselves.
+```
+  1. due?          a task whose interval has elapsed beats one whose has not
+  2. vruntime      of two equally due tasks, the one that has taken less service
+                   — and policy and priority both feed the weight that charges it
+  3. policy score  only when both of the above tie
+```
+
+**Due-ness is a gate, not a term.** Nothing about priority lets a task run before its interval has elapsed, so a 300-second task cannot sit at the head of the queue keeping a 1 ms listener off the CPU.
+
+**Virtual runtime is what priority actually buys.** Each task carries `m_vruntime`, and after every run it is charged the time that run took, divided by the task's weight:
+
+```
+  vruntime += exec_µs × TASK_WEIGHT_NOMINAL / task.m_weight
+```
+
+A heavier task is charged less for the same microseconds, so it comes back round sooner. Priority therefore changes the *rate* a task accrues debt, never granting it a standing advantage — which is what makes starvation unreachable rather than merely unlikely. Period-awareness falls out for free: a 10 ms task is charged a hundred times as often as a 1 s one, with no rule about periods anywhere.
+
+The weight is held on the task and recomputed only when priority, nice or policy changes — `setTaskPriority`, `setTaskNice` and `setTaskPolicy` own that, so no caller can move one of the three without the weight following. Nothing recomputes it per run.
+
+`taskWeight()` maps effective priority — `priority - nice`, clamped to 0..`MAX_TASK_PRIORITY` — onto a geometric ladder, computed rather than tabulated so no table lands in RAM on a small board:
+
+```
+  TASK_WEIGHT_LEVELS   = MAX_TASK_PRIORITY + 1        one step per priority
+  step ratio           = (LEVELS + TASK_WEIGHT_SPAN) / LEVELS
+```
+
+Both derive from `MAX_TASK_PRIORITY`, so raising the ceiling adds steps without stretching the ladder: `(1 + k/n)^n` tends to `e^k`, which makes `TASK_WEIGHT_SPAN` the natural log of the whole ladder's span whatever the level count. At 99 that is a ratio of 109/100 and a span of 9 → 69,531, about 7,700×.
+
+**One step per priority means every `renice` registers.** The named rungs land at `LOW` 27, `MEDIUM` 939, `HIGH` 8,068 and `MAX` 69,531 — so a task at `MEDIUM` is charged about 35× less than one at the `LOW` default, and a `renice` of 1 moves any task about 9%.
+
+A newly registered task starts at the scheduler's `m_min_vruntime` rather than at zero, so it cannot arrive owing nothing and monopolise the CPU until it catches up. That floor only ever moves forward.
+
+**Policy selects the weight**, the same way a scheduling class does rather than by adding a term to a score. That is what keeps it effective: vruntime is an accumulator, so two tasks are almost never exactly level on it, and anything that only broke ties would never be consulted.
+
+| Policy | Weight | Effect |
+|---|---|---|
+| FIFO (default) | the priority ladder | priority sets the rate the task accrues debt |
+| fair share | the priority ladder | the same rate; differs from FIFO only in the tie-break below |
+| round robin | **nominal, ignoring priority** | every round-robin task accrues at one rate, so peers get equal slices whatever their priority |
+| deadline | the ladder × `TASK_WEIGHT_DEADLINE_BOOST` | charged that much less, so it comes back round that much sooner |
+
+Round robin not consulting the ladder is the point of it — a round-robin task at `LOW` and one at `HIGH` get the same share. Use it where several tasks must progress together and priority would otherwise separate them.
+
+Only when due-ness **and** vruntime leave two tasks level does the blended score break the tie, on lateness, recentness or cumulative CPU according to the policy. Policies apply to the inline lane; contextual lanes schedule themselves.
+
+Priorities are larger-is-more-important, in the range 0..`MAX_TASK_PRIORITY` (99), with `HIGH_TASK_PRIORITY` 74, `MEDIUM_TASK_PRIORITY` 49 and `LOW_TASK_PRIORITY` 10 as the named rungs. `DEFAULT_TASK_PRIORITY` is `LOW`. Nice runs the other way, POSIX-style, and is subtracted.
+
+Deadline working through the weight is what makes it period-independent: a 10 ms task gets the same proportional lift as a 1 s one, because nothing in the charge depends on how far the task is from its deadline.
 
 ### 4.3 What a task record holds
 
@@ -775,7 +833,7 @@ A task is a POD stored by value in a vector reserved to `MAX_SCHEDULABLE_TASKS`,
 |---|---|---|
 | identity | id, name, owner | pid, a read-only name pointer (often in flash), and the owning session — 0 means kernel. Ids count up and start again at `MAX_TASK_ID`, stepping over any still in use, so a caller holding the id of a task that has ended cannot reach whatever registered next |
 | callback | the function | what actually runs |
-| schedule | duration, last run, remaining attempts, priority, nice, policy, mode | everything scoring needs |
+| schedule | duration, last run, remaining attempts, priority, nice, policy, mode, virtual runtime, weight | everything selection needs. Weight is derived from priority, nice and policy, and held rather than recomputed each run |
 | lifecycle | state, pending signal | ready / running / sleeping / stopped / zombie, plus a queued signal |
 | observability | created-at, run count, last and total exec time in µs | what `ps` and `top` render, including %CPU |
 | contextual | the lane executive | present only in contextual builds |
@@ -808,6 +866,8 @@ Every registration call takes a trailing name and owner. Fill them in — that i
 | name a task after the fact | `setTaskName(id, name)` — the pointer must outlive the task |
 | attach an owning session | `setTaskOwner(id, sid)` |
 | change nice, -20..19 | `setTaskNice(id, nice)`, then rebase for an immediate re-sort |
+| change the priority | `setTaskPriority(id, prio)` — clamped to `MAX_TASK_PRIORITY` |
+| change the policy | `setTaskPolicy(id, policy)` — see [§4.2](#42-policies) |
 | queue a signal on one task | `sendSignal(id, sig)` |
 | signal every task with a name | `sendSignalByName(name, sig, requester, is_root)` — this is what `pkill` and `killall` use |
 | promote a task to a lane | `scheduleUnderExecSched(sched, id, mode, stack)` |
@@ -818,8 +878,9 @@ Every registration call takes a trailing name and owner. Fill them in — that i
   run() ──▶ handle_tasks()
              │
              1. now = millis
-             2. score every task, sort an index table (the vector never moves,
-                so task ids stay stable), 3 ms tolerance on due-times
+             2. order every task — due first, then least virtual runtime,
+                then policy score — into an index table (the vector never
+                moves, so task ids stay stable)
              3. for each task in score order:
                   │
                   ├─ contextual task?  deliver its pending signal to the lane
@@ -832,7 +893,8 @@ Every registration call takes a trailing name and owner. Fill them in — that i
                   │     CONT        ─▶ back to sleeping
                   │
                   ├─ due?  sample µs, run the callback, sample µs again,
-                  │        update exec time, total time, run count, state
+                  │        update exec time, total time, run count, state,
+                  │        and charge the run against the task's weight
                   │
                   ├─ advance last-run by whole intervals (catch-up capped at 3)
                   └─ yield to the platform
@@ -875,7 +937,7 @@ A freshly registered interval stamps its last-run time on first consideration, s
 
 The slot table is `MAX_SCHEDULABLE_TASKS`, 25 by default. Raising it raises every service's worst-case footprint and the factory-reset hook count along with it.
 
-Sorting tolerates 3 ms of clock jitter per comparison. A `millis_now()` that wanders further will visibly reshuffle task order between runs.
+Due-ness itself is an exact comparison against `millis_now()`. The 3 ms tolerance applies only in the deepest tie-break, where two tasks are equally due, level on virtual runtime and level on score, so clock jitter no longer reshuffles ordinary task order.
 
 ### 4.8 Promoting a task to a lane
 
@@ -932,7 +994,7 @@ Services are driven the same way, one level up:
 
 All of these except `list` and `status` need root. Ownership is tracked per service rather than per task name, so renaming a task never breaks service control. None of the verbs signal a task: `stop` releases what the service holds, so `service stop SSH` gives up port 22 and closes its sessions.
 
-`stop` and `restart` refuse two services: an essential one, and the service carrying the session the command is typed on — otherwise `service stop SSH` over SSH would drop the connection mid-command. `start` and `restart` refuse while a service the target `Requires` is inactive, and name it.
+`stop` and `restart` refuse two services: an essential one, and the service carrying the session the command is typed on — otherwise `service stop SSH` over SSH would drop the connection mid-command. The essential set is time, database, serial, auth, user store, factory reset and cmd — a board must not be able to talk itself out of a console, a clock or an identity. `start` and `restart` refuse while a service the target `Requires` is inactive, and name it.
 
 Each service's own start and stop record its state: `active` once its init reports success, `failed` when that init says it did not come up, `inactive` before the first start and after a stop. A service that merely holds a task does not count as running. `enable`/`disable` decide what happens on the next boot and are the pair that survives a restart — see [§3.10](#310-the-etc-config-surface).
 
@@ -1155,19 +1217,41 @@ A new service is runtime-toggleable for free. The base reads `enabled` from `/et
 
 Ordered the way the orchestrator starts them.
 
-#### 6.2.1 `DatabaseServiceProvider` — `__database_service`
+#### 6.2.1 `TimeServiceProvider` — `__time_service`
+
+Always present, on every port, and **essential** — `service stop`, `restart` and `disable` all refuse it, because everything that reads the clock would quietly start reading one that had stopped. It is the single place that decides what time it is, so two readers can never disagree about which second they are in.
+
+It ticks every `TIME_SERVICE_TICK_MS` (10 ms), reads the clock, and announces the boundaries it has crossed:
+
+| Event | Fired when | Payload |
+|---|---|---|
+| `EVENT_TIME_SYNC` | validity changes in either direction | `datetime_t*` |
+| `EVENT_TIME_SECOND` | the second rolls over | `datetime_t*` |
+| `EVENT_TIME_MINUTE` | the minute rolls over | `datetime_t*` |
+
+The payload is one `datetime_t` broken down once per tick: `m_epoch` is UTC, every calendar field below it is local, and `m_valid` says whether that calendar means anything. ⚠ It is the service's own instance, reused every tick — read it inside the callback, never keep the pointer.
+
+**It is not gated on having a network.** Where the port reaches an NTP server the time is wall clock and is called valid. Where it does not, the millisecond counter still gives a clock that only moves forward, and that time is simply never called valid — so a board with no network still gets its second and minute ticks, and only the calendar *meaning* is withheld. `DEVICE_SUPPORTS_NTP` is what distinguishes the two.
+
+Uptime is accumulated rather than divided out of `millis_now()`, which is 32-bit and wraps at about 49 days.
+
+A minute is announced once however many the clock crossed, so an NTP correction of an hour cannot fire an hour of scheduled work. On a validity flip the second and minute markers reset — a clock that has just jumped says nothing about which boundary comes next.
+
+Read it in code with `__time_service.now()` and `__time_service.isTimeValid()`.
+
+#### 6.2.2 `DatabaseServiceProvider` — `__database_service`
 
 Always present; everything else may need persisted config. It mounts NVM, boots every registered table, optionally polls config validity every five seconds, and listens for the factory-reset event. Fully covered in [§5](#5-database-layer).
 
-#### 6.2.2 `DeviceFactoryReset` — `__factory_reset`
+#### 6.2.3 `DeviceFactoryReset` — `__factory_reset`
 
 Always present. Polls the flash button for a six-to-seven second hold and fires `EVENT_FACTORY_RESET`. Other services listen for that event to drop their own caches before the reboot. The web portal exposes the same action as a form.
 
-#### 6.2.3 `SerialServiceProvider` — `__serial_service`
+#### 6.2.4 `SerialServiceProvider` — `__serial_service`
 
 Opens the serial port at the configured baud and hooks its input handler into the device event pump. It supplies the default terminal for the CLI, and exposes the JSON apply/append hooks that Device-IoT uses to move sensor payloads across the serial link.
 
-#### 6.2.4 `WiFiServiceProvider` — `__wifi_service`
+#### 6.2.5 `WiFiServiceProvider` — `__wifi_service`
 
 Configures the access point from the WiFi table, starts a station scan, and keeps a connectivity check running every five seconds. NAPT, when enabled, is switched on by a one-shot scheduled after the station link comes up. It also puts `wlan0` and `ap0` into the netif registry that backs `/proc/net` and `/sys/class/net`, once in the service's life rather than on every start, so a restart does not attempt them again.
 
@@ -1184,7 +1268,7 @@ It is the framework's main event source:
   internet poller   ──▶ EVENT_WIFI_INTERNET_UP / _DOWN
 ```
 
-#### 6.2.5 `OtaServiceProvider` — `__ota_service`
+#### 6.2.6 `OtaServiceProvider` — `__ota_service`
 
 Polls for a firmware update on the interval stored in the OTA table:
 
@@ -1203,21 +1287,21 @@ Requests carry HTTP basic auth and a `pdistack` user agent, and run over TLS whe
 
 A build can also be flashed without any update server. `collectLocalImages()` lists the firmware images sitting on the filesystem and `flashFromFile()` writes one of them, checking the image magic byte before it commits and reporting through the same `upgrade_status_t` as a server-driven update. That is what backs the **Flash From Storage** form on the OTA page: upload a binary through the storage browser, pick it from the list, confirm, and the device flashes and restarts. Both entry points need the storage service.
 
-#### 6.2.6 `GpioServiceProvider` — `__gpio_service`
+#### 6.2.7 `GpioServiceProvider` — `__gpio_service`
 
 Loads the GPIO table, ticks pin modes and values, and refreshes the table every five minutes. Modes are off, digital write, digital read, digital blink, analog write and analog read.
 
 From the shell, GPIO is driven as files under `/sys` — `echo 1 > /sys/class/gpio/5/value`. The portal adds a GPIO page plus an events submenu where a pin condition can be routed to email or an HTTP endpoint.
 
-#### 6.2.7 `MqttServiceProvider` — `__mqtt_service`
+#### 6.2.8 `MqttServiceProvider` — `__mqtt_service`
 
 Opens the broker connection with a last-will message, subscribes to whatever the pub/sub table lists, and schedules the publish driver. Applications inject and receive payloads by registering publish and subscribe callbacks. The portal has general, LWT and pub/sub forms.
 
-#### 6.2.8 `EmailServiceProvider` — `__email_service`
+#### 6.2.9 `EmailServiceProvider` — `__email_service`
 
 Loads the email table and, if periodic mail is enabled, schedules the send. The GPIO service uses it for event alerts. The portal page includes a test button.
 
-#### 6.2.9 `DeviceIotServiceProvider` — `__device_iot_service`
+#### 6.2.10 `DeviceIotServiceProvider` — `__device_iot_service`
 
 Off by default; uncomment `ENABLE_DEVICE_IOT` to build it. The service handles registration and channel setup, and the application supplies the sensor.
 
@@ -1237,11 +1321,11 @@ Because `configureMQTT()` writes the MQTT tables, Device-IoT's server-supplied b
 
 The application registers its sensor by calling `initDeviceIotSensor(...)` with an object implementing init, sample, data and reset hooks. The shell offers `iot setid`, `iot getid`, `iot sethost` and `iot gethost`. [§11.6](#116-deviceiotexample) walks through the example sketch.
 
-#### 6.2.10 `AuthServiceProvider` — `__auth_service`
+#### 6.2.11 `AuthServiceProvider` — `__auth_service`
 
 A session-aware delegator rather than a store. `isAuthorized(user, pass)` verifies against `/etc/shadow` through the user store when that file exists, and against the bootstrap credential row otherwise. `setAuthorized` and `getUsername` read and write the *current* session, so there is no global "logged in" bit — three terminals can be at three different privilege levels at once.
 
-#### 6.2.11 Storage (interface init, no provider)
+#### 6.2.12 Storage (interface init, no provider)
 
 Storage has no service class. The filesystem is used directly by SSH and SFTP, the user store, every file command, and application code.
 
@@ -1312,15 +1396,15 @@ There is a narrow setuid analogue: a privileged scope that suspends those checks
 
 Copying, renaming or moving across mounts streams the file chunk by chunk into the destination backend, creating on the first chunk and appending after that; a failure part-way removes the partial destination, and a `mv` is that copy followed by deleting the source. Same-backend operations go straight to the backend's own call. Directories don't cross mounts, and an existing destination is refused.
 
-#### 6.2.12 `WebServer` — `__web_server`
+#### 6.2.13 `WebServer` — `__web_server`
 
 Started with the HTTP server interface and ticked from every pass of `serve()`. With HTTPS on, `initService` sets the certificate, key and — under mTLS — client CA paths, then binds 443 with TLS enabled and also opens a plain listener on 80 that answers every request with a redirect to the matching `https://` URL, so a browser that arrives on `http://` is carried up to the secure portal; without HTTPS it binds 80 directly. It has its own router, middleware chain, controllers and session handling, all covered in [§8](#8-web-server).
 
-#### 6.2.13 `TelnetServiceProvider` — `__telnet_service`
+#### 6.2.14 `TelnetServiceProvider` — `__telnet_service`
 
 Binds port 23, accepts clients into a pool of `TELNET_MAX_SESSIONS` slots, and hands each stream to the CLI as a terminal. Everything after that is the shell. A slot whose client has gone is reclaimed before the next accept, an idle session is closed after `TELNET_SHELL_IDLE_MS` while one running a command is left alone, and a client arriving when every slot is taken is told so and closed after `TELNET_POOL_FULL_GRACE_MS` rather than left waiting on a prompt that will not come. The sizes live in [src/config/TelnetConfig.h](src/config/TelnetConfig.h).
 
-#### 6.2.14 `SSHServer` — `__sshserver_service`
+#### 6.2.15 `SSHServer` — `__sshserver_service`
 
 The most expensive service in the framework, and the most capable: a full SSH server with an SFTP subsystem, written on the framework's own crypto.
 
@@ -1348,13 +1432,15 @@ Both authentication methods are on by default and each can be switched off in `/
 
 Two sessions are served concurrently by default, which is what graphical SFTP clients need — they hold a browse connection open and open a second one to move a file. The SFTP subsystem covers path resolution, stat, directory listing, open/read/write, mkdir, rmdir, remove and rename, which is enough for interactive `sftp`, for editing a remote file in FileZilla or WinSCP, and for `scp -s`.
 
-#### 6.2.15 `CommandLineServiceProvider` — `__cmd_service`
+#### 6.2.16 `CommandLineServiceProvider` — `__cmd_service`
 
 Registers every command and owns the binding between terminals and sessions. Attaching a terminal creates or finds its session and draws the login prompt; each input tick looks the session up from the terminal and makes it current before dispatching. Every in-flight command remembers which session owns it, so one session's half-finished prompt is never handed to another.
 
 Up to `PDI_MAX_SESSIONS` sessions run at once across serial, telnet and SSH, each with its own line buffer, cursor, history position, working directory, umask and identity — and telnet and SSH each hold a pool of their own, so several remote shells of the same kind can be open together. The table is sized from those pools: `PDI_MAX_SESSIONS` defaults to one console plus `TELNET_MAX_SESSIONS` plus `SSH_MAX_SESSIONS`, and a board that names a smaller number in its device config fails the build rather than leaving one transport unable to claim the slots its own pool promises. [§7](#7-command-line--terminal) is the full CLI reference.
 
-#### 6.2.16 TLS (no provider; transport hookup + cert provisioning)
+The same service runs scripts. One line of a script goes through the same parse-and-dispatch step a typed line does, so `source` and `/etc/rc.local` get the whole grammar without a second one; what the service wraps around a typed line — history and the prompt — happens once for the line you typed rather than once per script line, while finished commands are released after every line either way, so a long script does not hold every command it ever ran. Where a script has got to is held by the session, not by the call stack, which is what lets a line that stops for input hand the terminal back and be picked up afterwards. `/etc/rc.local` runs at the end of `initialize()`, before the login prompt is drawn. See [§7.15](#715-shell-scripts-and-etcrclocal).
+
+#### 6.2.17 TLS (no provider; transport hookup + cert provisioning)
 
 TLS has no service class either — it lives at the interface and port level. `iInstanceInterface` hands out the one outbound client the services share, built on first call and kept: `getSharedTcpClientInstance()` and, in a TLS build, `getSharedTlsClientInstance()`. Two literal accessors rather than one that quietly returns whichever is compiled in, so a caller picks its transport and the call site says which. OTA, device-IoT and GPIO posting take the TLS client where the flag is on and the TCP one otherwise. **Email is TCP only** — the SMTP path carries no TLS support. MQTT builds a client of its own instead of sharing.
 
@@ -1364,9 +1450,9 @@ Handshakes need more stack than the ESP8266 main context has, so enabling TLS al
 
 The bundled outbound client is created with peer verification off so that an encrypted-but-unverified connection works immediately. For production, point it at the CA bundle path and drop that line.
 
-Certificates come from one of two places. On ESP32, the on-device provisioner issues self-signed EC or RSA certs with the SANs you ask for, and `ensureServerCert` reissues only when the stored certificate's SANs no longer cover what was asked for. With runtime generation enabled the mDNS service drives it, so the certificate covers the address and `<hostname>.local` together ([§6.2.19](#6219-mdnsserviceprovider--__mdns_service)). Everywhere else, `scripts/GenTlsCerts.py` does the same job with OpenSSL and you upload the result over SFTP.
+Certificates come from one of two places. On ESP32, the on-device provisioner issues self-signed EC or RSA certs with the SANs you ask for, and `ensureServerCert` reissues only when the stored certificate's SANs no longer cover what was asked for. With runtime generation enabled the mDNS service drives it, so the certificate covers the address and `<hostname>.local` together ([§6.2.20](#6220-mdnsserviceprovider--__mdns_service)). Everywhere else, `scripts/GenTlsCerts.py` does the same job with OpenSSL and you upload the result over SFTP.
 
-#### 6.2.17 `UserStoreService` — `__user_store_service`
+#### 6.2.18 `UserStoreService` — `__user_store_service`
 
 The user directory, in two files:
 
@@ -1379,11 +1465,11 @@ The API is what you'd expect — look up by name or uid, add a user (writing bot
 
 On first start, if `/etc/passwd` is absent, it seeds root from the bootstrap credential row and hashes that password into shadow. The seeding is idempotent, and every boot re-stamps shadow as `0600`, so a file that turns up readable is corrected rather than trusted.
 
-Verifying or changing a password has to read shadow on behalf of a non-root session, so those two methods — and only those two — bracket the access in the privileged scope described in [§6.2.11](#6211-storage-interface-init-no-provider). `useradd` gives each user their own group by setting gid to uid.
+Verifying or changing a password has to read shadow on behalf of a non-root session, so those two methods — and only those two — bracket the access in the privileged scope described in [§6.2.12](#6212-storage-interface-init-no-provider). `useradd` gives each user their own group by setting gid to uid.
 
 It initialises after the filesystem and before the CLI, and the auth service prefers it whenever shadow exists. That preference is the switch that turns the framework from single-credential auth into a multi-user system.
 
-#### 6.2.18 `SessionManager`
+#### 6.2.19 `SessionManager`
 
 Not a service — a static registry holding one `session_t` per attached terminal, three by default.
 
@@ -1400,31 +1486,32 @@ A session carries its own line buffer and cursor, history position, autocomplete
 
 SSH attaches its session as soon as user auth succeeds, so authorisation state is anchored to the channel rather than to whichever command runs first.
 
-#### 6.2.19 `MdnsServiceProvider` — `__mdns_service`
+#### 6.2.20 `MdnsServiceProvider` — `__mdns_service`
 
 The responder from [§2.4.2](#242-mdns-and-dns-sd), running as an ordinary service on raw lwIP UDP. It derives the hostname from the MAC, writes `/etc/hostname`, joins the multicast group when the station gets an IP, and advertises whichever servers this build is running. Responses bundle PTR, SRV, TXT and A so a single query gets everything it needs. `service status MDNS` shows what it is announcing.
 
-Holding both the address and the name also makes it the right owner of HTTPS certificate provisioning: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` it schedules `ensureServerCert` for `<hostname>.local` plus the IP, one queued job at a time, dropped again if the service stops ([§6.2.16](#6216-tls-no-provider-transport-hookup--cert-provisioning)).
+Holding both the address and the name also makes it the right owner of HTTPS certificate provisioning: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` it schedules `ensureServerCert` for `<hostname>.local` plus the IP, one queued job at a time, dropped again if the service stops ([§6.2.17](#6217-tls-no-provider-transport-hookup--cert-provisioning)).
 
 ### 6.3 Init order
 
 The orchestrator starts services in a deliberate order:
 
 ```
-   1  database        every other service may need persisted config
-   2  serial          gives boot messages somewhere to go
-   3  wifi            brings the network up
-   4  ota             may pre-empt the rest of startup if an update is queued
-   5  gpio            can raise alerts once http and email exist
-   6  mqtt            may publish boot status
-   7  email           used by gpio events
-   8  factory reset   last of the always-on set, so every listener is registered
-   9  device iot      needs MQTT up
-  10  auth            gates everything the CLI and portal expose
-  11  storage         filesystem up — SSH depends on it
-  12  web server      needs auth and storage
-  13  telnet, ssh     need network, storage and the CLI
-  14  cmd             last, so `service` sees a complete list
+   1  time            the clock, before anything that stamps a line with it
+   2  database        every other service may need persisted config
+   3  serial          gives boot messages somewhere to go
+   4  wifi            brings the network up
+   5  ota             may pre-empt the rest of startup if an update is queued
+   6  gpio            can raise alerts once http and email exist
+   7  mqtt            may publish boot status
+   8  email           used by gpio events
+   9  factory reset   last of the always-on set, so every listener is registered
+  10  device iot      needs MQTT up
+  11  auth            gates everything the CLI and portal expose
+  12  storage         filesystem up — SSH depends on it
+  13  web server      needs auth and storage
+  14  telnet, ssh     need network, storage and the CLI
+  15  cmd             last, so `service` sees a complete list
 ```
 
 Two things follow from that. A service started later may call into one started earlier; the reverse is not defined. And a service that needs another one in its *constructor* is relying on static-init order — move the lookup into `initService`.
@@ -1442,6 +1529,8 @@ Direct calls are reserved for dependencies that are known to already exist. Anyt
 | `EVENT_WIFI_INTERNET_UP` / `_DOWN` | connectivity poller | OTA, IoT, email |
 | `EVENT_GPIO_TRIGGER` | GPIO event detector | email, MQTT, HTTP post |
 | `EVENT_SERIAL_AVAILABLE` | serial bridge | sketch hooks |
+| `EVENT_TIME_SYNC` | time service, when validity changes | anything that must recheck a stored timestamp |
+| `EVENT_TIME_SECOND` / `_MINUTE` | time service, on the boundary | anything scheduling against a wall clock |
 | `EVENT_OTA_*` | OTA | logger, portal status |
 
 Subscribe with `__utl_event.add_event_listener(name, [&](void* e){ … })`, publish with `__utl_event.fire(name, ptr)`.
@@ -1473,7 +1562,7 @@ Two habits keep services well-behaved. Do the real work in `initService`, not in
 ---
 ## 7. Command Line / Terminal
 
-The shell is the universal control plane. The same commands are reachable over serial, over telnet on port 23, and over SSH on port 22, with login, history, tab completion, pipes and redirection, in-place editing and file transfer. One implementation covers every channel because each source presents itself as an `iTerminalInterface`, and the CLI binds one session per terminal.
+The shell is the universal control plane. The same commands are reachable over serial, over telnet on port 23, and over SSH on port 22, with login, history, tab completion, pipes and redirection, variables, scripting, in-place editing and file transfer. One implementation covers every channel because each source presents itself as an `iTerminalInterface`, and the CLI binds one session per terminal.
 
 Start reading at [src/service_provider/cmd/](src/service_provider/cmd/); the parser lives in `src/utility/CommandBase.h`.
 
@@ -1602,6 +1691,7 @@ One thing to know when you do that: a parsed option value points into the live r
 | `NEED_AUTH`, `WRONG_CREDENTIAL` | login required or failed | back to the login flow |
 | `ABORTED` | Ctrl+C or Ctrl+Z | error line, iteration stops |
 | `FAILED` | the command's own failure | error line |
+| `FALSE` | the command was asked a question and the answer is no | nothing printed; only `$?` carries it |
 | `TERMINAL_*` | terminal-side states | handled by the service |
 
 ### 7.6 The dispatcher
@@ -1649,6 +1739,8 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 Not implemented yet: `;`, `&&` and `||`. They need a per-command exit status, which the shell does not carry today.
 
 ### 7.8 Built-in command inventory
+
+`if`, `else`, `fi`, `while`, `for` and `done` are not in this table. They are read by the script runner rather than dispatched as commands, so they work in a file and not at the prompt — see [§7.15](#715-shell-scripts-and-etcrclocal).
 
 | Command | Options | Brief |
 |---|---|---|
@@ -1704,6 +1796,8 @@ Not implemented yet: `;`, `&&` and `||`. They need a per-command exit status, wh
 | env | | Every variable this session can see, one `NAME=value` per line, each from the tier that wins. See [§7.14](#714-environment-variables). |
 | export \<name>=\<value> | | Set a variable for this session. Names the session answers for itself are refused. e.g. **export GREETING=hello** |
 | unset \<name> | | Drop a variable from this session, leaving `/.env` alone. |
+| source \<file> | | Run each line of a file in this session, so a `cd` or an `export` it performs is still in force afterwards. See [§7.15](#715-shell-scripts-and-etcrclocal). |
+| test \<a> \<op> \<b> | | Answer a question through `$?` and print nothing either way: `=` `!=` on strings, `-eq -ne -lt -le -gt -ge` on numbers, `-z` `-n` on emptiness, `-e` `-f` `-d` on paths. e.g. **test $MODE = debug && echo debugging** |
 | help | | Every registered command with its usage line. Works before login. |
 | uptime | | `up Xd Yh Zm Ws`. |
 | tls q=1,t=,l=,n=,i= | | On-device certificate generation, ESP32 with cert generation enabled. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
@@ -1715,7 +1809,7 @@ On argument style: commands with at most two arguments take them positionally, w
 
 ### 7.9 Multi-terminal session lifecycle
 
-Several sessions run at once with fully independent state. There is a single dispatcher and an array of session slots; each slot holds its own line buffer, cursor, history and completion position, working directory, umask, identity and descriptor table. The serial console holds one slot from boot, and telnet and SSH each keep a pool of their own, so two people over telnet and four over SSH are all just slots in the same table.
+Several sessions run at once with fully independent state. There is a single dispatcher and an array of session slots; each slot holds its own line buffer, cursor, history and completion position, working directory, umask, identity, descriptor table, environment variables and position in any script it is running. The serial console holds one slot from boot, and telnet and SSH each keep a pool of their own, so two people over telnet and four over SSH are all just slots in the same table.
 
 ```
   boot ──▶ filesystem up
@@ -1735,7 +1829,7 @@ Several sessions run at once with fully independent state. There is a single dis
                   ──▶ close: session detached
 ```
 
-The table and the pools are sized together — see the note in [§6.2.15](#6215-commandlineserviceprovider--__cmd_service). A pool larger than the table it draws from would leave one transport unable to claim the slots it promises, so a device config that names too few sessions fails the build rather than finding out at runtime.
+The table and the pools are sized together — see the note in [§6.2.16](#6216-commandlineserviceprovider--__cmd_service). A pool larger than the table it draws from would leave one transport unable to claim the slots it promises, so a device config that names too few sessions fails the build rather than finding out at runtime.
 
 Two invariants carry the whole design. First, the current session is switched once per tick, at the top of input handling, and the static terminal pointer moves with it — so prompt drawing, new command instances and the auth delegators all see the right session without anyone passing it around. Second, every in-flight command records which session created it, and the lookups that find waiting commands filter on that. A telnet login prompt waiting for a username cannot be fed by SSH keystrokes.
 
@@ -1815,22 +1909,30 @@ Say you want `temp`.
            SetCommand(CMD_NAME_TEMP);
            AddOption(CMD_OPTION_NAME_T);
        }
+       static void RegisterCommand() {
+           CommandBase::RegisterCommand(CMD_NAME_TEMP, [](void *arg)->void *{
+               return pdiutil::safe_new<TempCommand>();
+           });
+       }
        const char* getUsage() const override {
            return RODT_ATTR("temp [t=C|F]  read the temperature sensor (default Celsius)");
        }
        bool needauth() override { return true; }
-       cmd_result_t execute(cmd_term_inseq_t) override {
-           auto unit = RetrieveOption(CMD_OPTION_NAME_T);
-           bool celsius = !(unit && unit->optionval[0] == 'F');
+       pdi_err_t execute(cmd_term_inseq_t terminputaction) {
+           CommandOption *unit = RetrieveOption(CMD_OPTION_NAME_T);
+           bool celsius = !(unit && unit->optionval && unit->optionval[0] == 'F');
            m_terminal->writeln(readSensor(celsius));
-           return CMD_RESULT_OK;
+           return PDI_OK;
        }
-       static void* Registrar(void*) { static TempCommand cmd; return &cmd; }
    };
    ```
-3. Include the header in the CLI service and register the name against the registrar, next to its siblings.
+3. Include the header in the CLI service and call `TempCommand::RegisterCommand()` in its constructor, next to its siblings.
 
 That is the whole job. Tab completion, history, help, argument-error usage printing and Ctrl+C all come from the base.
+
+**Two argument shapes.** `AddOption` declares named `x=y` slots, as above. A command that takes its arguments positionally calls `setAcceptArgsOptions(true)` instead and reads `m_options[0]`, `[1]` and so on; `setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE)` makes those the space-separated words, which is how `su <user> <pass>` and `test <a> = <b>` read theirs. ⚠ Without `setAcceptArgsOptions(true)` a positional argument is never captured and every slot looks empty.
+
+**A command that answers a question** returns `CMD_RESULT_FALSE` for "no" rather than an error code. The dispatcher prints nothing for it, so a false result can sit inside a script or an `&&` chain without an error line, while `$?` still carries it — `test` is the one that does this today ([§7.15](#715-shell-scripts-and-etcrclocal)).
 
 A few limits shape command design. Names are capped at eight characters and options at three, each name up to three characters, so a verb that wants more either splits into sub-commands or takes positional arguments. Options are comma separated, and a value that needs to carry a comma, an `=` or a space is **quoted** — single or double, as a shell quotes — so `watch c="login u=a,p=b",i=3000` passes the whole inner command through as one value. The quotes bound the value and are removed before the command sees it. And `needauth()` is the only permission gate, so put it on anything that changes state.
 
@@ -1899,6 +2001,110 @@ $GREETING
 A name is a letter or underscore followed by letters, digits or underscores. A session holds `ENV_SESSION_MAX` variables, eight by default; names and values are bounded by `ENV_NAME_MAX` and `ENV_VALUE_MAX`. The base file needs storage, so a board without a filesystem keeps the first two tiers and simply has none.
 
 The session tier ends with the login. `logout` and `su` both clear it, which matters most on the serial console: telnet and SSH close their channel and release the session with it, while the serial terminal outlives every login on it, so without an explicit reset one user's variables would follow the next one in. Only the session tier is dropped — the base file is untouched, so clearing uncovers `/.env` rather than deleting from it.
+
+### 7.15 Shell scripts and `/etc/rc.local`
+
+A script is a file of shell lines, and there is no second grammar. Each line goes through the same executor a typed line goes through, so pipes, redirection, `&&` and `||`, quoting, `$NAME` and `$?` all mean inside a script exactly what they mean at the prompt. The runner reads only two things for itself: a blank line, and a `#` comment.
+
+```
+pdiStack@12580169:(/): source /demo.sh
+```
+
+**`source` runs in the session that called it**, not in a subshell — the framework has none. A `cd` or an `export` a script performs is still in force when it returns, which is the whole reason the POSIX name fits:
+
+```
+# /setup.sh
+export MODE=debug
+cd /var/log
+```
+```
+pdiStack@12580169:(/): source /setup.sh
+pdiStack@12580169:(/var/log): echo $MODE
+debug
+```
+
+A script that fails a line keeps going, the way `rc.local` does; use `&&` for a line that must gate the next. Scripts can call scripts, bounded by `SCRIPT_MAX_DEPTH`, so a file that sources itself stops rather than recursing until the heap gives out.
+
+#### Branching and repeating
+
+`if`/`else`/`fi`, `while`/`done` and `for`/`done` are handled by the runner as a line-level state machine, not by the line parser — control flow spans lines, and the parser deliberately understands one line at a time. There is no `then` and no `do`: the runner is line based, so a keyword on a line of its own would be noise.
+
+A close has to match what it closes. `fi` ends an `if`, `done` ends a `while` or a `for`, and a mismatched or stray one fails the script rather than quietly ending a block it does not belong to — a `for` closed by `fi` would otherwise run a single pass and read as a loop that simply had one word in its list.
+
+`if` and `while` branch on **a command's result**, which is what `$?` already carries for `&&`:
+
+```
+# /boot-checks.sh
+if test -f /etc/wifi/wifi.conf
+echo wifi settings present
+else
+echo running on stored defaults
+fi
+
+export TRIES=a
+while test $TRIES != c
+echo attempt
+if test $TRIES = a
+export TRIES=b
+else
+export TRIES=c
+fi
+done
+```
+
+`test` is what makes that useful. Every other command reports success or a *fault* — `grep` returns success whether or not it matched — so without `test` a condition could only ask whether a command malfunctioned, never what a value is. It answers through `$?` and prints nothing either way, so a false condition inside a loop leaves no output:
+
+| Form | True when |
+|---|---|
+| `test <a> = <b>`, `test <a> != <b>` | the strings match, or differ |
+| `test <a> -eq -ne -lt -le -gt -ge <b>` | the numbers compare so; a non-number is refused rather than answered |
+| `test -z <s>`, `test -n <s>` | the string is empty, or is not |
+| `test -e <path>`, `-f`, `-d` | the path exists, is a plain file, or is a directory |
+
+`for` walks a list of words instead of a condition, binding each one to a name in turn:
+
+```
+# /rotate.sh
+for LEVEL in error warning info
+echo clearing $LEVEL
+rm /var/log/syslog.$LEVEL
+done
+```
+
+The list is words, and quoting decides what a word is: `for X in "one two" three` is two passes, while an unquoted `$NAME` holding blanks is as many words as it reads as. A name the environment does not carry expands to nothing and contributes no word, so a list that goes empty simply runs the body no times. The name is bound for real, so it is still set to the last word after `done`; `for` refuses a name the session answers for itself, such as `PWD`.
+
+A loop is capped at `SCRIPT_LOOP_MAX` passes, so a condition that never goes false fails the script instead of holding the session — at boot there is nobody to interrupt one. A `for` over a fixed list ends itself, but the cap still applies, because the list is read again on each pass and a body that adds to its own list would otherwise never finish. Nesting is bounded by `SCRIPT_BLOCK_MAX`, and a block left unclosed at the end of a file is reported rather than passing quietly.
+
+#### A line that asks for something
+
+A command inside a script can stop for input — `su` and `passwd` both do. Where the script was typed by someone, the terminal is handed back so they can answer, and the script carries on at the next line afterwards. Where nobody is watching it, waiting would hold the session forever and the line after would be read as the answer, so the waiting command is cancelled and the script stops. Boot and scheduled scripts take the second path, which is what keeps `rc.local` from wedging a boot.
+
+Where a script has got to lives on the session, so two transports can each be part-way through one without touching the other, and a script pending when someone logs out or runs `su` is abandoned rather than resumed under the next login.
+
+#### `/etc/rc.local`
+
+If `/etc/rc.local` exists it runs at the end of boot, after every service has started and before the login prompt appears. It is not created for you.
+
+It names the identity it runs under, in its **leading comment block**:
+
+```
+# rc.local - runs at the end of boot
+# UID 0
+echo bringing up the workshop config
+source /etc/site.sh
+```
+
+| The header says | What happens |
+|---|---|
+| no `UID` line | runs as root |
+| `# UID <n>` and the user exists | runs as that user, with their home as the working directory |
+| `# UID <n>` and no such user | **the file does not run at all** |
+
+An identity that cannot be resolved is never quietly downgraded to root — a script asking to run as somebody specific and silently getting more privilege than it asked for is the wrong failure. A `UID` line below the first command is documentation, not policy, so a comment further down cannot change who the script runs as.
+
+The session `rc.local` runs in is built for it and given back afterwards. That is deliberate: reusing the console's session would leave a logged-in root shell sitting on the serial port at boot. It also means `export` inside `rc.local` does not reach your login — put anything that must outlive it in `/.env`.
+
+The whole of this section is behind `ENABLE_SCRIPT_RUNNER`, on by default. Comment it out and `source`, control flow and `rc.local` go with it, including the per-session state they use; the rest of the shell is unaffected.
 
 ---
 ## 8. Web Server
@@ -2595,7 +2801,7 @@ Every byte of that comes back when the client disconnects — the worker exits, 
 
 **The containers allocate.** `pdiutil::string` and `pdiutil::vector` hide the heap but still use it, and repeated growth fragments. Reserve up front wherever the size is known, the way the scheduler reserves its task table.
 
-**Sessions and their pools.** Every session slot is a fixed record in the table, so `PDI_MAX_SESSIONS` is a straight multiplier on static RAM — and because the table is sized from the telnet and SSH pools, growing a pool grows the table with it. A live session then costs a little heap on top for its line buffer and paths. On a tight port, shrink the pools rather than the table.
+**Sessions and their pools.** Every session slot is a fixed record in the table, so `PDI_MAX_SESSIONS` is a straight multiplier on static RAM — and because the table is sized from the telnet and SSH pools, growing a pool grows the table with it. A live session then costs a little heap on top for its line buffer and paths. On a tight port, shrink the pools rather than the table. The script runner adds a little to each slot too — the variables the session holds, and where it has got to in any script it is running — which is part of why it is behind a flag you can drop.
 
 ### 12.4 Heap discipline
 
@@ -3076,7 +3282,7 @@ Every section above has its own "how do I add one of these" part. This one is th
 | persist something only your sketch cares about | the database escape hatch | [§11.3](#113-addingdatabasetable) |
 | react to another service without coupling to it | the event bus | [§6.4](#64-the-event-bus) |
 | run periodic or long work | the scheduler | [§4](#4-task-scheduler) |
-| encrypt everything outbound | turn on TLS — each outbound service asks `__i_instance` for the shared TLS client instead of the TCP one | [§6.2.16](#6216-tls-no-provider-transport-hookup--cert-provisioning) |
+| encrypt everything outbound | turn on TLS — each outbound service asks `__i_instance` for the shared TLS client instead of the TCP one | [§6.2.17](#6217-tls-no-provider-transport-hookup--cert-provisioning) |
 | serve the portal over HTTPS | turn on HTTPS and drop a cert and key on the filesystem | [§8.7.1](#871-https-wiring-and-certificates) |
 | call a service from a sketch | the global | [§16.9](#169-calling-a-service-from-a-sketch) |
 
@@ -3340,7 +3546,7 @@ A `send()` went out without chunking and exceeded the per-send buffer. Compose i
 Wait for the subscribed callback before publishing on that topic — `Subscribe` reports enqueue, not acknowledgement ([§10.2](#102-mqtt)).
 
 **OTA polls the server but never updates.**
-The device only updates when the server's version is strictly newer than the firmware version compiled into it. Bump the firmware version before publishing ([§6.2.5](#625-otaserviceprovider--__ota_service)).
+The device only updates when the server's version is strictly newer than the firmware version compiled into it. Bump the firmware version before publishing ([§6.2.6](#626-otaserviceprovider--__ota_service)).
 
 **Email sends time out.**
 SMTP goes out in plaintext, so providers that require TLS on submission will not complete. Use a relay that accepts plain SMTP, or a test sink ([§10.3](#103-smtp)).

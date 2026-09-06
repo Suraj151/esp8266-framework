@@ -16,6 +16,9 @@ created Date    : 16th Aug 2026
  * execute() returns, so a test reads them from inside execute the way a real
  * command does.
  */
+namespace
+{
+
 struct TestCommand : public cmd_t
 {
     char seen[CMD_OPTION_MAX][64];
@@ -69,6 +72,8 @@ struct TestCommand : public cmd_t
         return seen[index];
     }
 };
+
+} // namespace
 
 /**
  * Build a command with the given name and options, ready to parse a line.

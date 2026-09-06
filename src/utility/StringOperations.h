@@ -85,6 +85,13 @@ bool __is_digit(char c);
 bool __is_alnum(char c);
 
 /**
+ * @brief Whether the character separates words without ending the line.
+ * @param c The character to test.
+ * @return True when the character is a space or a tab.
+ */
+bool __is_blank(char c);
+
+/**
  * @brief Trims leading and trailing whitespace from a string.
  * @param str The string to trim.
  * @param _overflow_limit The maximum length of the string (default is 300).

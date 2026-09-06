@@ -47,6 +47,7 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define SSH_MAX_SESSIONS            4
 #define TELNET_MAX_SESSIONS         2
 #define MAX_SERVICE_TASKS           12
+#define SCRIPT_MAX_DEPTH            4
 #define TCP_WRITE_DRAIN_TIMEOUT_MS  (MILLISECOND_DURATION_1000/2)
 
 #define PDI_NET_STACK_LWIP
@@ -106,6 +107,8 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define DEVICE_SUPPORTS_TLS
 #define DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION
 #define DEVICE_SUPPORTS_TLS_CERT_GENERATION
+
+#define DEVICE_SUPPORTS_NTP
 #define DEVICE_SUPPORTS_PROGRAM_EXEC
 // device yield is valid from any task, so blocking network calls may run off the main loop
 #define DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK

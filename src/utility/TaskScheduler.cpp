@@ -23,6 +23,7 @@ Created Date    : 1st June 2019
 TaskScheduler::TaskScheduler() : m_util(nullptr),
                                  m_max_tasks(MAX_SCHEDULABLE_TASKS),
                                  m_rebase_start_priotask(false),
+                                 m_min_vruntime(0),
                                  m_next_task_id(1)
 {
     // the table is sized once and never grown or compacted after this, so a
@@ -118,7 +119,7 @@ pdiutil::task_id_t TaskScheduler::updateInterval(pdiutil::task_id_t _task_id, Ca
         CRITICAL_SECTION_ENTER
         this->m_tasks[_registered_index].m_task = _task_fn;
         this->m_tasks[_registered_index].m_duration = _duration;
-        this->m_tasks[_registered_index].m_task_priority = _task_priority;
+        setTaskPriority(this->m_tasks[_registered_index], _task_priority);
         this->m_tasks[_registered_index].m_last_millis = _last_millis == 0 ? this->m_tasks[_registered_index].m_last_millis : _last_millis;
         this->m_tasks[_registered_index].m_max_attempts = _max_attempts;
         if (nullptr != _name) this->m_tasks[_registered_index].m_name = _name;
@@ -166,6 +167,8 @@ bool TaskScheduler::clearInterval(pdiutil::task_id_t _id)
  */
 pdiutil::task_id_t TaskScheduler::register_task(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority, pdiutil::millis_t _last_millis, pdiutil::attempts_t _max_attempts, const char* _name, uint8_t _owner)
 {
+    uint64_t _start_vruntime = this->m_min_vruntime;
+
     // claim a free slot in place, the table is never grown so slots never move
     uint16_t _slot = this->m_tasks.size();
     for (uint16_t i = 0; i < this->m_tasks.size() && i < this->m_max_tasks; i++)
@@ -189,12 +192,14 @@ pdiutil::task_id_t TaskScheduler::register_task(CallBackVoidArgFn _task_fn, pdiu
         task_t &_new_task = this->m_tasks[_slot];
         _new_task.m_task = _task_fn;
         _new_task.m_duration = _duration;
-        _new_task.m_task_priority = _task_priority;
         _new_task.m_last_millis = _last_millis;
         _new_task.m_max_attempts = _max_attempts;
         _new_task.m_task_exec_us = 0;
+        _new_task.m_vruntime = _start_vruntime;
         _new_task.m_task_id = _new_id;
         _new_task.m_state = TASK_STATE_SLEEPING;
+        setTaskPolicy(_new_task, TASK_POLICY_FIFO);
+        setTaskPriority(_new_task, _task_priority);
         _new_task.m_created_ms = (nullptr != m_util) ? m_util->millis_now() : 0;
         _new_task.m_name = _name;
         _new_task.m_owner = _owner;
@@ -224,6 +229,34 @@ bool TaskScheduler::setTaskOwner(pdiutil::task_id_t _id, uint8_t _owner)
     return true;
 }
 
+/**
+ * @brief Set the priority on a task record, keeping its weight in step.
+ */
+void TaskScheduler::setTaskPriority(task_t& _t, pdiutil::task_priority_t _priority)
+{
+    if (_priority > MAX_TASK_PRIORITY) _priority = MAX_TASK_PRIORITY;
+    _t.m_task_priority = _priority;
+    _t.m_weight = taskWeight(_t);
+}
+
+/**
+ * @brief Set the policy on a task record, keeping its weight in step.
+ */
+void TaskScheduler::setTaskPolicy(task_t& _t, task_policy_t _policy)
+{
+    _t.m_task_policy = _policy;
+    _t.m_weight = taskWeight(_t);
+}
+
+/**
+ * @brief Set the nice value on a task record, keeping its weight in step.
+ */
+void TaskScheduler::setTaskNice(task_t& _t, int8_t _nice)
+{
+    _t.m_nice = _nice;
+    _t.m_weight = taskWeight(_t);
+}
+
 bool TaskScheduler::setTaskNice(pdiutil::task_id_t _id, int8_t _nice)
 {
     int16_t _idx = this->is_registered_task(_id);
@@ -231,7 +264,36 @@ bool TaskScheduler::setTaskNice(pdiutil::task_id_t _id, int8_t _nice)
     if (_nice < -20) _nice = -20;
     if (_nice > 19) _nice = 19;
     CRITICAL_SECTION_ENTER
-    this->m_tasks[_idx].m_nice = _nice;
+    setTaskNice(this->m_tasks[_idx], _nice);
+    CRITICAL_SECTION_EXIT
+    return true;
+}
+
+/**
+ * @brief Choose how a task is scored against the others, for one that is
+ *        wanted on time rather than merely eventually.
+ * @return true if the task was found and updated.
+ */
+bool TaskScheduler::setTaskPolicy(pdiutil::task_id_t _id, task_policy_t _policy)
+{
+    int16_t _idx = this->is_registered_task(_id);
+    if (_idx < 0) return false;
+    CRITICAL_SECTION_ENTER
+    setTaskPolicy(this->m_tasks[_idx], _policy);
+    CRITICAL_SECTION_EXIT
+    return true;
+}
+
+/**
+ * @brief Change a registered task's priority.
+ * @return true if the task was found and updated.
+ */
+bool TaskScheduler::setTaskPriority(pdiutil::task_id_t _id, pdiutil::task_priority_t _priority)
+{
+    int16_t _idx = this->is_registered_task(_id);
+    if (_idx < 0) return false;
+    CRITICAL_SECTION_ENTER
+    setTaskPriority(this->m_tasks[_idx], _priority);
     CRITICAL_SECTION_EXIT
     return true;
 }
@@ -281,6 +343,39 @@ uint16_t TaskScheduler::sendSignalByName(const char* _name, signal_t _sig, uint8
 }
 
 /**
+ * @brief The weight a task's service is divided by, so a heavier one is
+ *        charged less for the same run and comes up again sooner.
+ * @return the weight, never zero.
+ */
+uint32_t TaskScheduler::taskWeight(const task_t& _t)
+{
+    // equal slices among peers, so the ladder is not consulted at all
+    if (TASK_POLICY_ROUNDROBIN == _t.m_task_policy)
+    {
+        return TASK_WEIGHT_NOMINAL;
+    }
+
+    int32_t effective = (int32_t)_t.m_task_priority - (int32_t)_t.m_nice;
+
+    if (effective < 0) effective = 0;
+    if (effective > MAX_TASK_PRIORITY) effective = MAX_TASK_PRIORITY;
+
+    int32_t step = ((effective * (TASK_WEIGHT_LEVELS - 1)) / MAX_TASK_PRIORITY) - (TASK_WEIGHT_LEVELS / 2);
+
+    uint64_t weight = TASK_WEIGHT_NOMINAL;
+
+    for (int32_t i = 0; i < step; i++) weight = (weight * TASK_WEIGHT_STEP_NUM) / TASK_WEIGHT_STEP_DEN;
+    for (int32_t i = 0; i > step; i--) weight = (weight * TASK_WEIGHT_STEP_DEN) / TASK_WEIGHT_STEP_NUM;
+
+    if (TASK_POLICY_DEADLINE == _t.m_task_policy)
+    {
+        weight *= TASK_WEIGHT_DEADLINE_BOOST;
+    }
+
+    return (weight < 1) ? 1 : (uint32_t)weight;
+}
+
+/**
  * @brief Return the computed score for task.
  *
  */
@@ -301,7 +396,10 @@ int TaskScheduler::computeScore(const task_t& _t, uint64_t _now)
     int64_t recentness = (int64_t)(_now - _t.m_last_millis);
 
     // Priority Weight
-    int priority_weight = 100;
+    int priority_weight = (int)_t.m_duration;
+
+    if (priority_weight < TASK_PRIORITY_WEIGHT_MIN) priority_weight = TASK_PRIORITY_WEIGHT_MIN;
+    if (priority_weight > TASK_PRIORITY_WEIGHT_MAX) priority_weight = TASK_PRIORITY_WEIGHT_MAX;
 
     // Policy Weight is policy_boost * policy_cap
     int policy_cap = 50;
@@ -368,24 +466,37 @@ uint16_t TaskScheduler::getSortedTaskList(uint16_t* _priority_indices, uint16_t 
 
             bool swap_needed = false;
 
-            // --- Blend policy, priority into a score ---
-            int score_i = this->computeScore(task_i, now);
-            int score_j = this->computeScore(task_j, now);
-            
-            // --- Compare blended score first (priority-biased) ---
-            if (score_i != score_j) {
+            // --- Due first, then least service taken for what the task weighs ---
+            bool due_i = (now >= next_due_i);
+            bool due_j = (now >= next_due_j);
 
-                swap_needed = (score_j > score_i);
+            if (due_i != due_j) {
+
+                swap_needed = due_j;
+            } else if (task_i.m_vruntime != task_j.m_vruntime) {
+
+                swap_needed = (task_j.m_vruntime < task_i.m_vruntime);
             } else {
-                // --- Scores equal → compare due times with tolerance ---
-                int64_t diff = (int64_t)(next_due_i - next_due_j);
 
-                if (abs(diff) > (int64_t)tolerance) {
-                    swap_needed = (next_due_j < next_due_i);
+                // --- Blend policy, priority into a score ---
+                int score_i = this->computeScore(task_i, now);
+                int score_j = this->computeScore(task_j, now);
+
+                // --- Compare blended score first (priority-biased) ---
+                if (score_i != score_j) {
+
+                    swap_needed = (score_j > score_i);
                 } else {
-                    // --- Due times effectively equal → compare exec time ---
-                    if (task_i.m_task_exec_us > task_j.m_task_exec_us) {
-                        swap_needed = true;
+                    // --- Scores equal → compare due times with tolerance ---
+                    int64_t diff = (int64_t)(next_due_i - next_due_j);
+
+                    if (abs(diff) > (int64_t)tolerance) {
+                        swap_needed = (next_due_j < next_due_i);
+                    } else {
+                        // --- Due times effectively equal → compare exec time ---
+                        if (task_i.m_task_exec_us > task_j.m_task_exec_us) {
+                            swap_needed = true;
+                        }
                     }
                 }
             }
@@ -500,6 +611,11 @@ void TaskScheduler::handle_tasks()
         {
             if (nullptr != _task.m_task)
             {
+                if (_task.m_vruntime > this->m_min_vruntime)
+                {
+                    this->m_min_vruntime = _task.m_vruntime;
+                }
+
                 CRITICAL_SECTION_ENTER
                 _task.m_state = TASK_STATE_RUNNING;
                 CRITICAL_SECTION_EXIT
@@ -510,6 +626,10 @@ void TaskScheduler::handle_tasks()
                 CRITICAL_SECTION_ENTER
                 _task.m_task_exec_us = (uint32_t)(_cb_end_us - _cb_start_us);
                 _task.m_total_exec_us += (uint64_t)_task.m_task_exec_us;
+
+                uint32_t _charge_weight = (_task.m_weight > 0) ? _task.m_weight : 1;
+                _task.m_vruntime += ((uint64_t)_task.m_task_exec_us * (uint64_t)TASK_WEIGHT_NOMINAL)
+                                    / (uint64_t)_charge_weight;
                 _task.m_run_count++;
                 _task.m_state = TASK_STATE_SLEEPING;
                 CRITICAL_SECTION_EXIT
@@ -668,7 +788,7 @@ bool TaskScheduler::remove_task(pdiutil::task_id_t _id)
 			// this->m_tasks.erase( this->m_tasks.begin() + i );
             CRITICAL_SECTION_ENTER
             this->m_tasks[i].m_duration = 10;
-            this->m_tasks[i].m_task_priority = 0;
+            setTaskPriority(this->m_tasks[i], 0);
             this->m_tasks[i].m_max_attempts = 0;
             this->m_tasks[i].m_task = nullptr;
             this->m_tasks[i].m_state = TASK_STATE_ZOMBIE;

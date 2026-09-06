@@ -23,6 +23,8 @@ created Date    : 1st June 2019
 */
 typedef enum services{
 
+  SERVICE_TIME,
+
 #ifdef ENABLE_AUTH_SERVICE
   SERVICE_AUTH,
   SERVICE_USER_STORE,

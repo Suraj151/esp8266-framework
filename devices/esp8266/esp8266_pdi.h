@@ -17,8 +17,10 @@ created Date    : 1st Jan 2024
 #include "WiFiInterface.h"
 #include "HttpServerInterface.h"
 #endif
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef DEVICE_SUPPORTS_NTP
 #include "NtpInterface.h"
+#endif
+#ifdef ENABLE_NETWORK_SERVICE
 #include "PingInterface.h"
 #include "TcpClientInterface.h"
 #include "TcpServerInterface.h"

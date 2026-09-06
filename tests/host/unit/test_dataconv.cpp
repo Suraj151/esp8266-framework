@@ -204,3 +204,69 @@ TEST(dataconv, int64_digit_count_counts_wide_digits)
 {
     ASSERT_EQ(Int64DigitCount(1000000000000LL), (uint8_t)13);
 }
+
+TEST(dataconv, epoch_breaks_down_into_calendar_fields)
+{
+    datetime_t dt;
+
+    // 2024-02-29T13:45:07Z, a leap day so the month arithmetic is exercised
+    EpochToDateTime(1709214307u, dt);
+    ASSERT_EQ((int)dt.m_year, 2024);
+    ASSERT_EQ((int)dt.m_month, 2);
+    ASSERT_EQ((int)dt.m_day, 29);
+    ASSERT_EQ((int)dt.m_hour, 13);
+    ASSERT_EQ((int)dt.m_minute, 45);
+    ASSERT_EQ((int)dt.m_second, 7);
+}
+
+TEST(dataconv, epoch_zero_is_the_start_of_1970)
+{
+    datetime_t dt;
+    EpochToDateTime(0u, dt);
+    ASSERT_EQ((int)dt.m_year, 1970);
+    ASSERT_EQ((int)dt.m_month, 1);
+    ASSERT_EQ((int)dt.m_day, 1);
+    ASSERT_EQ((int)dt.m_hour, 0);
+    ASSERT_EQ((int)dt.m_minute, 0);
+    ASSERT_EQ((int)dt.m_second, 0);
+
+    // the epoch fell on a Thursday, which is what anchors every weekday below
+    ASSERT_EQ((int)dt.m_weekday, 4);
+}
+
+TEST(dataconv, weekday_is_sunday_zero_across_a_whole_week)
+{
+    // 2024-03-03 was a Sunday; walk the seven days after it
+    const int expected[7] = {0, 1, 2, 3, 4, 5, 6};
+
+    for (int i = 0; i < 7; i++)
+    {
+        datetime_t dt;
+        EpochToDateTime(1709424000u + (uint32_t)i * 86400u, dt);
+        ASSERT_EQ((int)dt.m_weekday, expected[i]);
+        ASSERT_EQ((int)dt.m_day, 3 + i);
+    }
+}
+
+TEST(dataconv, the_string_formatter_agrees_with_the_breakdown)
+{
+    // the formatter is built on the same breakdown now, so a disagreement
+    // would mean the refactor changed what a timestamp reads as
+    const uint32_t samples[4] = {1u, 951782400u, 1709214307u, 2147483647u};
+
+    for (int i = 0; i < 4; i++)
+    {
+        datetime_t dt;
+        EpochToDateTime(samples[i], dt);
+
+        char text[24];
+        EpochToDateTimeString(samples[i], text, sizeof(text), "%Y-%m-%d %H:%M:%S");
+
+        char built[24];
+        snprintf(built, sizeof(built), "%04u-%02u-%02u %02u:%02u:%02u",
+                 (unsigned)dt.m_year, (unsigned)dt.m_month, (unsigned)dt.m_day,
+                 (unsigned)dt.m_hour, (unsigned)dt.m_minute, (unsigned)dt.m_second);
+
+        ASSERT_STREQ(text, built);
+    }
+}
