@@ -46,7 +46,7 @@ DevFs::DevFs() : iFileSystemInterface(s_dev_null_storage) {}
 
 const char* DevFs::normalizePath(const char* path) const {
     if (!path) return "";
-    while (*path == '/') path++;
+    while (*path == PATH_SEPARATOR_CHAR) path++;
     return path;
 }
 
@@ -64,7 +64,7 @@ pdiutil::string DevFs::basename(const char* path) {
     if (!path) return pdiutil::string();
     const char* last = path;
     for (const char* p = path; *p; ++p) {
-        if (*p == '/') last = p + 1;
+        if (*p == PATH_SEPARATOR_CHAR) last = p + 1;
     }
     return pdiutil::string(last);
 }

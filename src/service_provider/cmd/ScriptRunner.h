@@ -62,7 +62,25 @@ public:
    */
   static bool declaredUid(const char *path, uint16_t &uid, bool &named);
 
+  /**
+   * Runs one command line with nobody watching, so a scheduled job runs as the
+   * identity it was given rather than as whoever last used the console.
+   */
+  static pdi_err_t runDetachedLine(const char *line, uint16_t uid);
+
 private:
+
+  /**
+   * Opens a session on the given terminal under the identity named, refusing
+   * when that terminal already holds one so nothing can borrow a live session.
+   */
+  static session_t *beginDetached(uint16_t uid, iTerminalInterface *terminal);
+
+  /**
+   * Gives the terminal back once detached work is done, so the console can be
+   * logged into again.
+   */
+  static void endDetached(iTerminalInterface *terminal);
 
   enum keyword_t : uint8_t {
     KEYWORD_NONE = 0,

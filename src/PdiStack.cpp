@@ -244,6 +244,9 @@ void PDIStack::initialize(){
     ScriptRunner::runScheduledScript(rclocal.c_str());
   }
   #endif
+  #ifdef ENABLE_CRON_SERVICE
+  __cron_service.startService();
+  #endif
   CommandLineServiceProvider::startInteraction();
   #endif
 }

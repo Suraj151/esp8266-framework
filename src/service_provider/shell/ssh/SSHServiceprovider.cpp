@@ -1254,10 +1254,10 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                             // Build absolute starting path. SFTP path separator is always '/'.
                             pdiutil::string abspath;
-                            if (reqpath.empty() || reqpath[0] != '/') {
+                            if (reqpath.empty() || reqpath[0] != PATH_SEPARATOR_CHAR) {
                                 abspath = SessionManager::getPWD();
-                                if (abspath.empty() || abspath[abspath.length() - 1] != '/') {
-                                    abspath += '/';
+                                if (abspath.empty() || abspath[abspath.length() - 1] != PATH_SEPARATOR_CHAR) {
+                                    abspath += PATH_SEPARATOR_CHAR;
                                 }
                                 abspath += reqpath;
                             } else {
@@ -1270,20 +1270,20 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                             pdiutil::string canonical;
                             size_t i = 0;
                             while (i < abspath.length()) {
-                                while (i < abspath.length() && abspath[i] == '/') i++;
+                                while (i < abspath.length() && abspath[i] == PATH_SEPARATOR_CHAR) i++;
                                 size_t j = i;
-                                while (j < abspath.length() && abspath[j] != '/') j++;
+                                while (j < abspath.length() && abspath[j] != PATH_SEPARATOR_CHAR) j++;
                                 if (j > i) {
                                     pdiutil::string seg = abspath.substr(i, j - i);
                                     if (seg == ".") {
                                         // skip
                                     } else if (seg == "..") {
-                                        size_t lastsep = canonical.find_last_of('/');
+                                        size_t lastsep = canonical.find_last_of(PATH_SEPARATOR_CHAR);
                                         if (lastsep != pdiutil::string::npos) {
                                             canonical = canonical.substr(0, lastsep);
                                         }
                                     } else {
-                                        canonical += '/';
+                                        canonical += PATH_SEPARATOR_CHAR;
                                         canonical += seg;
                                     }
                                 }

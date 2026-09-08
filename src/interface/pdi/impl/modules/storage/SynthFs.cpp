@@ -23,7 +23,7 @@ SynthFs::SynthFs(iStorageInterface &storage, const char *root)
  */
 const char *SynthFs::normalizePath(const char *path) {
     if (nullptr == path) return "";
-    while (*path == '/') path++;
+    while (*path == PATH_SEPARATOR_CHAR) path++;
     return path;
 }
 
@@ -34,7 +34,7 @@ bool SynthFs::matchSegment(const char *&cursor, const char *literal) {
     uint32_t n = strlen(literal);
     if (strncmp(cursor, literal, n) != 0) return false;
     char after = cursor[n];
-    if (after != '\0' && after != '/') return false;
+    if (after != '\0' && after != PATH_SEPARATOR_CHAR) return false;
     cursor += n;
     return true;
 }
@@ -52,7 +52,7 @@ int32_t SynthFs::numberSegment(const char *&cursor) {
         if (value > 65535) return PDI_ERR_RANGE;
     }
 
-    if (*cursor != '\0' && *cursor != '/') return PDI_ERR_INVALID_ARG;
+    if (*cursor != '\0' && *cursor != PATH_SEPARATOR_CHAR) return PDI_ERR_INVALID_ARG;
     return value;
 }
 
@@ -60,7 +60,7 @@ int32_t SynthFs::numberSegment(const char *&cursor) {
  * Step over the separator between two segments.
  */
 bool SynthFs::nextSegment(const char *&cursor) {
-    if (*cursor != '/') return false;
+    if (*cursor != PATH_SEPARATOR_CHAR) return false;
     cursor++;
     return true;
 }
@@ -113,7 +113,7 @@ pdiutil::string SynthFs::basename(const char *path) {
 
     const char *last = path;
     for (const char *p = path; *p; ++p) {
-        if (*p == '/') last = p + 1;
+        if (*p == PATH_SEPARATOR_CHAR) last = p + 1;
     }
     return pdiutil::string(last);
 }

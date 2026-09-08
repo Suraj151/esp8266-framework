@@ -53,7 +53,7 @@ struct EnvCommand : public CommandBase {
 
 		for( uint32_t i = 0; i < all.size(); i++ ){
 			m_terminal->write(all[i].m_key.c_str());
-			m_terminal->write('=');
+			m_terminal->write(KEY_VALUE_SEPARATOR_CHAR);
 			m_terminal->writeln(all[i].m_value.c_str());
 		}
 

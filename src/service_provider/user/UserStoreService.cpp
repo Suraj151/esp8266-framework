@@ -121,7 +121,7 @@ bool UserStoreService::removeUser(const char *username)
 
 bool UserStoreService::parsePasswdLine(const pdiutil::string &line, user_record_t &out)
 {
-  if (line.empty() || line[0] == '#') return false;
+  if (line.empty() || line[0] == LINE_COMMENT_CHAR) return false;
 
   pdiutil::string fields[6];
   pdiutil::string::size_type start = 0;

@@ -10,6 +10,7 @@ created Date    : 16th Aug 2026
 
 #include <FakeClock.h>
 #include <pditest.h>
+#include <config/Common.h>
 #include <utility/TaskScheduler.h>
 
 static int s_counter_a = 0;
@@ -390,4 +391,152 @@ TEST(scheduler, a_cleared_task_still_runs_its_finalizer)
 
     ASSERT_EQ(calls, 1);
     ASSERT_LT(scheduler.is_registered_task(id), 0);
+}
+
+/**
+ * A task record carrying nothing but the weight the ladder gives that
+ * priority, nice and policy, so a rung can be read without a scheduler.
+ */
+static task_t weighed(pdiutil::task_priority_t priority, int8_t nice = 0,
+                      task_policy_t policy = TASK_POLICY_FIFO)
+{
+    task_t task;
+    TaskScheduler::setTaskPolicy(task, policy);
+    TaskScheduler::setTaskNice(task, nice);
+    TaskScheduler::setTaskPriority(task, priority);
+    return task;
+}
+
+TEST(scheduler, the_ladder_rises_with_priority)
+{
+    ASSERT_LT(weighed(LOW_TASK_PRIORITY).m_weight, weighed(MEDIUM_TASK_PRIORITY).m_weight);
+    ASSERT_LT(weighed(MEDIUM_TASK_PRIORITY).m_weight, weighed(HIGH_TASK_PRIORITY).m_weight);
+    ASSERT_LT(weighed(HIGH_TASK_PRIORITY).m_weight, weighed(MAX_TASK_PRIORITY).m_weight);
+}
+
+TEST(scheduler, the_ladder_rungs_hold_the_values_the_design_names)
+{
+    ASSERT_EQ(weighed(LOW_TASK_PRIORITY).m_weight, (uint32_t)27);
+    ASSERT_EQ(weighed(MEDIUM_TASK_PRIORITY).m_weight, (uint32_t)939);
+    ASSERT_EQ(weighed(HIGH_TASK_PRIORITY).m_weight, (uint32_t)8068);
+    ASSERT_EQ(weighed(MAX_TASK_PRIORITY).m_weight, (uint32_t)69531);
+}
+
+TEST(scheduler, a_nicer_task_weighs_less_and_a_meaner_one_more)
+{
+    ASSERT_LT(weighed(MEDIUM_TASK_PRIORITY, 10).m_weight, weighed(MEDIUM_TASK_PRIORITY).m_weight);
+    ASSERT_GT(weighed(MEDIUM_TASK_PRIORITY, -10).m_weight, weighed(MEDIUM_TASK_PRIORITY).m_weight);
+}
+
+TEST(scheduler, a_round_robin_task_weighs_the_nominal_whatever_its_priority)
+{
+    ASSERT_EQ(weighed(LOW_TASK_PRIORITY, 0, TASK_POLICY_ROUNDROBIN).m_weight,
+              (uint32_t)TASK_WEIGHT_NOMINAL);
+    ASSERT_EQ(weighed(MAX_TASK_PRIORITY, 0, TASK_POLICY_ROUNDROBIN).m_weight,
+              (uint32_t)TASK_WEIGHT_NOMINAL);
+}
+
+TEST(scheduler, a_deadline_task_outweighs_the_same_priority_on_fifo)
+{
+    ASSERT_EQ(weighed(MEDIUM_TASK_PRIORITY, 0, TASK_POLICY_DEADLINE).m_weight,
+              weighed(MEDIUM_TASK_PRIORITY).m_weight * (uint32_t)TASK_WEIGHT_DEADLINE_BOOST);
+}
+
+TEST(scheduler, a_weight_is_never_zero_at_the_floor_of_the_ladder)
+{
+    ASSERT_GE(weighed(0, 19).m_weight, (uint32_t)1);
+    ASSERT_GE(weighed(0, 19, TASK_POLICY_DEADLINE).m_weight, (uint32_t)1);
+}
+
+TEST(scheduler, every_setter_leaves_the_cached_weight_in_step)
+{
+    task_t task;
+
+    TaskScheduler::setTaskPriority(task, MAX_TASK_PRIORITY);
+    ASSERT_EQ(task.m_weight, TaskScheduler::taskWeight(task));
+
+    TaskScheduler::setTaskNice(task, 7);
+    ASSERT_EQ(task.m_weight, TaskScheduler::taskWeight(task));
+
+    TaskScheduler::setTaskPolicy(task, TASK_POLICY_DEADLINE);
+    ASSERT_EQ(task.m_weight, TaskScheduler::taskWeight(task));
+}
+
+static pditest::FakeClock *s_burn_clock = nullptr;
+
+static void burnA()
+{
+    s_counter_a++;
+    if (nullptr != s_burn_clock) s_burn_clock->advanceMicros(1000);
+}
+
+static void burnB()
+{
+    s_counter_b++;
+    if (nullptr != s_burn_clock) s_burn_clock->advanceMicros(1000);
+}
+
+TEST(scheduler, a_run_is_charged_against_the_task_weight)
+{
+    TaskScheduler scheduler;
+    pditest::FakeClock clock;
+    scheduler.setUtilityInterface(&clock);
+    resetCounters();
+    s_burn_clock = &clock;
+
+    pdiutil::task_id_t id = scheduler.setInterval(burnA, 10, clock.millis_now());
+    scheduler.setTaskPriority(id, MEDIUM_TASK_PRIORITY);
+
+    task_t *task = scheduler.get_task(id);
+    ASSERT_NE(task, (task_t *)nullptr);
+    uint32_t weight = task->m_weight;
+
+    runFor(scheduler, clock, 12);
+    s_burn_clock = nullptr;
+
+    ASSERT_EQ(s_counter_a, 1);
+    ASSERT_EQ(task->m_task_exec_us, (uint32_t)1000);
+    ASSERT_EQ(task->m_vruntime, ((uint64_t)1000 * (uint64_t)TASK_WEIGHT_NOMINAL) / (uint64_t)weight);
+}
+
+TEST(scheduler, a_heavier_task_comes_up_more_often_than_a_light_one)
+{
+    TaskScheduler scheduler;
+    pditest::FakeClock clock;
+    scheduler.setUtilityInterface(&clock);
+    resetCounters();
+    s_burn_clock = &clock;
+
+    pdiutil::task_id_t heavy = scheduler.setInterval(burnA, 1, clock.millis_now());
+    pdiutil::task_id_t light = scheduler.setInterval(burnB, 1, clock.millis_now());
+    scheduler.setTaskPriority(heavy, MAX_TASK_PRIORITY);
+    scheduler.setTaskPriority(light, LOW_TASK_PRIORITY);
+
+    runFor(scheduler, clock, 200);
+    s_burn_clock = nullptr;
+
+    ASSERT_GT(s_counter_a, s_counter_b);
+}
+
+TEST(scheduler, a_due_task_is_taken_before_one_that_owes_less_but_is_not_due)
+{
+    TaskScheduler scheduler;
+    pditest::FakeClock clock;
+    scheduler.setUtilityInterface(&clock);
+    resetCounters();
+    s_burn_clock = &clock;
+
+    pdiutil::task_id_t often = scheduler.setInterval(burnA, 1, clock.millis_now());
+    scheduler.setTaskPriority(often, LOW_TASK_PRIORITY);
+    runFor(scheduler, clock, 50);
+
+    pdiutil::task_id_t seldom = scheduler.setInterval(burnB, 1000, clock.millis_now());
+    scheduler.setTaskPriority(seldom, MAX_TASK_PRIORITY);
+
+    int before = s_counter_a;
+    runFor(scheduler, clock, 50);
+    s_burn_clock = nullptr;
+
+    ASSERT_EQ(s_counter_b, 0);
+    ASSERT_GT(s_counter_a, before);
 }

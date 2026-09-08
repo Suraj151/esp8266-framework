@@ -725,7 +725,7 @@ bool Http_Client::SendHeaders(const char *type)
     if (Connected() && nullptr != m_request.host)
     {
         uint8_t space = ' ';
-        uint8_t slash = '/';
+        uint8_t slash = PATH_SEPARATOR_CHAR;
         uint8_t colon = ':';
         uint8_t host_key[] = "Host";
         uint8_t http_txt[] = "HTTP";

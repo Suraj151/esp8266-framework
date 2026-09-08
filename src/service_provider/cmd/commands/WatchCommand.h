@@ -142,7 +142,7 @@ struct WatchCommand : public CommandBase {
 					m_terminal->commit();
 				}
 
-			}, interval, 0, __i_dvc_ctrl.millis_now(), numberofiterations, CMD_NAME_WATCH );
+			}, interval, DEFAULT_TASK_PRIORITY, __i_dvc_ctrl.millis_now(), numberofiterations, CMD_NAME_WATCH );
 
 			if( m_watchtaskid < 0 ){
 				result = CMD_ERROR_FAILED;

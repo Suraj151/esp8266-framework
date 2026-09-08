@@ -16,7 +16,7 @@ What comes out of the box is closer to a small system than to a sketch template:
 
 **Secrets stay secret at rest.** Config records holding a credential are sealed — encrypted and tagged under a key kept in the eeprom — so a copy of the database taken off the device reveals nothing. Syslog can ship each line to a remote collector as well as to `/var/log`.
 
-**A real shell.** The same fifty-odd commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `fedit`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `service`, `exec`, `net`, `host`, `ping`, `date`, `uptime`, `useradd`, `su`, `passwd`, `db`, `sshkgen`, `watch`, `source`, `test` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
+**A real shell.** The same fifty-odd commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `fedit`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `service`, `exec`, `net`, `host`, `ping`, `date`, `uptime`, `useradd`, `su`, `passwd`, `db`, `sshkgen`, `watch`, `source`, `test`, `crontab` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
 
 **Commands join up.** Output pipes from one command into the next and redirects to and from files, so `ps | grep ssh`, `cat /proc/meminfo > /tmp/mem.txt` and `wc < /home/notes.txt` all mean what they mean on a desktop — see [§7.7](#77-pipes-and-redirection).
 
@@ -29,6 +29,8 @@ What comes out of the box is closer to a small system than to a sketch template:
 **Settings that live in files.** WiFi, MQTT, OTA and email keep theirs in `/etc/<feature>/<feature>.conf` — plain `key value` text you can `cat`, edit with `fedit`, pull off over SFTP and diff between two devices, rather than something you reflash for. Which services run is a separate flat `/etc/service.conf`. Each settings file is `0600 root:root` and the portal page that edits one demands a root session, so the file and the browser agree on who may change what — see [§3.10](#310-the-etc-config-surface).
 
 **Scheduling that scales down and up.** Tasks run inline, cooperatively, or preemptively on a hardware tick, with priorities, POSIX nice values and per-task signals. Inline selection is weighted virtual runtime behind a due-ness gate — priority changes how fast a task accrues debt for the CPU it uses, rather than granting it a standing advantage, so no task can be starved by a busier one at a higher priority. Where the port supplies a loader, an external program image can be loaded from the filesystem and launched as a background process — `exec <path>` returns a pid you can `ps` and `kill`, no reflash involved.
+
+**Jobs that run on a schedule.** `/etc/crontab` takes the standard five time fields and a command line, read fresh from the file every minute so an edit takes effect on the next one. `crontab` shows the table as the device parsed it, so a row with a typo is visibly absent rather than quietly never running.
 
 **One clock, for everything that needs one.** An essential time service ticks every 10 ms, keeps the current instant broken down once, and publishes second, minute and validity-change events other services subscribe to instead of each converting an epoch of its own. On a board that can reach NTP the time is wall clock; on one that cannot it still counts forward from boot and simply never calls itself valid.
 
@@ -65,7 +67,7 @@ Not every board exposes every capability. An Arduino UNO has no WiFi, so the web
 
 ## What's Inside
 
-**Services** — the ones `service list` shows: Time · WiFi · HTTP/S server · MQTT · OTA · SSH · Telnet · SMTP · GPIO · Serial · Cmd · Database · User store · Auth · mDNS · Syslog · Factory reset · Device-IoT.
+**Services** — the ones `service list` shows: Time · Cron · WiFi · HTTP/S server · MQTT · OTA · SSH · Telnet · SMTP · GPIO · Serial · Cmd · Database · User store · Auth · mDNS · Syslog · Factory reset · Device-IoT.
 Per-service reference in [§6 Service Providers](#6-service-providers).
 
 **Capabilities services build on**, not services themselves — TLS · SFTP and scp · ESPNOW mesh.
@@ -74,7 +76,7 @@ Per-service reference in [§6 Service Providers](#6-service-providers).
 Full inventory in [§15 Utility Library](#15-utility-library).
 
 **Storage** — one VFS tree over LittleFS, `/proc`, `/sys`, `/dev` and `/tmp`, with POSIX permissions and multi-user access control.
-Details in [§6.2.12 Storage](#6212-storage-interface-init-no-provider).
+Details in [§6.2.12](#6212-storage-interface-init-no-provider).
 
 **CLI** — 50+ built-in commands, listed in [§7.8 Built-in command inventory](#78-built-in-command-inventory).
 
@@ -268,7 +270,8 @@ setup()
  │     ├─ time service starts                (always, every port)
  │     ├─ database service starts            (always)
  │     ├─ every enabled service starts       (conditional)
- │     └─ /etc/rc.local runs, if present     (script runner)
+ │     ├─ /etc/rc.local runs, if present     (script runner)
+ │     └─ cron starts watching the minute      (cron service)
  │
 loop()
  │
@@ -1436,7 +1439,17 @@ Up to `PDI_MAX_SESSIONS` sessions run at once across serial, telnet and SSH, eac
 
 The same service runs scripts. One line of a script goes through the same parse-and-dispatch step a typed line does, so `source` and `/etc/rc.local` get the whole grammar without a second one; what the service wraps around a typed line — history and the prompt — happens once for the line you typed rather than once per script line, while finished commands are released after every line either way, so a long script does not hold every command it ever ran. Where a script has got to is held by the session, not by the call stack, which is what lets a line that stops for input hand the terminal back and be picked up afterwards. `/etc/rc.local` runs at the end of `initialize()`, before the login prompt is drawn. See [§7.15](#715-shell-scripts-and-etcrclocal).
 
-#### 6.2.17 TLS (no provider; transport hookup + cert provisioning)
+#### 6.2.17 `CronServiceProvider` — `__cron_service`
+
+Starts after the cmd service, because a job is a command line. It keeps no clock and no table of its own: it listens on `EVENT_TIME_MINUTE`, and on each minute the clock calls valid it streams `/etc/crontab` a line at a time, matching each row against the instant the event carried and running whatever is due. Nothing is held between minutes, so an edit to the table takes effect on the next one and a board carries no memory cost for a feature it is not using.
+
+It registers **no scheduler task**, only a listener — which is why it keeps that listener's id and gives it back in `stopService()`. A service that listens rather than scheduling would otherwise keep reacting after being stopped, and gain a second listener on every restart ([§6.4](#64-the-event-bus)).
+
+At init it seeds `/etc/crontab` with its column names when none is there, `0600 root:root`, so there is always a file to `fedit`. Jobs run as root, so a table anyone could write would be a way to schedule root commands as anyone.
+
+Full reference, including the field grammar, in [§7.16](#716-scheduled-jobs-and-etccrontab).
+
+#### 6.2.18 TLS (no provider; transport hookup + cert provisioning)
 
 TLS has no service class either — it lives at the interface and port level. `iInstanceInterface` hands out the one outbound client the services share, built on first call and kept: `getSharedTcpClientInstance()` and, in a TLS build, `getSharedTlsClientInstance()`. Two literal accessors rather than one that quietly returns whichever is compiled in, so a caller picks its transport and the call site says which. OTA, device-IoT and GPIO posting take the TLS client where the flag is on and the TCP one otherwise. **Email is TCP only** — the SMTP path carries no TLS support. MQTT builds a client of its own instead of sharing.
 
@@ -1448,7 +1461,7 @@ The bundled outbound client is created with peer verification off so that an enc
 
 Certificates come from one of two places. On ESP32, the on-device provisioner issues self-signed EC or RSA certs with the SANs you ask for, and `ensureServerCert` reissues only when the stored certificate's SANs no longer cover what was asked for. With runtime generation enabled the mDNS service drives it, so the certificate covers the address and `<hostname>.local` together ([§6.2.20](#6220-mdnsserviceprovider--__mdns_service)). Everywhere else, `scripts/GenTlsCerts.py` does the same job with OpenSSL and you upload the result over SFTP.
 
-#### 6.2.18 `UserStoreService` — `__user_store_service`
+#### 6.2.19 `UserStoreService` — `__user_store_service`
 
 The user directory, in two files:
 
@@ -1465,7 +1478,7 @@ Verifying or changing a password has to read shadow on behalf of a non-root sess
 
 It initialises after the filesystem and before the CLI, and the auth service prefers it whenever shadow exists. That preference is the switch that turns the framework from single-credential auth into a multi-user system.
 
-#### 6.2.19 `SessionManager`
+#### 6.2.20 `SessionManager`
 
 Not a service — a static registry holding one `session_t` per attached terminal, three by default.
 
@@ -1482,11 +1495,11 @@ A session carries its own line buffer and cursor, history position, autocomplete
 
 SSH attaches its session as soon as user auth succeeds, so authorisation state is anchored to the channel rather than to whichever command runs first.
 
-#### 6.2.20 `MdnsServiceProvider` — `__mdns_service`
+#### 6.2.21 `MdnsServiceProvider` — `__mdns_service`
 
 The responder from [§2.4.2](#242-mdns-and-dns-sd), running as an ordinary service on raw lwIP UDP. It derives the hostname from the MAC, writes `/etc/hostname`, joins the multicast group when the station gets an IP, and advertises whichever servers this build is running. Responses bundle PTR, SRV, TXT and A so a single query gets everything it needs. `service status MDNS` shows what it is announcing.
 
-Holding both the address and the name also makes it the right owner of HTTPS certificate provisioning: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` it schedules `ensureServerCert` for `<hostname>.local` plus the IP, one queued job at a time, dropped again if the service stops ([§6.2.17](#6217-tls-no-provider-transport-hookup--cert-provisioning)).
+Holding both the address and the name also makes it the right owner of HTTPS certificate provisioning: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` it schedules `ensureServerCert` for `<hostname>.local` plus the IP, one queued job at a time, dropped again if the service stops ([§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning)).
 
 ### 6.3 Init order
 
@@ -1508,6 +1521,7 @@ The orchestrator starts services in a deliberate order:
   13  web server      needs auth and storage
   14  telnet, ssh     need network, storage and the CLI
   15  cmd             last, so `service` sees a complete list
+  16  cron            after cmd, because a job is a command line
 ```
 
 Two things follow from that. A service started later may call into one started earlier; the reverse is not defined. And a service that needs another one in its *constructor* is relying on static-init order — move the lookup into `initService`.
@@ -1526,10 +1540,14 @@ Direct calls are reserved for dependencies that are known to already exist. Anyt
 | `EVENT_GPIO_TRIGGER` | GPIO event detector | email, MQTT, HTTP post |
 | `EVENT_SERIAL_AVAILABLE` | serial bridge | sketch hooks |
 | `EVENT_TIME_SYNC` | time service, when validity changes | anything that must recheck a stored timestamp |
-| `EVENT_TIME_SECOND` / `_MINUTE` | time service, on the boundary | anything scheduling against a wall clock |
+| `EVENT_TIME_SECOND` / `_MINUTE` | time service, on the boundary | cron, and anything scheduling against a wall clock |
 | `EVENT_OTA_*` | OTA | logger, portal status |
 
-Subscribe with `__utl_event.add_event_listener(name, [&](void* e){ … })`, publish with `__utl_event.fire(name, ptr)`.
+Subscribe with `__utl_event.add_event_listener(name, [&](void* e){ … })`, publish with `__utl_event.execute_event(name, ptr)`.
+
+**Subscribing returns an id, and that is how a listener is taken back.** `add_event_listener` hands back an `int16_t`, `EVENT_LISTENER_ID_INVALID` if the table was full; `remove_event_listener(id)` releases it. A service that listens rather than scheduling a task needs this: the base `stopService()` reaps tracked *tasks*, so without releasing its listener a service would keep reacting after it was stopped, and would gain a second listener on every restart. Keep the id and give it back in `stopService()`, the way cron does.
+
+Removal **marks the slot rather than erasing it**, and a later subscription takes the slot over. That is deliberate: `execute_event` calls each handler through the table entry, so erasing during a dispatch would destroy the callable while it is running — which is exactly what a job that stops its own service would do.
 
 ### 6.5 Writing a new service
 
@@ -1587,7 +1605,9 @@ Start reading at [src/service_provider/cmd/](src/service_provider/cmd/); the par
 
 ### 7.2 The terminal contract
 
-Anything that wants to feed the CLI implements `iTerminalInterface` — byte-level reads and writes overloaded for every primitive type, plus the terminal affordances. Three implementations ship: the serial port, the client object a TCP server hands back for telnet, and the SSH channel wrapper.
+Anything that wants to feed the CLI implements `iTerminalInterface` — byte-level reads and writes overloaded for every primitive type, plus the terminal affordances. Four implementations ship: the serial port, the client object a TCP server hands back for telnet, the SSH channel wrapper, and `__i_null_terminal`.
+
+The null terminal swallows everything written to it and never has anything to read. It exists because a session is bound to a terminal, so work that must run under a session with nobody watching — a cron job, say — would otherwise have to borrow the console's terminal, and would be refused whenever somebody was logged in on it. Attaching to the sink instead makes such work independent of who is signed in.
 
 When a telnet or SSH client connects, its service calls `useTerminal(client)`, which attaches a fresh session and draws a login prompt on that client alone. Serial holds its slot from boot. Nothing leaks between sessions.
 
@@ -1727,12 +1747,15 @@ Each session carries a small descriptor table — `stdin`, `stdout`, `stderr` �
 | `>>` | send output to a file, appending |
 | `\|` | send output to the next command |
 | `<` | read input from a file |
+| `;` | run the next command whatever this one returned |
+| `&&` | run the next command only if this one succeeded |
+| `\|\|` | run the next command only if this one failed |
 
 `cat`, `head`, `tail`, `wc` and `grep` read the input descriptor when no filename is given, which is what makes them useful on the right of a pipe. Everything else keeps writing to `stdout` without a line of its own changing.
 
 Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` bytes (1024 by default), the way a real one is; a stage that outruns it marks the pipe overflowed instead of growing until the heap is gone. And a write the filesystem refuses — a redirect into read-only `/proc`, or a full disk — is reported as `cannot write <path>` rather than passing silently, because the answer only arrives when the last block is committed.
 
-Not implemented yet: `;`, `&&` and `||`. They need a per-command exit status, which the shell does not carry today.
+`;`, `&&` and `||` join whole pipelines rather than single commands, so `echo counted | wc && echo done` runs the pipeline first and the right-hand side on its result. `$?` carries that result, which is what a following `&&` reads and what `if` and `while` branch on ([§7.15](#715-shell-scripts-and-etcrclocal)). An operator with nothing after it is a syntax error, and one inside quotes is text.
 
 ### 7.8 Built-in command inventory
 
@@ -1794,6 +1817,7 @@ Not implemented yet: `;`, `&&` and `||`. They need a per-command exit status, wh
 | unset \<name> | | Drop a variable from this session, leaving `/.env` alone. |
 | source \<file> | | Run each line of a file in this session, so a `cd` or an `export` it performs is still in force afterwards. See [§7.15](#715-shell-scripts-and-etcrclocal). |
 | test \<a> \<op> \<b> | | Answer a question through `$?` and print nothing either way: `=` `!=` on strings, `-eq -ne -lt -le -gt -ge` on numbers, `-z` `-n` on emptiness, `-e` `-f` `-d` on paths. e.g. **test $MODE = debug && echo debugging** |
+| crontab | | List the scheduled jobs `/etc/crontab` holds, as the device parsed them, and what is due this minute. See [§7.16](#716-scheduled-jobs-and-etccrontab). |
 | help | | Every registered command with its usage line. Works before login. |
 | uptime | | `up Xd Yh Zm Ws`. |
 | tls q=1,t=,l=,n=,i= | | On-device certificate generation, ESP32 with cert generation enabled. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
@@ -2101,6 +2125,50 @@ An identity that cannot be resolved is never quietly downgraded to root — a sc
 The session `rc.local` runs in is built for it and given back afterwards. That is deliberate: reusing the console's session would leave a logged-in root shell sitting on the serial port at boot. It also means `export` inside `rc.local` does not reach your login — put anything that must outlive it in `/.env`.
 
 The whole of this section is behind `ENABLE_SCRIPT_RUNNER`, on by default. Comment it out and `source`, control flow and `rc.local` go with it, including the per-session state they use; the rest of the shell is unaffected.
+
+### 7.16 Scheduled jobs and `/etc/crontab`
+
+`rc.local` covers "run this once at boot". `/etc/crontab` covers "run this every so often" — one job per line, five time fields and the command:
+
+```
+# min hour dom mon dow  command
+*/5  *    *   *   *     echo tick >> /tmp/heartbeat
+0    3    *   *   *     source /etc/nightly.sh
+30   4    *   *   0     db backup
+```
+
+Each field takes the standard grammar: `*`, a number, a range `10-20`, a step `*/5` or `10-20/2`, and comma-separated lists of any of those. Day-of-week runs 0–6 from Sunday. Month and day-of-month names (`JAN`, `MON`) and `@daily`-style macros are not read — `rc.local` is the `@reboot` equivalent.
+
+| field | range |
+|---|---|
+| minute | 0–59 |
+| hour | 0–23 |
+| day of month | 1–31 |
+| month | 1–12 |
+| day of week | 0–6, Sunday 0 |
+
+**A spec that does not parse matches nothing**, rather than reading as zero and firing on the hour. That distinction matters because the two look identical from outside: a job that never runs and a job that has not come round yet both do nothing.
+
+**The table is read from the file every minute and nothing is kept between runs.** An edit takes effect on the next minute with no reload step, and a board carries no memory cost for jobs it is not running. The cost is one pass over the file per minute, which is why `CRON_MAX_ENTRIES` (8 by default) bounds it — a line is found by scanning from the start of the file, so a long table costs more than its length suggests.
+
+**Jobs only run while the clock is trustworthy.** A board that cannot reach a time server still counts forward from boot but never calls that time valid, and a calendar cannot be matched against a count from boot, so nothing fires. `crontab` says so rather than leaving you to wonder.
+
+Each job runs in a session built for it, under root, and given back afterwards. **That session is attached to the null terminal, not the console**, which is what lets a job run at all while somebody is logged in — a job must never borrow a live session, and waiting for the console to be free would mean never running on a board anyone uses. Job output therefore goes where the job sends it: to a file if it redirects, and nowhere otherwise, the way `cron` has always behaved. A job that stops for input is interrupted rather than left holding the terminal.
+
+`rc.local` keeps the console instead, so its output is still visible at boot — it runs before anyone can be logged in, so there is no session to collide with.
+
+`crontab` lists the table as the device parsed it, which is what makes it worth more than `cat /etc/crontab` — a row missing a field, or a typo in a spec, simply does not appear:
+
+```
+$ crontab
+*/5 * * * * echo tick >> /tmp/heartbeat
+0 3 * * * source /etc/nightly.sh
+
+due this minute:
+  none
+```
+
+Editing is `fedit /etc/crontab`. The whole of this is behind `ENABLE_CRON_SERVICE`, on by default and switched off automatically without the cmd and storage services.
 
 ---
 ## 8. Web Server
@@ -3201,7 +3269,7 @@ Most of these have already appeared in passing. This is the index.
 
 ### 15.1 Event bus
 
-`__utl_event` is a synchronous publisher. Services add listeners at boot and fire events from state changes, without any of them taking a direct dependency on another. Event names are centralised, and the usage patterns are in [§6.4](#64-the-event-bus).
+`__utl_event` is a synchronous publisher. Services add listeners at boot and fire events from state changes, without any of them taking a direct dependency on another. Subscribing returns an id and `remove_event_listener(id)` gives it back, which is what lets a service that listens rather than scheduling a task be stopped and restarted without leaving listeners behind. Event names are centralised, and the usage patterns are in [§6.4](#64-the-event-bus).
 
 ### 15.2 String operations
 
@@ -3278,7 +3346,7 @@ Every section above has its own "how do I add one of these" part. This one is th
 | persist something only your sketch cares about | the database escape hatch | [§11.3](#113-addingdatabasetable) |
 | react to another service without coupling to it | the event bus | [§6.4](#64-the-event-bus) |
 | run periodic or long work | the scheduler | [§4](#4-task-scheduler) |
-| encrypt everything outbound | turn on TLS — each outbound service asks `__i_instance` for the shared TLS client instead of the TCP one | [§6.2.17](#6217-tls-no-provider-transport-hookup--cert-provisioning) |
+| encrypt everything outbound | turn on TLS — each outbound service asks `__i_instance` for the shared TLS client instead of the TCP one | [§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning) |
 | serve the portal over HTTPS | turn on HTTPS and drop a cert and key on the filesystem | [§8.7.1](#871-https-wiring-and-certificates) |
 | call a service from a sketch | the global | [§16.9](#169-calling-a-service-from-a-sketch) |
 

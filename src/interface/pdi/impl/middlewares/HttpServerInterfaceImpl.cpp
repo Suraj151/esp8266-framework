@@ -542,7 +542,7 @@ void HttpServerInterfaceImpl::parseRequest(){
                     isEncoded = true;
                 } else if( value.find(ROPTR_WRAP("multipart/")) != pdiutil::string::npos ){
                     isForm = true;
-                    boundaryStr = value.substr(value.find('=') + 1);
+                    boundaryStr = value.substr(value.find(KEY_VALUE_SEPARATOR_CHAR) + 1);
                     boundaryStr.replace("\"","");
                 }
             }else if( key == content_length_key ){
@@ -618,7 +618,7 @@ void HttpServerInterfaceImpl::parseRequest(){
                 param_end = query_string.length(); // Last parameter
             }
             pdiutil::string param = query_string.substr(param_start, param_end - param_start);
-            pdiutil::string::size_type equal_pos = param.find('=');
+            pdiutil::string::size_type equal_pos = param.find(KEY_VALUE_SEPARATOR_CHAR);
             if (equal_pos != pdiutil::string::npos) {
                 pdiutil::string key = param.substr(0, equal_pos);
                 pdiutil::string value = param.substr(equal_pos + 1);
@@ -990,7 +990,7 @@ bool HttpServerInterfaceImpl::handleStaticFileRequest(){
     pdiutil::string method_head = CHARPTR_WRAP("HEAD");
     if (m_clientRequest.method == method_get || m_clientRequest.method == method_head) {
 
-        pdiutil::string filePath = m_storagePath + (m_clientRequest.uri[0] == '/' ? m_clientRequest.uri.substr(1) : m_clientRequest.uri);
+        pdiutil::string filePath = m_storagePath + (m_clientRequest.uri[0] == PATH_SEPARATOR_CHAR ? m_clientRequest.uri.substr(1) : m_clientRequest.uri);
         mimetype_t filetype = __i_instance.getFileSystemInstance().getFileMimeType(filePath.c_str());
 
         // Check if the request URI is a static file

@@ -105,7 +105,7 @@ struct TopCommand : public CommandBase {
 			m_terminal->csi_cursor_home();
 			printProcessTable(m_terminal, m_filter_owner);
 			m_terminal->commit();
-		}, interval, 0, __i_dvc_ctrl.millis_now(), iterations, CMD_NAME_TOP );
+		}, interval, DEFAULT_TASK_PRIORITY, __i_dvc_ctrl.millis_now(), iterations, CMD_NAME_TOP );
 
 		if( m_toptaskid < 0 ){
 			return CMD_ERROR_FAILED;

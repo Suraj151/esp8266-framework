@@ -113,7 +113,7 @@ void OtaServiceProvider::handleOtaVersionRequest()
 
   if (firmware_url.size() > 0)
   {
-    if (firmware_url[firmware_url.size() - 1] == '/')
+    if (firmware_url[firmware_url.size() - 1] == PATH_SEPARATOR_CHAR)
     {
       firmware_url.pop_back();
     }
@@ -209,7 +209,7 @@ void OtaServiceProvider::handleOtaVersionResponse( Http_Client *client )
 
       if (firmware_url.size() > 0)
       {
-        if (firmware_url[firmware_url.size() - 1] == '/')
+        if (firmware_url[firmware_url.size() - 1] == PATH_SEPARATOR_CHAR)
         {
           firmware_url.pop_back();
         }

@@ -158,6 +158,9 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   TestCommand::RegisterCommand();
   #ifdef ENABLE_SCRIPT_RUNNER
   SourceCommand::RegisterCommand();
+#ifdef ENABLE_CRON_SERVICE
+  CrontabCommand::RegisterCommand();
+#endif
   #endif
   DateCommand::RegisterCommand();
   TimedatectlCommand::RegisterCommand();

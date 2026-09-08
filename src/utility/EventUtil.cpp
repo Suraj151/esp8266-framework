@@ -17,7 +17,8 @@ Created Date    : 1st June 2019
  */
 EventUtil::EventUtil() : m_last_event(EVENT_NAME_MAX),
                          m_last_event_millis(0),
-                         m_util(nullptr)
+                         m_util(nullptr),
+                         m_next_listener_id(1)
 {
 }
 
@@ -44,24 +45,64 @@ void EventUtil::begin(iUtilityInterface *_iutil)
 
 /**
  * @brief Adds an event listener for a specific event.
- *
- * Registers a callback function to be executed when the specified event is triggered.
- * Returns true if the listener is successfully added, false otherwise.
- *
  * @param _event The name of the event to listen for.
  * @param _handler The callback function to execute when the event is triggered.
- * @return True if the listener was added successfully, false otherwise.
+ * @return The listener id to remove it by, EVENT_LISTENER_ID_INVALID if it was not added.
  */
-bool EventUtil::add_event_listener(event_name_t _event, CallBackVoidPointerArgFn _handler)
+int16_t EventUtil::add_event_listener(event_name_t _event, CallBackVoidPointerArgFn _handler)
 {
+  int16_t _id = this->m_next_listener_id;
+
+  this->m_next_listener_id = (_id >= MAX_EVENT_LISTENER_ID) ? 1 : (int16_t)(_id + 1);
+
+  // a released slot keeps its callable until something takes the slot over,
+  // so nothing is destroyed while a dispatch is still running it
+  for (uint16_t i = 0; i < this->m_event_listeners.size(); i++)
+  {
+    if (EVENT_NAME_MAX == this->m_event_listeners[i]._event)
+    {
+      this->m_event_listeners[i]._event = _event;
+      this->m_event_listeners[i]._event_handler = _handler;
+      this->m_event_listeners[i]._id = _id;
+      return _id;
+    }
+  }
+
   if (this->m_event_listeners.size() < MAX_EVENT_LISTENERS)
   {
     event_listener_t _new_event;
     _new_event._event = _event;
     _new_event._event_handler = _handler;
+    _new_event._id = _id;
     this->m_event_listeners.push_back(_new_event);
-    return true;
+    return _id;
   }
+
+  return EVENT_LISTENER_ID_INVALID;
+}
+
+/**
+ * @brief Drops the listener the given id names, so a listener registered once
+ *        can be taken back without disturbing anything else on the event.
+ * @return True if a listener was found and removed.
+ */
+bool EventUtil::remove_event_listener(int16_t _id)
+{
+  if (EVENT_LISTENER_ID_INVALID == _id)
+  {
+    return false;
+  }
+
+  for (uint16_t i = 0; i < this->m_event_listeners.size(); i++)
+  {
+    if (this->m_event_listeners[i]._id == _id)
+    {
+      this->m_event_listeners[i]._event = EVENT_NAME_MAX;
+      this->m_event_listeners[i]._id = EVENT_LISTENER_ID_INVALID;
+      return true;
+    }
+  }
+
   return false;
 }
 

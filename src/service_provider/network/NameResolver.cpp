@@ -68,14 +68,14 @@ bool NameResolver::lookupHostsFile(const char *hostname, ipaddress_t &out)
     while (line[p] == ' ' || line[p] == '\t') p++;
 
     // skip blank lines and comments
-    if (line[p] != '#' && line[p] != '\0') {
+    if (line[p] != LINE_COMMENT_CHAR && line[p] != '\0') {
       int ipstart = p;
       while (line[p] != '\0' && line[p] != ' ' && line[p] != '\t') p++;
       pdiutil::string ipstr(line + ipstart, p - ipstart);
 
       while (line[p] != '\0') {
         while (line[p] == ' ' || line[p] == '\t') p++;
-        if (line[p] == '\0' || line[p] == '#') break;
+        if (line[p] == '\0' || line[p] == LINE_COMMENT_CHAR) break;
         int nstart = p;
         while (line[p] != '\0' && line[p] != ' ' && line[p] != '\t') p++;
         if ((size_t)(p - nstart) == hlen && 0 == strncmp(line + nstart, hostname, hlen)) {

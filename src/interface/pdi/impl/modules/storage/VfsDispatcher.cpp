@@ -86,13 +86,13 @@ iFileSystemInterface* VfsDispatcher::resolve(const char* path, const char** relp
         uint8_t plen = m.m_prefix_len;
         if (plen == 0) continue;
 
-        if (plen == 1 && m.m_prefix[0] == '/') {
+        if (plen == 1 && m.m_prefix[0] == PATH_SEPARATOR_CHAR) {
             if (best_len == 0) { best_idx = i; best_len = 1; }
             continue;
         }
         if (strncmp(path, m.m_prefix, plen) != 0) continue;
         char after = path[plen];
-        if (after != '\0' && after != '/') continue;
+        if (after != '\0' && after != PATH_SEPARATOR_CHAR) continue;
         if (plen > best_len) { best_idx = i; best_len = plen; }
     }
 
@@ -102,7 +102,7 @@ iFileSystemInterface* VfsDispatcher::resolve(const char* path, const char** relp
     }
 
     if (relpath_out) {
-        if (m_mounts[best_idx].m_prefix_len == 1 && m_mounts[best_idx].m_prefix[0] == '/') {
+        if (m_mounts[best_idx].m_prefix_len == 1 && m_mounts[best_idx].m_prefix[0] == PATH_SEPARATOR_CHAR) {
             *relpath_out = path;
         } else {
             const char* suffix = path + best_len;
@@ -114,7 +114,7 @@ iFileSystemInterface* VfsDispatcher::resolve(const char* path, const char** relp
 
 iFileSystemInterface* VfsDispatcher::rootBackend() const {
     for (uint8_t i = 0; i < m_mount_count; ++i) {
-        if (m_mounts[i].m_prefix_len == 1 && m_mounts[i].m_prefix[0] == '/') {
+        if (m_mounts[i].m_prefix_len == 1 && m_mounts[i].m_prefix[0] == PATH_SEPARATOR_CHAR) {
             return m_mounts[i].m_backend;
         }
     }
@@ -129,13 +129,13 @@ const vfs_mount_t* VfsDispatcher::findMountForPath(const char* path) const {
         const vfs_mount_t& m = m_mounts[i];
         uint8_t plen = m.m_prefix_len;
         if (plen == 0) continue;
-        if (plen == 1 && m.m_prefix[0] == '/') {
+        if (plen == 1 && m.m_prefix[0] == PATH_SEPARATOR_CHAR) {
             if (best_len == 0) { best_idx = i; best_len = 1; }
             continue;
         }
         if (strncmp(path, m.m_prefix, plen) != 0) continue;
         char after = path[plen];
-        if (after != '\0' && after != '/') continue;
+        if (after != '\0' && after != PATH_SEPARATOR_CHAR) continue;
         if (plen > best_len) { best_idx = i; best_len = plen; }
     }
     return (best_idx == 0xFF) ? nullptr : &m_mounts[best_idx];

@@ -108,6 +108,15 @@ created Date    : 1st June 2019
 #undef ENABLE_SCRIPT_RUNNER
 #endif
 
+/* enable/disable running commands from /etc/crontab on their scheduled minute */
+#ifndef PDI_NO_CRON_SERVICE
+#define ENABLE_CRON_SERVICE
+#endif
+
+#if defined(ENABLE_CRON_SERVICE) && (!defined(ENABLE_CMD_SERVICE) || !defined(ENABLE_STORAGE_SERVICE))
+#undef ENABLE_CRON_SERVICE
+#endif
+
 /**
  * enable/disable sealing of the config records that hold a credential. A sealed
  * record is encrypted and carries a tag, under a key kept in the eeprom, so a

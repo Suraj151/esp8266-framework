@@ -18,6 +18,7 @@ created Date    : 1st June 2019
 #endif
 
 #include <service_provider/time/TimeServiceProvider.h>
+#include <service_provider/cron/CronServiceProvider.h>
 #include <service_provider/database/DatabaseServiceProvider.h>
 #include <service_provider/device/FactoryResetServiceProvider.h>
 

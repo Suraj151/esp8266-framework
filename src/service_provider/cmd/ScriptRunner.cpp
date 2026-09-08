@@ -17,6 +17,7 @@ created Date    : 5th Sep 2026
 #include <service_provider/session/SessionManager.h>
 #include <service_provider/session/Environment.h>
 #include <utility/StringOperations.h>
+#include <interface/pdi/impl/modules/terminal/NullTerminal.h>
 #include <utility/DataTypeConversions.h>
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -571,33 +572,20 @@ bool ScriptRunner::declaredUid(const char *path, uint16_t &uid, bool &named)
  * Runs a script nobody is watching under the identity it names, and does
  * nothing at all when it names one the user store cannot resolve.
  */
-pdi_err_t ScriptRunner::runScheduledScript(const char *path)
+/**
+ * Opens a session on the given terminal under the identity named, refusing
+ * when that terminal already holds one so nothing can borrow a live session.
+ */
+session_t *ScriptRunner::beginDetached(uint16_t uid, iTerminalInterface *terminal)
 {
-  if( nullptr == path || !__i_fs.isFileExist(path) ){
-    return PDI_OK;
-  }
-
-  iTerminalInterface *terminal = __cmd_service.m_terminal;
-
   if( nullptr == terminal || nullptr != SessionManager::findByTerminal(terminal) ){
-    return CMD_ERROR_FAILED;
-  }
-
-#ifdef ENABLE_AUTH_SERVICE
-  uint16_t uid = USER_STORE_ROOT_UID;
-#else
-  uint16_t uid = 0;
-#endif
-  bool named = false;
-
-  if( !declaredUid(path, uid, named) ){
-    return CMD_ERROR_PERM;
+    return nullptr;
   }
 
   session_t *session = SessionManager::attach(terminal);
 
   if( nullptr == session ){
-    return CMD_ERROR_FAILED;
+    return nullptr;
   }
 
   session->m_state = SESSION_STATE_INTERACTIVE;
@@ -620,13 +608,89 @@ pdi_err_t ScriptRunner::runScheduledScript(const char *path)
     SessionManager::setPWD(__i_fs.getRootDirectory());
   }
 #else
+  (void)uid;
   SessionManager::setPWD(__i_fs.getRootDirectory());
 #endif
 
-  pdi_err_t res = run(path, true);
+  return session;
+}
 
+/**
+ * Gives the terminal back once detached work is done, so the console can be
+ * logged into again.
+ */
+void ScriptRunner::endDetached(iTerminalInterface *terminal)
+{
   SessionManager::detach(terminal);
   SessionManager::setCurrent(nullptr);
+}
+
+pdi_err_t ScriptRunner::runScheduledScript(const char *path)
+{
+  if( nullptr == path || !__i_fs.isFileExist(path) ){
+    return PDI_OK;
+  }
+
+#ifdef ENABLE_AUTH_SERVICE
+  uint16_t uid = USER_STORE_ROOT_UID;
+#else
+  uint16_t uid = 0;
+#endif
+  bool named = false;
+
+  if( !declaredUid(path, uid, named) ){
+    return CMD_ERROR_PERM;
+  }
+
+  iTerminalInterface *terminal = __cmd_service.m_terminal;
+  session_t *session = beginDetached(uid, terminal);
+
+  if( nullptr == session ){
+    return CMD_ERROR_FAILED;
+  }
+
+  pdi_err_t res = run(path, true);
+
+  endDetached(terminal);
+
+  return res;
+}
+
+/**
+ * Runs one command line with nobody watching, so a scheduled job runs as the
+ * identity it was given rather than as whoever last used the console.
+ */
+pdi_err_t ScriptRunner::runDetachedLine(const char *line, uint16_t uid)
+{
+  if( nullptr == line || '\0' == line[0] ){
+    return PDI_OK;
+  }
+
+  iTerminalInterface *terminal = &__i_null_terminal;
+  session_t *session = beginDetached(uid, terminal);
+
+  if( nullptr == session ){
+    return CMD_ERROR_FAILED;
+  }
+
+  pdiutil::string statement = line;
+  bool named_noent = false;
+
+  pdi_err_t res = __cmd_service.runLine(statement, named_noent);
+
+  int16_t waiting = __cmd_service.getCommandWaitingForUserInput();
+
+  if( waiting >= 0 ){
+
+    if( nullptr != __cmd_service.m_cmdlist[waiting] ){
+      __cmd_service.m_cmdlist[waiting]->executeTermInputAction(CMD_TERM_INSEQ_CTRL_C);
+    }
+
+    res = CMD_ERROR_CANCELED;
+  }
+
+  __cmd_service.reapFinishedCommands();
+  endDetached(terminal);
 
   return res;
 }

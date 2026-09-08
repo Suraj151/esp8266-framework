@@ -36,7 +36,7 @@ static bool splitConfigLine(const pdiutil::string &linedata, pdiutil::string &ke
 {
   size_t start = 0;
   while (start < linedata.length() && (linedata[start] == ' ' || linedata[start] == '\t')) start++;
-  if (start >= linedata.length() || linedata[start] == '#')
+  if (start >= linedata.length() || linedata[start] == LINE_COMMENT_CHAR)
   {
     return false;
   }
@@ -368,7 +368,7 @@ bool ensureConfigFile(const char *path, const pdiutil::vector<config_kv_t> &defa
   }
 
   pdiutil::string dir = path;
-  pdiutil::string::size_type sep = dir.find_last_of('/');
+  pdiutil::string::size_type sep = dir.find_last_of(PATH_SEPARATOR_CHAR);
   if (sep != pdiutil::string::npos && sep > 0)
   {
     dir = dir.substr(0, sep);

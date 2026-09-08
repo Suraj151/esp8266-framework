@@ -39,9 +39,9 @@ TmpFs::TmpFs() : iFileSystemInterface(s_tmp_null_storage) {}
 pdiutil::string TmpFs::normalize(const char* path) const {
     pdiutil::string out;
     if (!path) return out;
-    while (*path == '/') path++;
+    while (*path == PATH_SEPARATOR_CHAR) path++;
     out = path;
-    while (out.length() > 0 && out[out.length() - 1] == '/') {
+    while (out.length() > 0 && out[out.length() - 1] == PATH_SEPARATOR_CHAR) {
         out.erase(out.length() - 1, 1);
     }
     return out;
@@ -57,7 +57,7 @@ int TmpFs::findNode(const pdiutil::string& norm) const {
 pdiutil::string TmpFs::parentOf(const pdiutil::string& norm) const {
     int cut = -1;
     for (int i = (int)norm.length() - 1; i >= 0; --i) {
-        if (norm[i] == '/') { cut = i; break; }
+        if (norm[i] == PATH_SEPARATOR_CHAR) { cut = i; break; }
     }
     if (cut < 0) return pdiutil::string();
     return norm.substr(0, cut);
@@ -373,7 +373,7 @@ pdiutil::string TmpFs::basename(const char* path) {
     if (!path) return pdiutil::string();
     const char* last = path;
     for (const char* p = path; *p; ++p) {
-        if (*p == '/') last = p + 1;
+        if (*p == PATH_SEPARATOR_CHAR) last = p + 1;
     }
     return pdiutil::string(last);
 }

@@ -47,6 +47,7 @@ file(GLOB PDI_IMPL_SOURCES
   ${PDI_ROOT}/src/interface/pdi/impl/modules/exec/*.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/modules/netif/*.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/modules/storage/*.cpp
+  ${PDI_ROOT}/src/interface/pdi/impl/modules/terminal/*.cpp
 )
 
 # everything above the adapters. the archive only yields the objects something

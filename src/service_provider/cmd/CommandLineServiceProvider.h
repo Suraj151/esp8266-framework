@@ -71,6 +71,7 @@ created Date    : 1st June 2019
 #include "commands/TailFSCommand.h"
 #include "commands/GrepFSCommand.h"
 #include "commands/ExecCommand.h"
+#include "commands/CrontabCommand.h"
 #include "ShellParser.h"
 
 

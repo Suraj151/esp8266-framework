@@ -287,12 +287,12 @@ protected:
       }
 
       size_t eq = pos;
-      while (eq < cookie.size() && cookie[eq] != '=' && cookie[eq] != ';')
+      while (eq < cookie.size() && cookie[eq] != KEY_VALUE_SEPARATOR_CHAR && cookie[eq] != ';')
       {
         eq++;
       }
 
-      if (eq >= cookie.size() || cookie[eq] != '=')
+      if (eq >= cookie.size() || cookie[eq] != KEY_VALUE_SEPARATOR_CHAR)
       {
         break;
       }

@@ -137,7 +137,7 @@ SysFs::NodeKind SysFs::classify(const char* path, int16_t& index_out,
             iNetifInterface* netif = __netif_registry.at(i);
             if (nullptr == netif) continue;
             const char* cursor = p;
-            if (matchSegment(cursor, netif->name()) && (*cursor == '\0' || *cursor == '/')) {
+            if (matchSegment(cursor, netif->name()) && (*cursor == '\0' || *cursor == PATH_SEPARATOR_CHAR)) {
                 found = (int16_t)i;
                 p = cursor;
                 break;

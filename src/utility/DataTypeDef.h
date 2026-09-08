@@ -1026,6 +1026,18 @@ struct fd_table_t {
 };
 #endif
 
+/*
+ * Common char indicaters
+ */
+#define LINE_COMMENT_CHAR '#'
+#define WILDCARD_CHAR '*'
+#define RANGE_SEPARATOR_CHAR '-'
+#define STEP_SEPARATOR_CHAR '/'
+#define LIST_SEPARATOR_CHAR ','
+#define PATH_SEPARATOR_CHAR '/'
+#define KEY_VALUE_SEPARATOR_CHAR '='
+
+
 #ifdef ENABLE_SCRIPT_RUNNER
 enum script_block_kind_t : uint8_t {
     SCRIPT_BLOCK_IF = 0,

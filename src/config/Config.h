@@ -87,6 +87,10 @@ created Date    : 1st June 2019
 #include "DeviceIotConfig.h"
 #endif
 
+#ifdef ENABLE_CRON_SERVICE
+#include "CronConfig.h"
+#endif
+
 // #define GLOBAL_CONFIG_TABLE_ADDRESS CONFIG_START
 // #define LOGIN_CREDENTIAL_TABLE_ADDRESS GLOBAL_CONFIG_TABLE_ADDRESS +  global_config_size
 // #define WIFI_CONFIG_TABLE_ADDRESS LOGIN_CREDENTIAL_TABLE_ADDRESS + login_credential_size

@@ -32,6 +32,9 @@ typedef enum services{
 #ifdef ENABLE_CMD_SERVICE
   SERVICE_CMD,
 #endif
+#ifdef ENABLE_CRON_SERVICE
+  SERVICE_CRON,
+#endif
   SERVICE_DATABASE,
 #ifdef ENABLE_GPIO_SERVICE
   SERVICE_GPIO,

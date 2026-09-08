@@ -763,7 +763,7 @@ bool __get_from_json(const char *_str, const char *_key, char *_value, int _max_
             else if (c == '}') braces--;
             else if (c == '[') brackets++;
             else if (c == ']') brackets--;
-            else if (c == ',' && braces == 0 && brackets == 0) break;
+            else if (c == LIST_SEPARATOR_CHAR && braces == 0 && brackets == 0) break;
         }
 
         if (braces < 0 || brackets < 0) break; // safety
@@ -778,7 +778,7 @@ bool __get_from_json(const char *_str, const char *_key, char *_value, int _max_
 
     // the trimmed pointer walks forward inside _value, so the shift back to the
     // front overlaps and has to carry the trimmed length along with its nul
-    char* _trimmedstr = __strtrim_val(_value, ',', _max_value_len);
+    char* _trimmedstr = __strtrim_val(_value, LIST_SEPARATOR_CHAR, _max_value_len);
     if( nullptr != _trimmedstr )
     memmove(_value, _trimmedstr, strlen(_trimmedstr) + 1);
 

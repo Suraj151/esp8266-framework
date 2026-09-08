@@ -34,14 +34,61 @@ def _names(text):
     return found
 
 
-def _a_task(t):
-    """A live task as (pid, name), or a skip when ps lists none."""
-    for line in t.run("ps").splitlines():
-        parts = line.split()
-        if len(parts) >= 10 and parts[0].isdigit():
-            return parts[0], parts[-1]
+def _settled_read(t, path, tries=6):
+    """
+    The contents of a node, re-read until something comes back.
 
-    raise Skip("ps listed no task to look up in /proc")
+    A read can land on other output in the shell and return nothing at all, and
+    nothing is not a value: held against a later good read it is indistinguishable
+    from a node that accepted a write. One empty read is retried; a node that is
+    still empty after every try is reported by the caller rather than passed
+    over, since a node that renders nothing is a fault of its own.
+    """
+    text = ""
+    for _ in range(tries):
+        text = t.run("cat %s" % path).strip()
+        if text:
+            break
+    return text
+
+
+def _a_task(t):
+    """
+    A task that will still be there a command later, as (pid, name).
+
+    The caller reads /proc/<pid>/... as a separate command, so naming whichever
+    task happens to head the listing races the board: a task registered for one
+    command takes the first free slot, which puts it high in the listing and
+    gone again before the second command runs, and the node then reads empty.
+    Task ids count up rather than filling the lowest gap, so the smallest id
+    belongs to a task registered at boot, which outlives any test. It is
+    confirmed against a second listing so a task retired between the two is not
+    handed back either.
+    """
+    def listed(tries=4):
+        for _ in range(tries):
+            text = t.run("ps")
+            if "PID" not in text or "NAME" not in text:
+                continue
+            rows = {}
+            for line in text.splitlines():
+                parts = line.split()
+                if len(parts) >= 10 and parts[0].isdigit():
+                    rows[parts[0]] = parts[-1]
+            if rows:
+                return rows
+        return {}
+
+    first = listed()
+    if not first:
+        raise Skip("ps listed no task to look up in /proc")
+
+    still = listed()
+    for pid in sorted(first, key=int):
+        if pid in still:
+            return pid, first[pid]
+
+    raise Skip("ps listed no task that lasted long enough to look up in /proc")
 
 
 def _fields(text):
@@ -245,9 +292,12 @@ def proc_is_read_only(t):
     write through a redirect (defect BD), so the node refusing the write is
     what is provable here, and it is the part that matters.
     """
-    before = t.run("cat /proc/version").strip()
+    before = _settled_read(t, "/proc/version")
+    if not before:
+        raise AssertionError("/proc/version rendered nothing, so a write cannot be judged")
+
     t.run("echo overwritten > /proc/version")
-    after = t.run("cat /proc/version").strip()
+    after = _settled_read(t, "/proc/version")
 
     if before != after:
         raise AssertionError("/proc/version took a write:\n%s\nbecame\n%s" % (before, after))
@@ -387,9 +437,12 @@ def sys_net_is_read_only(t):
     if "wlan0" not in listing:
         raise Skip("this target has no station interface")
 
-    before = t.run("cat /sys/class/net/wlan0/ip").strip()
+    before = _settled_read(t, "/sys/class/net/wlan0/ip")
+    if not before:
+        raise AssertionError("the station address rendered nothing, so a write cannot be judged")
+
     t.run("echo 10.0.0.1 > /sys/class/net/wlan0/ip")
-    after = t.run("cat /sys/class/net/wlan0/ip").strip()
+    after = _settled_read(t, "/sys/class/net/wlan0/ip")
 
     if before != after:
         raise AssertionError(

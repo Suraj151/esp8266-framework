@@ -65,9 +65,16 @@ public:
    * @brief Adds an event listener for a specific event.
    * @param _event The name of the event to listen for.
    * @param _handler The callback function to execute when the event is triggered.
-   * @return True if the listener was added successfully, false otherwise.
+   * @return The listener id to remove it by, EVENT_LISTENER_ID_INVALID if it was not added.
    */
-  bool add_event_listener(event_name_t _event, CallBackVoidPointerArgFn _handler);
+  int16_t add_event_listener(event_name_t _event, CallBackVoidPointerArgFn _handler);
+
+  /**
+   * @brief Drops the listener the given id names, so a listener registered once
+   *        can be taken back without disturbing anything else on the event.
+   * @return True if a listener was found and removed.
+   */
+  bool remove_event_listener(int16_t _id);
 
   /**
    * @brief Executes an event and calls the associated listeners.
@@ -100,6 +107,12 @@ protected:
    * @brief Vector of registered event listeners.
    */
   pdiutil::vector<event_listener_t> m_event_listeners;
+
+  /**
+   * @var int16_t m_next_listener_id
+   * @brief Id handed to the next listener registered, advancing rather than refilling gaps.
+   */
+  int16_t m_next_listener_id;
 };
 
 /**

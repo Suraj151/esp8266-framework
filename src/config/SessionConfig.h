@@ -106,7 +106,7 @@ created Date    : 18th July 2026
 #define SCRIPT_MAX_DEPTH 3
 #endif
 
-#define SCRIPT_COMMENT_CHAR '#'
+#define SCRIPT_COMMENT_CHAR LINE_COMMENT_CHAR
 #define SCRIPT_UID_DIRECTIVE "UID"
 
 #ifndef SCRIPT_BLOCK_MAX

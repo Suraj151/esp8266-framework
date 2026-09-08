@@ -43,8 +43,14 @@ typedef enum event_name event_name_t;
 /**
 * event listener struct type for event
 */
+#define EVENT_LISTENER_ID_INVALID (-1)   /* no listener, and nothing to remove */
+
+#ifndef MAX_EVENT_LISTENER_ID
+#define MAX_EVENT_LISTENER_ID 32000      /* highest id handed out before they start again */
+#endif
+
 typedef struct event_listener {
-  
+
   // Default Constructor
   event_listener(){
     clear();
@@ -54,10 +60,12 @@ typedef struct event_listener {
   void clear(){
     _event = EVENT_NAME_MAX;
     _event_handler = nullptr;
+    _id = EVENT_LISTENER_ID_INVALID;
   }
 
   event_name_t _event;
   CallBackVoidPointerArgFn _event_handler;
+  int16_t _id;
 } event_listener_t;
 
 #endif
