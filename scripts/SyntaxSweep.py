@@ -37,7 +37,7 @@ POSIX_DEVICE = os.path.join(ROOT, "devices", "posix")
 # port a syntax sweep can reach -- the others need their vendor sdk headers.
 PORTS = {
     "mock": "MOCK_DEVICE_TEST",
-    "posix": "DEVICE_POSIX",
+    "posix": "PDI_DEVICE=posix",
 }
 
 STANDARDS = ("gnu++11", "gnu++17", "gnu++2a")

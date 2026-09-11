@@ -56,5 +56,9 @@ def get_device_folder_relpath(device):
         return None
 
 def get_device_id(device):
-    
+
     return "DEVICE_" + device.upper()
+
+def get_device_name(device):
+
+    return device.lower()

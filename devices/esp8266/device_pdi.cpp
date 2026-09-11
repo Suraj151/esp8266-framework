@@ -1,4 +1,4 @@
-/********************* ESP32 Portable Device Interface ************************
+/****************** ESP8266 Portable Device Interface ************************
 This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -8,7 +8,7 @@ Author          : Suraj I.
 created Date    : 1st Jan 2024
 ******************************************************************************/
 
-#include "esp32_pdi.h"
+#include "device_pdi.h"
 
 /*
  * Since arduino platform ide only considers the files inside "src" dir of root folder structure for compilation
@@ -31,15 +31,13 @@ created Date    : 1st Jan 2024
 #include "UdpInterface.cpp"
 #endif
 #ifdef ENABLE_TLS_SERVICE
-#include "MbedTLSCertLoader.cpp"
+#include "BearSSLCertLoader.cpp"
 #include "TlsClientInterface.cpp"
 #include "TlsServerInterface.cpp"
 #endif
-#ifdef ENABLE_TLS_CERT_GENERATION
-#include "TlsCertProvisioner.cpp"
-#endif
 #include "ExceptionsNotifier.cpp"
-#include "core/EEPROM.cpp"
+#include "core/Espnow.cpp"
+#include "core/EW_EEPROM.cpp"
 #ifdef ENABLE_SERIAL_SERVICE
 #include "SerialInterface.cpp"
 #endif
@@ -47,14 +45,11 @@ created Date    : 1st Jan 2024
 #include "StorageInterface.cpp"
 #include "FileSystemInterface.cpp"
 #endif
-#ifdef ENABLE_PROGRAM_EXEC
-#include "ProgramLoaderInterface.cpp"
-#endif
 #include "InstanceInterface.cpp"
 
 #ifdef ENABLE_CONTEXTUAL_EXECUTION
-portMUX_TYPE __pdi_critical_mux = portMUX_INITIALIZER_UNLOCKED;
 #include "threading/Cooperative.cpp"
+#include "threading/XtensaTimer.cpp"
 #include "threading/Preemptive.cpp"
 #include "threading/PreemptiveMutex.cpp"
 #endif

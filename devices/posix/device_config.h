@@ -11,6 +11,9 @@ created Date    : 16th Aug 2026
 #ifndef _PDI_POSIX_DEVICE_CONFIG_H_
 #define _PDI_POSIX_DEVICE_CONFIG_H_
 
+/* the port names itself so the framework can test for it without a selection chain */
+#define DEVICE_POSIX
+
 #include <string.h>
 
 /**

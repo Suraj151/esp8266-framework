@@ -11,7 +11,7 @@ created Date    : 1st Jan 2024
 
 #ifdef MOCK_DEVICE_TEST
 
-#include "posix_pdi.h"
+#include "device_pdi.h"
 
 /*
  * Since arduino platform ide only considers the files inside "src" dir of root folder structure for compilation

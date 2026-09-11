@@ -16,6 +16,8 @@ added by        : Suraj I.
 //This is a system-specific header which does all of the error-handling management
 #include "unwind-cxx.h"
 
+#ifdef __UCLIBCXX_EXCEPTION_SUPPORT__
+
 namespace __cxxabiv1
 {
 
@@ -55,3 +57,5 @@ extern "C" void __cxa_free_dependent_exception(__cxa_dependent_exception *vptr) 
 }
 
 }  /* namespace __cxxabiv1 */
+
+#endif

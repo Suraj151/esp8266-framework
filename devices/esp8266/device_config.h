@@ -11,6 +11,9 @@ created Date    : 1st Jan 2026
 #ifndef _ESP8266_DEVICE_CONFIG_H_
 #define _ESP8266_DEVICE_CONFIG_H_
 
+/* the port names itself so the framework can test for it without a selection chain */
+#define DEVICE_ESP8266
+
 #include <Arduino.h>
 
 
@@ -104,7 +107,6 @@ created Date    : 1st Jan 2026
 // #define MAKE_STORAGE_DEPENDENT_OTA_UPGRADE
 // #endif
 
-// devices/esp8266/esp8266_device_config.h
 #define DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK
 
 #define DEVICE_SUPPORTS_NTP

@@ -45,13 +45,15 @@ What comes out of the box is closer to a small system than to a sketch template:
 2. Open **File → Examples → pdi-framework → PdiStack**, then compile and upload.
 
    Note : ESP32 require 1.4MB+ app size so make sure you will select suitable partition scheme that fits required app size.
-4. On your phone or laptop, look for the WiFi network **`pdiStack`** — password **`pdiStack@123`**.
-5. Browse to **http://192.168.0.1** and log in as **`pdiStack` / `pdiStack@123`**.
+3. **Over the serial cable.** Open the serial monitor at **115200** and log in as **`pdiStack` / `pdiStack@123`**. You get the full shell — the same one every other route reaches.
+4. **Over the device's own WiFi.** Look for the network **`pdiStack`**, password **`pdiStack@123`**, then browse to **http://192.168.0.1** and log in with the same credentials for the web portal.
+5. **Over your own network.** Point the device at your router from the portal or with `net` commands, then reach it by IP or by name — it advertises itself over mDNS as **`pdi-<xxxxxx>.local`**, so any machine on the same router can use that instead of hunting for the address:
+   ```
+   ssh pdiStack@pdi-<xxxxxx>.local        # or telnet, port 23
+   ```
+6. **Copying files.** `scp -s file pdiStack@<host>:/path` or `sftp -P 22 pdiStack@<host>`.
 
-That's it — the device is now running a web portal, a remote shell and file transfer.
-
-Prefer a remote shell? `ssh pdiStack@<device-ip>` or `telnet <device-ip>` (default ports 22 and 23).
-Copying files? `scp -s file pdiStack@<device-ip>:/path` or `sftp -P 22 pdiStack@<device-ip>`.
+That's it — the device is now running a web portal, a remote shell and file transfer, and the shell behaves the same whether you reached it over serial, ssh or telnet.
 
 Manual clone paths, the autogen script, board-package versions and git-ignored files are covered in [§2 Build & Toolchain](#2-build--toolchain).
 
@@ -102,15 +104,15 @@ Details in [§6.2.12](#6212-storage-interface-init-no-provider).
     <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-help-1.png" width="100%"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/portal_home_menu.png" width="100%"></td>
-    <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/gpio-control-menu.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/portal_home_menu.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/gpio-control-menu.png" width="100%"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/mqtt-submenu.png" width="100%"></td>
-    <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/storage-home.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/mqtt-submenu.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/storage-home.png" width="100%"></td>
   </tr>
   <tr>
-    <td ><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/dashboard.png" width="100%"></td>
+    <td ><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/dashboard.png" width="100%"></td>
   </tr>
 </table>
 
@@ -331,7 +333,7 @@ Two routes: the Library Manager, or a git clone if you intend to work on the fra
      </tr>
    </table>
 
-A fresh install already carries ESP32-shaped placeholder database headers, and `devices/DeviceConfig.h` falls back to `DEVICE_ESP32` when no generated setup header is present — hence the zero-step ESP32 build.
+A fresh install already carries ESP32-shaped placeholder database headers, and `devices/DeviceConfig.h` falls back to `PDI_DEVICE esp32` when no generated setup header is present — hence the zero-step ESP32 build.
 
 **For ESP8266 or Arduino UNO,** generate the per-device files first:
 
@@ -340,7 +342,7 @@ cd <your-Arduino-libraries-path>/pdi-framework/scripts
 python3 DeviceSetup.py -d esp8266        # or arduinouno
 ```
 
-That writes `devices/DeviceSetup.h` with the right `DEVICE_<NAME>` and regenerates the database table headers for the target. Changing boards later is the same one-liner with a different name.
+That writes `devices/DeviceSetup.h` with the right `PDI_DEVICE` and regenerates the database table headers for the target. Changing boards later is the same one-liner with a different name.
 
 **Git clone, for contributors.**
 
@@ -372,12 +374,37 @@ That writes `devices/DeviceSetup.h` with the right `DEVICE_<NAME>` and regenerat
 
 There are no git submodules to initialise — LittleFS is vendored in-tree.
 
+**PlatformIO.** `library.json` carries the build rules and the bundled-library dependencies, so a project needs nothing beyond the port selector:
+
+```ini
+[env:esp8266]
+platform = espressif8266
+board = nodemcuv2
+framework = arduino
+lib_deps = https://github.com/Suraj151/pdi-framework.git
+build_flags = -DPDI_DEVICE=esp8266
+
+[env:esp32]
+platform = https://github.com/pioarduino/platform-espressif32/releases/download/stable/platform-espressif32.zip
+board = esp32dev
+framework = arduino
+board_build.partitions = min_spiffs.csv
+lib_deps = https://github.com/Suraj151/pdi-framework.git
+build_flags = -DPDI_DEVICE=esp32
+```
+
+`-DPDI_DEVICE=<port>` selects the port on the command line and takes precedence over `devices/DeviceSetup.h`, so no script run is needed to change boards. The database table headers still come from `DeviceSetup.py` when you need a target other than the ESP32 defaults.
+
+Two settings the ESP32 environment cannot do without. `board_build.partitions = min_spiffs.csv` gives each app slot 1.9 MB and keeps both OTA slots, where the `esp32dev` default of 1.31 MB cannot hold the image. And the platform line points at the `pioarduino` fork because the official `espressif32` platform pins Arduino-ESP32 2.x, while the framework builds against the 3.x line.
+
+⚠ Do not set `lib_ldf_mode = deep+`. In that mode the dependency finder stops resolving `Networking` into the bundled `WiFi` library, and the ESP32 build fails on a missing `Network.h`. The default mode resolves it correctly.
+
 ### 2.3 What the scripts do
 
 ```
   DeviceSetup.py -d <board>
         │
-        ├──▶ devices/DeviceSetup.h        #define DEVICE_<NAME>
+        ├──▶ devices/DeviceSetup.h        #define PDI_DEVICE <board>
         │
         └──▶ CreateDBSourceFromJson.py
                    │  reads the board's DBTableSchema.json
@@ -436,19 +463,21 @@ Three things line up so that a first build needs no scripts:
   devices/DeviceConfig.h
         │
         ├─ #if __has_include("DeviceSetup.h")  →  use the generated macro
-        └─ #else                               →  #define DEVICE_ESP32
+        └─ #else                               →  #define PDI_DEVICE esp32
                 │
-                ├─ per-port config cascade ends in esp32_device_config.h
+                ├─ per-port config cascade ends in esp32/device_config.h
                 └─ checked-in placeholder table headers are ESP32-shaped
 ```
 
 Running `DeviceSetup.py` for another board overrides all three: the generated `DeviceSetup.h` wins over the fallback and fresh table headers replace the placeholders. To come back to ESP32, either re-run the script with `-d esp32` or delete `devices/DeviceSetup.h` and let the fallback take over again.
 
+`DeviceSetup.h` is not tracked, so a fresh clone always starts on the ESP32 fallback. A build that only needs a different port, and not a different table set, can say so on the compiler command line instead — `-DPDI_DEVICE=esp8266` takes precedence over both the generated header and the fallback, and leaves the working tree untouched. See [§14.4](#144-how-a-board-gets-selected).
+
 Because the fallback is silent, a build flashed onto an ESP8266 or an UNO without running the script compiles happily with the ESP32's table set and feature flags. Run the script whenever you leave the ESP32 default, and again whenever you come back — `git checkout src/database/tables/` restores the placeholders if the generated ones are still lying around.
 
 #### 2.5.1 Per-port capability flags
 
-Board-specific answers live in `<board>_device_config.h`, not in the central config, which keeps the selection logic board-agnostic:
+Board-specific answers live in each port's `device_config.h`, not in the central config, which keeps the selection logic board-agnostic:
 
 | Macro | Set by | Effect |
 |---|---|---|
@@ -470,7 +499,7 @@ Configuration is layered and additive. Which services *exist*, how big each tabl
 
 | Tier | Lives in | Owns | Written by |
 |---|---|---|---|
-| Device | `devices/DeviceSetup.h` (generated), `devices/DeviceConfig.h`, and each port's `<board>_device_config.h` | the `DEVICE_*` selector, the `ENABLE_*` flags, per-board limits, and platform macros such as `RODT_ATTR` and `CRITICAL_SECTION_ENTER/EXIT` | integrator picking board and features; porter describing the board |
+| Device | `devices/DeviceSetup.h` (generated), `devices/DeviceConfig.h`, and each port's `device_config.h` | the `PDI_DEVICE` selector, the `ENABLE_*` flags, per-board limits, and platform macros such as `RODT_ATTR` and `CRITICAL_SECTION_ENTER/EXIT` | integrator picking board and features; porter describing the board |
 | Common | `src/config/Common.h`, `src/config/GlobalConfig.h` | cross-cutting constants and the always-present `global_config` table | framework author, integrator |
 | Service | one `*Config.h` per service under `src/config/` | per-service knobs plus the struct that gets persisted to NVM | service author |
 
@@ -479,11 +508,11 @@ Everything funnels through [src/config/Config.h](src/config/Config.h), which con
 ### 3.2 How the pieces include each other
 
 ```
-  DeviceSetup.h            generated:  #define DEVICE_<NAME>
+  DeviceSetup.h            generated:  #define PDI_DEVICE <name>
         │
         ▼
-  DeviceConfig.h           DEVICE_* ──▶ ENABLE_* cascade
-        │                  + pulls in <board>_device_config.h for platform macros
+  DeviceConfig.h           PDI_DEVICE ──▶ ENABLE_* cascade
+        │                  + pulls in <port>/device_config.h for platform macros
         ▼
   Common.h                 shared defaults other configs reference
         │
@@ -3095,9 +3124,10 @@ The device layer is the only place vendor SDK and Arduino-core symbols are allow
 ```
   devices/esp32/
     esp32.h                     umbrella include for the SDK and core
-    esp32_device_config.h       platform macros: flash strings, critical sections
-    esp32_pdi.h                 header aggregator — what the framework sees
-    esp32_pdi.cpp               source aggregator — see below
+    device_config.h             platform macros: flash strings, critical sections
+    device_pdi.h                header aggregator — what the framework sees
+    device_pdi.cpp              source aggregator — see below
+    device_pdi.c                C-side source aggregator
 
     DeviceControlInterface      required
     DatabaseInterface           required
@@ -3149,16 +3179,18 @@ A port is valid the moment the always rows compile and link. Everything else arr
 Every port supplies a pair, with a strict split:
 
 ```
-  <name>_pdi.h     which interface headers the framework can see
+  device_pdi.h     which interface headers the framework can see
                    each include wrapped in its ENABLE_* guard, so unused interfaces cost nothing
 
-  <name>_pdi.cpp   #includes the implementation .cpp files
+  device_pdi.cpp   #includes the implementation .cpp files
                    the Arduino build flattens the port into one object file, which means
                    anything marked static there is per-port, not per-file — and those .cpp
                    files must never be included from outside this chain
 ```
 
-There is an optional C-side aggregator for pure-C translation units, and the umbrella header exists so each per-interface header can pull in the SDK once rather than repeating the plumbing.
+The names are fixed rather than prefixed with the port, because the selector builds the include path from the port directory name alone.
+
+A third aggregator, `device_pdi.c`, carries pure-C translation units. It is required even when a port has no C sources — `src/interface/pdi.c` includes it unconditionally — in which case it holds nothing but its file header. The umbrella header exists so each per-interface header can pull in the SDK once rather than repeating the plumbing.
 
 ### 14.4 How a board gets selected
 
@@ -3166,21 +3198,28 @@ There is an optional C-side aggregator for pure-C translation units, and the umb
   DeviceSetup.py -d esp8266
         │  writes
         ▼
-  devices/DeviceSetup.h        #define DEVICE_ESP8266
+  devices/DeviceSetup.h        #define PDI_DEVICE esp8266
         │  included by
         ▼
   devices/DeviceConfig.h       cascades into ENABLE_* flags, and pulls in
-        │                      esp8266_device_config.h so the platform macros exist
-        │                      before any framework header is parsed
+        │                      esp8266/device_config.h so the platform macros exist
+        │                      before any framework header is parsed. that header
+        │                      defines DEVICE_ESP8266, so the port names itself
         ▼
   src/config/Config.h          now everything under src/ sees flags and macros
         ▼
-  src/interface/pdi.h          picks esp8266_pdi.h
+  src/interface/pdi.h          includes esp8266/device_pdi.h
         ▼
   the port's interface headers  which transitively pull in the SDK
 ```
 
-Adding a board touches exactly three files outside its own folder: the device config cascade, the interface selector, and the architecture list in `library.properties`.
+`PDI_DEVICE` names the port directory, and every selector builds its include path from that one macro. Setting it on the compiler command line takes precedence over the generated header, so a build matrix can cover every port from one tree without rewriting a file:
+
+```
+  -DPDI_DEVICE=esp32
+```
+
+Adding a board therefore touches **no** source file outside its own folder — only the architecture list in `library.properties` and `library.json`.
 
 ### 14.5 The singletons a port must define
 
@@ -3217,17 +3256,13 @@ Say the board is `myboard`.
    ```
    devices/myboard/
      myboard.h
-     myboard_device_config.h
+     device_config.h
      config/DBTableSchema.json
    ```
-   Add a branch for it in the device-config cascade so those macros are picked up.
+   Have `device_config.h` define `DEVICE_MYBOARD` right after its include guard, so the board names itself to the rest of the framework.
 2. **Implement the three required interfaces** — device control, database, instance factory — each deriving from its abstract counterpart, each defining its `__i_*` global.
-3. **Write the two aggregators**, mirroring an existing board's pair and keeping only what you have implemented.
-4. **Register the board** in the interface selector:
-   ```cpp
-   #elif defined(DEVICE_MYBOARD)
-   #include "../../devices/myboard/myboard_pdi.h"
-   ```
+3. **Write the three aggregators** — `device_pdi.h`, `device_pdi.cpp` and `device_pdi.c` — mirroring an existing board's set and keeping only what you have implemented. The `.c` is required even if it stays empty.
+4. **Nothing to register.** The selectors build their paths from `PDI_DEVICE`, so the folder name is the registration.
 5. **Add the per-board limits** — pin counts, table count — and switch off any service the board cannot support, the way the UNO port does.
 6. **Generate the setup files**: `python3 DeviceSetup.py -d myboard`.
 7. **Build the bundled example** for the new board. That is the first real validation.

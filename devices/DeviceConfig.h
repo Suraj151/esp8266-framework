@@ -16,39 +16,33 @@ created Date    : 1st June 2019
  * the tests run against the same port a host build ships.
  */
 #ifdef MOCK_DEVICE_TEST
-#ifndef DEVICE_POSIX
-#define DEVICE_POSIX
+#ifndef PDI_DEVICE
+#define PDI_DEVICE posix
 #endif
-#endif
-
-#ifdef DEVICE_POSIX
-
-#include "posix/posix_device_config.h"
-
-#else
-
-#if __has_include("DeviceSetup.h")
-#include "DeviceSetup.h"
-#else
-#define DEVICE_ESP32
 #endif
 
 /**
- * include device specific config if any
+ * PDI_DEVICE names the port directory under devices. Setting it on the compiler
+ * command line selects a port without rewriting the generated device setup, so a
+ * build matrix can cover every port from one tree.
  */
-#if defined(DEVICE_ESP8266)
-#include "esp8266/esp8266_device_config.h"
-#elif defined(DEVICE_ESP32)
-#include "esp32/esp32_device_config.h"
-#elif defined(DEVICE_ARDUINOUNO)
-#include "arduinouno/arduinouno_device_config.h"
-#elif defined(DEVICE_POSIX)
-#include "posix/posix_device_config.h"
+#ifndef PDI_DEVICE
+#if __has_include("DeviceSetup.h")
+#include "DeviceSetup.h"
 #else
-#include "esp32/esp32_device_config.h"
+#define PDI_DEVICE esp32
+#endif
 #endif
 
-#endif
+/* expands PDI_DEVICE before stringizing it into a port relative include path */
+#define PDI_PORT_STR(path) #path
+#define PDI_PORT_PATH(path) PDI_PORT_STR(path)
+
+/**
+ * include device specific config if any. the port names itself by defining its
+ * own DEVICE_* macro, so no selection chain grows as ports are added.
+ */
+#include PDI_PORT_PATH(PDI_DEVICE/device_config.h)
 
 /**
  * the user store keeps its accounts in /etc/passwd and /etc/shadow, so auth is

@@ -18,6 +18,7 @@ added by        : Suraj I.
 
 //The following functionality is derived from reading of the GNU libstdc++ code and making it...simple
 
+#ifdef __UCLIBCXX_EXCEPTION_SUPPORT__
 
 namespace __cxxabiv1{
 
@@ -32,3 +33,5 @@ extern "C" __cxa_eh_globals* __cxa_get_globals_fast() _UCXX_USE_NOEXCEPT{
 }
 
 }
+
+#endif

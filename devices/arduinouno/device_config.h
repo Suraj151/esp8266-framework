@@ -11,6 +11,9 @@ created Date    : 1st Jan 2026
 #ifndef _ARDUINOUNO_DEVICE_CONFIG_H_
 #define _ARDUINOUNO_DEVICE_CONFIG_H_
 
+/* the port names itself so the framework can test for it without a selection chain */
+#define DEVICE_ARDUINOUNO
+
 #include <Arduino.h>
 
 #define RODT_ATTR(v) (const char*)F(v)

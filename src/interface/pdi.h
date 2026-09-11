@@ -13,17 +13,7 @@ created Date    : 1st Jan 2024
 
 #include <config/Config.h>
 
-#if defined(DEVICE_ESP32)
-#include "../../devices/esp32/esp32_pdi.h"
-#elif defined(DEVICE_ESP8266)
-#include "../../devices/esp8266/esp8266_pdi.h"
-#elif defined(DEVICE_ARDUINOUNO)
-#include "../../devices/arduinouno/arduinouno_pdi.h"
-#elif defined(DEVICE_POSIX)
-#include "../../devices/posix/posix_pdi.h"
-#else
-#include "../../devices/posix/posix_pdi.h"
-#endif
+#include PDI_PORT_PATH(../../devices/PDI_DEVICE/device_pdi.h)
 
 #include <interface/pdi/iDeviceIotInterface.h>
 
