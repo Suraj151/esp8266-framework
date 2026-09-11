@@ -1,10 +1,8 @@
 /***************************** ed25519 util ***********************************
-This file is taken from external sources. this is taken from open source ed25519 
-library available on github. below is reference link. Thanking to author for
-providing this .
+This file is third party source, taken from the open source ed25519 library and
+used here with modifications. Thanking to author for providing this .
 
-This is free software. you can redistribute it and/or modify it but without any
-warranty.
+for the license terms of this file refer the source link below.
 
 referred from   : https://github.com/orlp/ed25519
 added Date      : 1st June 2025

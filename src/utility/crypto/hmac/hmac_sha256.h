@@ -1,11 +1,11 @@
-/***************************** hmac_sha256 *********************************
+/******************************** hmac_sha256 ********************************
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
-referred from   : https://github.com/kokke/tiny-AES-c
-added Date      : 29th Jul 2025
-added by        : Suraj I.
+Author          : Suraj I.
+created Date    : 29th Jul 2025
 ******************************************************************************/
 
 #ifndef _HMAC_SHA256_H_

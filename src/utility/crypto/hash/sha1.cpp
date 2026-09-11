@@ -1,3 +1,14 @@
+/************************************ SHA1 ***********************************
+This file is third party source, taken from the open source sha1 library and
+used here with modifications. Thanking to author for providing this .
+
+for the license terms of this file refer the source link below.
+
+referred from   : https://github.com/clibs/sha1
+added Date      : 1st June 2025
+added by        : Suraj I.
+******************************************************************************/
+
 /*
 SHA-1 in C
 By Steve Reid <steve@edmweb.com>

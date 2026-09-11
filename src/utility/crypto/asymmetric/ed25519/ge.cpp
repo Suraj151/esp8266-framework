@@ -1,3 +1,14 @@
+/******************************** ed25519 util *******************************
+This file is third party source, taken from the open source ed25519 library and
+used here with modifications. Thanking to author for providing this .
+
+for the license terms of this file refer the source link below.
+
+referred from   : https://github.com/orlp/ed25519
+added Date      : 1st June 2025
+added by        : Suraj I.
+******************************************************************************/
+
 #include "ge.h"
 #include "precomp_data.h"
 #include <utility/SafeAlloc.h>
