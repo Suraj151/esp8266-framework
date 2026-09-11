@@ -137,6 +137,9 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   NetworkCommand::RegisterCommand();
   HostCommand::RegisterCommand();
   PingCommand::RegisterCommand();
+#if defined(ENABLE_HTTP_CLIENT) && defined(ENABLE_STORAGE_SERVICE)
+  WgetCommand::RegisterCommand();
+#endif
   #endif
 
   // WatchCommand *watchcmd = new WatchCommand();

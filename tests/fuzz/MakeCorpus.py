@@ -130,6 +130,56 @@ def http_seeds():
     }
 
 
+def http_response_seeds():
+    """Mode byte, writer budget byte, then the reply as the server sent it."""
+
+    ok = "HTTP/1.1 200 OK\r\nServer: SimpleHTTP/0.6 Python/3.12.3\r\n"
+    ok += "Content-Type: application/octet-stream\r\nContent-Length: 12\r\n"
+    ok += "Connection: close\r\n\r\nhello pdi!!\n"
+
+    chunked = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n"
+    chunked += "8\r\npdistack\r\n4\r\nfuzz\r\n0\r\n\r\n"
+
+    redirect = "HTTP/1.1 301 Moved Permanently\r\n"
+    redirect += "Location: http://pdi.local/moved.bin\r\nContent-Length: 0\r\n\r\n"
+
+    # a header whose value carries a status line of its own, which is the
+    # shape that once overwrote the code the server actually sent
+    spoofed = "HTTP/1.1 200 OK\r\nX-Note: HTTP/9.9 404 nope\r\n"
+    spoofed += "Content-Length: 3\r\n\r\npdi"
+
+    nolength = "HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nno length declared"
+
+    return {
+        "buffered_ok": bytes([0, 0]) + ok.encode(),
+        "buffered_chunked": bytes([0, 0]) + chunked.encode(),
+        "buffered_redirect": bytes([0, 0]) + redirect.encode(),
+        "buffered_spoofed_status": bytes([0, 0]) + spoofed.encode(),
+        "streamed_ok": bytes([1, 0]) + ok.encode(),
+        "streamed_chunked": bytes([1, 0]) + chunked.encode(),
+        "streamed_nolength": bytes([1, 0]) + nolength.encode(),
+        "streamed_aborted": bytes([1, 1]) + chunked.encode(),
+        "url_plain": bytes([2, 0]) + b"http://pdi.local:8080/dir/file.bin?a=1&b=2",
+        "url_secure": bytes([2, 0]) + b"https://user:pass@pdi.local/deep/path.bin",
+    }
+
+
+def crontab_seeds():
+    """Value, low and high bytes first, then one table row."""
+
+    head = bytes([30, 0, 59])
+
+    return {
+        "every_minute": head + b"* * * * * echo tick",
+        "step": head + b"*/5 * * * * ls -l /etc",
+        "range": head + b"0 9-17 * * 1-5 cat /proc/uptime",
+        "list": head + b"0,15,30,45 * * * * df",
+        "comment": head + b"# minute hour dom mon dow command",
+        "ragged": head + b"  *   *  *  *  *   echo   spaced   out  ",
+        "short_row": head + b"* * * echo not enough fields",
+    }
+
+
 def shell_seeds():
     """Keystrokes, including the escape sequences the line editor decodes."""
 
@@ -169,9 +219,11 @@ TARGETS = {
     "fuzz_ssh_wire": ssh_wire_seeds,
     "fuzz_sftp": sftp_seeds,
     "fuzz_http": http_seeds,
+    "fuzz_http_response": http_response_seeds,
     "fuzz_shell": shell_seeds,
     "fuzz_config": config_seeds,
     "fuzz_dbrecord": dbrecord_seeds,
+    "fuzz_crontab": crontab_seeds,
 }
 
 

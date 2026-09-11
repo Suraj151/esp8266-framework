@@ -16,7 +16,7 @@ What comes out of the box is closer to a small system than to a sketch template:
 
 **Secrets stay secret at rest.** Config records holding a credential are sealed — encrypted and tagged under a key kept in the eeprom — so a copy of the database taken off the device reveals nothing. Syslog can ship each line to a remote collector as well as to `/var/log`.
 
-**A real shell.** The same fifty-odd commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `fedit`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `service`, `exec`, `net`, `host`, `ping`, `date`, `uptime`, `useradd`, `su`, `passwd`, `db`, `sshkgen`, `watch`, `source`, `test`, `crontab` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
+**A real shell.** The same fifty-odd commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `fedit`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `service`, `exec`, `net`, `host`, `ping`, `date`, `uptime`, `useradd`, `su`, `passwd`, `db`, `sshkgen`, `watch`, `source`, `test`, `crontab`, `wget` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
 
 **Commands join up.** Output pipes from one command into the next and redirects to and from files, so `ps | grep ssh`, `cat /proc/meminfo > /tmp/mem.txt` and `wc < /home/notes.txt` all mean what they mean on a desktop — see [§7.7](#77-pipes-and-redirection).
 
@@ -415,7 +415,7 @@ The responder is written from scratch on raw lwIP UDP — `udp_*` plus `igmp_joi
         │
         ├─ hostname pdi-<last-3-mac-bytes> written to /etc/hostname
         ├─ join 224.0.0.251:5353
-        ├─ queue HTTPS cert provisioning        (esp32, with runtime cert generation)
+        ├─ queue HTTPS cert provisioning        (where the port can generate certs)
         └─ answer queries as they arrive        (callback-driven, nothing to pump)
                 │
                 ├─ A                    →  hostname → address
@@ -630,7 +630,7 @@ The always-on tables — global config, plus credentials and WiFi when those ser
   DEVICE_IOT ── the application implements iDeviceIotInterface and passes it to initService
 ```
 
-Most of these are enforced structurally — the dependent flags are physically nested inside `#ifdef ENABLE_NETWORK_SERVICE` and friends in `DeviceConfig.h`. Two pairings are worth remembering because nothing stops them at compile time: TLS and NAPT both want more heap than an ESP8266 has, and enabling TLS implies contextual execution because the TLS engine runs on its own cooperative task.
+Most of these are enforced structurally — the dependent flags are physically nested inside `#ifdef ENABLE_NETWORK_SERVICE` and friends in `DeviceConfig.h`. Two pairings are worth remembering because nothing stops them at compile time: TLS and NAPT both want a large share of the same heap, so a device without room for both will fail at runtime rather than at build time, and enabling TLS implies contextual execution because the TLS engine runs on its own cooperative task.
 
 ### 3.7 Common build shapes
 
@@ -958,7 +958,7 @@ __task_scheduler.scheduleUnderExecSched(
 );
 ```
 
-Stack sizing is on you unless the port can measure it. A KiB for cooperative and two for preemptive is a reasonable starting point on ESP8266; raise it if the task touches `pdiutil::string`, parses JSON, or goes through TLS.
+Stack sizing is on you unless the port can measure it. A KiB for cooperative and two for preemptive is a reasonable starting point on a constrained device; raise it if the task touches `pdiutil::string`, parses JSON, or goes through TLS.
 
 Across lanes: `sleep(ms)` and `yield()` are called from inside a cooperative task (the inline lane's `sleep` is deliberately a no-op), a preemptive task can yield voluntarily even though the ISR will preempt it anyway, and any data shared between lanes needs `iMutex` or `iConditionVar`. The inline lane needs neither.
 
@@ -1042,7 +1042,7 @@ A device with storage runs on a container file and keeps the eeprom as the defau
 
 `resolve_tiers()` prefers the container and falls back to running directly on the eeprom when there is no storage service or the container cannot be opened. A container that never existed, or one that was wiped, is rebuilt from the eeprom defaults on the next boot.
 
-The eeprom is opened only for the length of a defaults copy, so on a device running the container tier it holds no RAM at all — 4 KB on esp8266 that stays available to everything else.
+The eeprom is opened only for the length of a defaults copy, so on a device running the container tier it holds no RAM at all — a few KB that stays available to everything else.
 
 A single container file is used rather than one file per table: LittleFS runs a 4096-byte block and a 64-byte inline limit, so most tables would each claim a whole block. One container costs one block, and every write is an in-place `editFile()` at its offset, which keeps the mode and owner the file was created with.
 
@@ -1453,13 +1453,17 @@ Full reference, including the field grammar, in [§7.16](#716-scheduled-jobs-and
 
 TLS has no service class either — it lives at the interface and port level. `iInstanceInterface` hands out the one outbound client the services share, built on first call and kept: `getSharedTcpClientInstance()` and, in a TLS build, `getSharedTlsClientInstance()`. Two literal accessors rather than one that quietly returns whichever is compiled in, so a caller picks its transport and the call site says which. OTA, device-IoT and GPIO posting take the TLS client where the flag is on and the TCP one otherwise. **Email is TCP only** — the SMTP path carries no TLS support. MQTT builds a client of its own instead of sharing.
 
-BearSSL backs the ESP8266 port and mbedTLS the ESP32 one. Certificates and keys are read from the filesystem at runtime, defaulting to `/etc/http/server.crt`, `/etc/http/server.key`, `/etc/http/client-ca.crt` and `/etc/ssl/ca-bundle.crt`.
+Each port brings its own TLS backend, named alongside `ENABLE_TLS_SERVICE` in [§3.3.1](#331-service-flags). Nothing above the interface knows which one it has. Certificates and keys are read from the filesystem at runtime, defaulting to `/etc/http/server.crt`, `/etc/http/server.key`, `/etc/http/client-ca.crt` and `/etc/ssl/ca-bundle.crt`.
 
-Handshakes need more stack than the ESP8266 main context has, so enabling TLS also enables contextual execution and runs the engine on its own cooperative task with a stack sized by `TLS_TASK_STACK_SIZE`.
+Handshakes need more stack than a main context typically has, so enabling TLS also enables contextual execution and runs the engine on its own cooperative task with a stack sized by `TLS_TASK_STACK_SIZE`.
 
 The bundled outbound client is created with peer verification off so that an encrypted-but-unverified connection works immediately. For production, point it at the CA bundle path and drop that line.
 
-Certificates come from one of two places. On ESP32, the on-device provisioner issues self-signed EC or RSA certs with the SANs you ask for, and `ensureServerCert` reissues only when the stored certificate's SANs no longer cover what was asked for. With runtime generation enabled the mDNS service drives it, so the certificate covers the address and `<hostname>.local` together ([§6.2.20](#6220-mdnsserviceprovider--__mdns_service)). Everywhere else, `scripts/GenTlsCerts.py` does the same job with OpenSSL and you upload the result over SFTP.
+**Certificates come from one of two places, and which one is a port capability.** A port declaring `DEVICE_SUPPORTS_TLS_CERT_GENERATION` can issue its own: the on-device provisioner writes self-signed EC or RSA certs with the SANs you ask for, `ensureServerCert` reissues only when the stored certificate's SANs no longer cover what was asked for, and the `tls` command exposes the same issuer from the shell. With runtime generation enabled the mDNS service drives it, so the certificate covers the address and `<hostname>.local` together ([§6.2.21](#6221-mdnsserviceprovider--__mdns_service)).
+
+**Without that capability there is no `tls` command and nothing issues a certificate on the device.** Generate the material off-device with `scripts/GenTlsCerts.py`, which does the same job with OpenSSL, and upload the result to the paths above over SFTP ([§7.10](#710-sftp-and-scp-file-transfer)). Outbound verification needs the same treatment — a CA bundle at `/etc/ssl/ca-bundle.crt` is something you put there.
+
+**TLS is also the flag most likely to need room made for it.** A live session costs more than any other feature here, per session rather than per build, and on a device whose heap is already committed the handshake is what fails first. Expect to turn other services off to fit it — the per-session figures and what to trade against them are in [§12.3](#123-the-expensive-features).
 
 #### 6.2.19 `UserStoreService` — `__user_store_service`
 
@@ -1802,10 +1806,11 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | pkill [\<sig>] \<name> | | Same, matched by name across every task carrying it. |
 | killall [\<sig>] \<name> | | Same as `pkill`, defaulting to KILL. |
 | renice \<nice> \<pid> | | Change nice, -20..19, and re-sort immediately. |
-| sshkgen t=\<algo>[,f=\<dir>] | t, f | Generate an SSH key pair. `t=1` Ed25519, `t=2` or `3` RSA. Without `f` it prompts for the directory — **a]** `~/.ssh` for client keys, **b]** `/etc/ssh` for host keys, the default — and an explicit path also works. Ed25519 is instant; RSA takes about a minute on ESP32 and six on ESP8266. e.g. **sshkgen t=1**, **sshkgen t=2,f=b** |
+| sshkgen t=\<algo>[,f=\<dir>] | t, f | Generate an SSH key pair. `t=1` Ed25519, `t=2` or `3` RSA. Without `f` it prompts for the directory — **a]** `~/.ssh` for client keys, **b]** `/etc/ssh` for host keys, the default — and an explicit path also works. Ed25519 is instant; RSA keygen runs into minutes and how many depends on the device. e.g. **sshkgen t=1**, **sshkgen t=2,f=b** |
 | net \<option> | ip, scansta, connsta | Network state and control. e.g. **net connsta,\<ssid>,\<password>** |
 | host \<name> | | Resolve a name: IP literal, then `/etc/hosts`, then DNS. |
 | ping \<host> [count] | | ICMP echo, default four packets and at most ten, streaming each reply and finishing with a loss and rtt summary. |
+| wget [\<path>] \<url> | | Download an `http` or `https` url to a file, redrawing a transfer bar as it goes. The path may name a file or a directory; left out, the file lands in the working directory under the name the url ends with. An existing file is replaced. The transfer is refused before anything is fetched when the name is longer than the filesystem allows or the body will not fit in the free space, and a failed transfer leaves no partial file. `https` needs the TLS service ([§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning)). e.g. **wget https://host/app.bin**, **wget /home/app.bin https://host/app.bin** |
 | date [-u] [-n] [-s \<epoch>] [+\<fmt>] | | Show or set the clock. `-u` for UTC, `+fmt` for a custom format, `-s` to set, `-n` to force an NTP resync. |
 | tdctl | | Clock status: local and universal time, zone, sync state, server. |
 | reboot | | Reboot. |
@@ -1820,8 +1825,8 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | crontab | | List the scheduled jobs `/etc/crontab` holds, as the device parsed them, and what is due this minute. See [§7.16](#716-scheduled-jobs-and-etccrontab). |
 | help | | Every registered command with its usage line. Works before login. |
 | uptime | | `up Xd Yh Zm Ws`. |
-| tls q=1,t=,l=,n=,i= | | On-device certificate generation, ESP32 with cert generation enabled. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
-| exec \<path> | | Load a program image from the filesystem and run it as a background task, returning its pid. Present only where the port registers a loader; today that is the ESP32. See [§7.13](#713-dynamic-app-loading). |
+| tls q=1,t=,l=,n=,i= | | On-device certificate generation. Present only where the port declares `DEVICE_SUPPORTS_TLS_CERT_GENERATION` and the flag is on; elsewhere certificates are generated off-device and uploaded ([§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning)). e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
+| exec \<path> | | Load a program image from the filesystem and run it as a background task, returning its pid. Present only where the port registers a loader; a board without one simply has no `exec`. See [§7.13](#713-dynamic-app-loading). |
 
 Path arguments behave the POSIX way everywhere: a leading `/` is absolute, anything else resolves against the session's working directory, and `cd` also takes `~` and `-`.
 
@@ -1901,7 +1906,7 @@ Set either option to `no` to switch that method off — `yes`/`on`/`1` and `no`/
 ssh -i ~/.ssh/id_ed25519 pdiStack@<device-ip>
 ```
 
-The device's own host keys are separate, in `/etc/ssh`. Ed25519 lives in `/etc/ssh/ed25519` with its `.pub` and `.seed`, and is created automatically the first time the SSH service starts. RSA lives in `/etc/ssh/rsa` and is generated only when you ask for it with `sshkgen t=2,f=b`, since 2048-bit keygen costs about a minute on ESP32 and six on ESP8266. Either way the key goes onto the wire in standard SSH format during the handshake. `authorized_keys` is one file under the device home directory, shared by all users.
+The device's own host keys are separate, in `/etc/ssh`. Ed25519 lives in `/etc/ssh/ed25519` with its `.pub` and `.seed`, and is created automatically the first time the SSH service starts. RSA lives in `/etc/ssh/rsa` and is generated only when you ask for it with `sshkgen t=2,f=b`, since 2048-bit keygen costs minutes and how many depends on the device. Either way the key goes onto the wire in standard SSH format during the handshake. `authorized_keys` is one file under the device home directory, shared by all users.
 
 ### 7.11 Background commands and Ctrl+C
 
@@ -1966,7 +1971,7 @@ With `ENABLE_PROGRAM_EXEC`, `exec` reads a program image off the filesystem, han
 exec /apps/hello.app.elf
 ```
 
-The command knows nothing about image formats. A port declares `DEVICE_SUPPORTS_PROGRAM_EXEC` and registers an `iProgramLoaderInterface`, which owns what an image is and how it is relocated — so a board with a different architecture needs no change on the command side, and a board with no loader simply has no `exec`. Today the ESP32 registers one, over a relocatable ELF loader.
+The command knows nothing about image formats. A port declares `DEVICE_SUPPORTS_PROGRAM_EXEC` and registers an `iProgramLoaderInterface`, which owns what an image is and how it is relocated — so a board with a different architecture needs no change on the command side, and a board with no loader simply has no `exec`. The loader that exists today works over a relocatable ELF image.
 
 The command returns to the prompt immediately with a pid. The app runs concurrently and its output arrives asynchronously; `ps` lists it and `kill <pid>` ends it. It also ends when `main()` returns, and the image is freed on either path. Because it is a task rather than a scheduler entry, stop and continue don't apply to it.
 
@@ -2355,7 +2360,7 @@ The same server implementation runs in TLS mode, with responsibility split like 
   HttpServerInterfaceImpl     listener switches to the TLS server instance; each accepted
         │                     client still looks like an ordinary client to the parser
         ▼
-  port TLS backend            BearSSL on esp8266, mbedTLS on esp32 — loads PEM from the
+  port TLS backend            whichever the port supplies — loads PEM from the
                               filesystem at the configured paths
 ```
 
@@ -2367,7 +2372,9 @@ The same server implementation runs in TLS mode, with responsibility split like 
 
 Upload those over SFTP after first boot and reboot; the listener picks them up on the next start. The directory is created for you.
 
-Certificates come either from the on-device `tls` command on ESP32 — or minted automatically by the mDNS service once the station has an address, covering both the IP and `<hostname>.local` — or from `scripts/GenTlsCerts.py` off-device.
+Where the port supports on-device generation, the certificates come from the `tls` command, or are minted automatically by the mDNS service once the station has an address, covering both the IP and `<hostname>.local`. Where it does not, they come from `scripts/GenTlsCerts.py` off-device and the upload above is the only way they arrive — there is no `tls` command to fall back on.
+
+**Serving HTTPS costs a live TLS session on top of whatever else is running.** On a device with heap to spare that is a flag change; on one already near its limit, expect to compile other services out to make room, and read [§12.3](#123-the-expensive-features) before assuming it fits.
 
 One header is worth a decision rather than a default: `Strict-Transport-Security` is sent only when its max-age is non-zero, and it ships as zero. Turn it on once you have a CA-signed certificate. With a self-signed one, the browser will pin HTTPS and refuse the click-through until the pin expires.
 
@@ -2554,7 +2561,7 @@ Live in [src/transports/](src/transports/). There are no globals — each consum
 
 | Transport | Class | Used by | Speaks |
 |---|---|---|---|
-| HTTP | `Http_Client` | OTA, IoT, GPIO posting, and the portal indirectly | HTTP/1.1, and 1.0 |
+| HTTP | `Http_Client` | OTA, IoT, GPIO posting, `wget`, and the portal indirectly | HTTP/1.1, and 1.0 |
 | MQTT | `MQTTClient` plus the message builders | MQTT service, IoT service | MQTT 3.1.1 |
 | SMTP | `SMTPClient` | email service | SMTP with AUTH LOGIN |
 
@@ -2838,9 +2845,9 @@ When a consumer genuinely cannot take a flash pointer, `rofn::to_charptr()` copi
 
 A handful of choices dominate the budget.
 
-**SSH** is the heaviest single flag. Turning it on effectively commits you to ESP32-class memory.
+**SSH** is the heaviest single flag. Turning it on effectively commits you to a device with heap to spare, and to compiling out whatever else was competing for it.
 
-**TLS** costs about what SSH does in flash, and more than NAPT in heap. On ESP8266 the two cannot coexist — both want more of the same fixed heap than exists. Inbound HTTPS and outbound TLS share the same backend, so enabling both costs nothing extra.
+**TLS** costs about what SSH does in flash, and more than NAPT in heap. Where the heap is small and fixed the two cannot coexist — both want more of it than exists — and the failure lands at runtime, since nothing rejects the pairing at build time. Inbound HTTPS and outbound TLS share the same backend, so enabling both costs nothing extra.
 
 What matters with TLS is per-session, not per-build:
 

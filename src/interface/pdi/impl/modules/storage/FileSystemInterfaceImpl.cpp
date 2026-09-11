@@ -32,7 +32,7 @@ pdi_err_t FileSystemInterfaceImpl::init() {
     lfscfg.read_size = 64; // Minimum read size (adjust as needed)
     lfscfg.prog_size = 64; // Minimum program size (adjust as needed)
     lfscfg.block_size = 4096; // Block size (adjust as needed)
-    lfscfg.cache_size = 64; // Cache size (adjust as needed)
+    lfscfg.cache_size = 512; // Cache size (adjust as needed)
     lfscfg.lookahead_size = 64; // Lookahead buffer size (adjust as needed)
     lfscfg.block_cycles = 100; // Number of erase cycles before wear leveling    
     int status = initLFSConfig(&lfscfg);

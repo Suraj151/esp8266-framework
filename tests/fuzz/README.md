@@ -1,8 +1,11 @@
 # Fuzz tier
 
-Six libFuzzer harnesses over the parsers a peer reaches **before any credential
-is checked**. Everything else in the framework is guarded by a login; these are
-not, so a length field trusted here is trusted from an anonymous stranger.
+Eight libFuzzer harnesses over the parsers that read bytes nobody on this device
+chose. Most of them are reached **before any credential is checked** — everything
+else in the framework is guarded by a login, so a length field trusted there is
+trusted from an anonymous stranger. The rest read a reply, a stored table or a
+stored file, where the bytes belong to whichever server was dialled or to
+whoever last wrote the file.
 
 ```
 python3 tests/run_tests.py --tier fuzz                       # 60s per harness
@@ -22,9 +25,11 @@ instrumentation. The ordinary tiers keep using gcc and `tests/.build`.
 | `fuzz_ssh_wire` | packet framing, KEXINIT, ECDH init, userauth, channel request and data, the length-prefixed field readers | every byte of this runs before the password is looked at |
 | `fuzz_sftp` | channel-data reassembly, the request header and every string field, split across chunks | where AO lived, and where BB and BC were found |
 | `fuzz_http` | request line, headers, query string, urlencoded form, multipart upload | the portal's front door, before the session cookie |
+| `fuzz_http_response` | the reply reader: status line, header split, chunked decoder, streamed body, and the url parser ahead of them | the other direction — `wget`, ota and iot all read a reply from a server they did not write, and CV lived here |
 | `fuzz_shell` | the terminal reader every transport shares: escape decoding, line editing, the login prompt | telnet hands it raw socket bytes |
 | `fuzz_dbrecord` | the superblock and directory a mount believes | a bad sector or another firmware's image arrives looking like this |
 | `fuzz_config` | the `/etc` key/value reader | an interrupted write leaves a file this reader still opens |
+| `fuzz_crontab` | the `/etc/crontab` row split and the field grammar — stars, numbers, ranges, steps | the table is re-read every minute and what it names runs with the scheduler's privileges |
 
 ## Corpus and findings
 
@@ -49,6 +54,13 @@ is null, so 17 million executions tested one early return. With a listener
 handed to it, the same harness reports **cov: 3884**. Run a new harness with
 `--verbose` once and look at `cov:` before believing a clean result.
 
+## A finding left in `findings/` is not a live defect
+
+The directory is gitignored and persists across runs, so an artefact there was true
+of whatever build wrote it. `fuzz_sftp` carried a crash file from the BB/BC era for
+two weeks that exits 0 against the current binary. **Replay it before believing it**,
+and delete it once it is dead — otherwise every future run looks like it failed.
+
 ## The client models a peer that hung up
 
 `FuzzClient::connected()` goes false once the input is drained, because a fuzz
@@ -66,7 +78,9 @@ only moves when something calls `wait()` — which that loop does not.
 
 **Sessions own their client.** `LWSSHSession` closes and deletes the client it
 was given, so a harness must hand it a heap allocation, never a stack object.
-The same goes for the http reader.
+The same goes for the http *server* reader. `Http_Client` is the exception — its
+`End()` only nulls the pointer and never deletes, so `fuzz_http_response` hands it
+a stack object on purpose.
 
 **The host is 64 bit and the boards are not.** `size_t` is 8 bytes here and 4
 there, so an overflow that needs a 32 bit `size_t` will never fire under the

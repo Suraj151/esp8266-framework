@@ -60,8 +60,13 @@ bool http_req_t::init(const char *url)
 
     if (nullptr != _url)
     {
-        // check for : (http: or https:)
-        int16_t index = __strstr(_url, ":");
+        while (' ' == *_url || '\t' == *_url)
+        {
+            _url++;
+        }
+
+        // check for :// (http:// or https://)
+        int16_t index = __strstr(_url, "://");
         bStatus = (-1 != index);
 
         if (bStatus)
@@ -69,12 +74,12 @@ bool http_req_t::init(const char *url)
             // check for correct protocol (http or https)
             pdiutil::string proto_https = CHARPTR_WRAP("https");
             pdiutil::string proto_http = CHARPTR_WRAP("http");
-            if (-1 != __strstr(_url, proto_https.c_str()))
+            if (0 == __strstr(_url, proto_https.c_str()))
             {
                 port = 443;
                 isHttps = true;
             }
-            else if (-1 != __strstr(_url, proto_http.c_str()))
+            else if (0 == __strstr(_url, proto_http.c_str()))
             {
                 port = 80;
             }
@@ -904,6 +909,11 @@ int16_t Http_Client::handleResponse()
             char* line = __strtrim(buf);
             line = __strtrim_val(line, '\n');
             line = __strtrim_val(line, '\r');
+            if (nullptr == line)
+            {
+                buf[0] = 0;
+                line = buf;
+            }
             uint16_t line_len = strlen(line);
 
             // break once header end and response collected
@@ -914,7 +924,7 @@ int16_t Http_Client::handleResponse()
 
             // check for status code in initial resp
             int index = __strstr(line, "HTTP/");
-            if (-1 != index)
+            if (0 == index)
             {
                 index += 5; // ignore version for now - HTTP/
                 while (index < line_len && line[index] != space) {

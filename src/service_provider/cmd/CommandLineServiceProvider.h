@@ -72,6 +72,7 @@ created Date    : 1st June 2019
 #include "commands/GrepFSCommand.h"
 #include "commands/ExecCommand.h"
 #include "commands/CrontabCommand.h"
+#include "commands/WgetCommand.h"
 #include "ShellParser.h"
 
 

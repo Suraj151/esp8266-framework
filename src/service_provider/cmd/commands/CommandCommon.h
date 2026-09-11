@@ -109,6 +109,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_SOURCE			    "source"
 #define CMD_NAME_TEST			    "test"
 #define CMD_NAME_CRONTAB		    "crontab"
+#define CMD_NAME_WGET			    "wget"
 
 #ifdef ENABLE_STORAGE_SERVICE
 /**

@@ -29,9 +29,11 @@ FUZZ_TARGETS = (
     "fuzz_ssh_wire",
     "fuzz_sftp",
     "fuzz_http",
+    "fuzz_http_response",
     "fuzz_shell",
     "fuzz_dbrecord",
     "fuzz_config",
+    "fuzz_crontab",
 )
 
 GREEN = "\033[32m"
