@@ -418,6 +418,7 @@ typedef struct CommandBase {
      */
     void setAcceptArgsOptions(bool _accept){
         m_acceptArgsOptions = _accept;
+        m_optionseparator = nullptr;
     }
 
     /**
@@ -455,13 +456,6 @@ typedef struct CommandBase {
     }
 
     /**
-     * @brief Executes the command with the provided arguments.
-     * @param _args The command arguments.
-     * @param _len The length of the arguments.
-     * @param _waiting_option Indicates if the command is waiting for an option.
-     * @return The result of the command execution.
-     */
-    /**
      * @brief Remove quoting from a value span, in place.
      *
      * The quotes are the shell's: they bound the value against the separator
@@ -473,8 +467,9 @@ typedef struct CommandBase {
      */
     void stripQuotes(char *_args, int16_t &_start, int16_t &_end){
 
-        while( _end > _start && ' ' == _args[_start] ) _start++;
-        while( _end > _start && ' ' == _args[_end-1] ) _end--;
+        // Strip whitespace around quoted string
+        while( _end > _start && (' ' == _args[_start] || '\t' == _args[_start]) ) _start++;
+        while( _end > _start && (' ' == _args[_end-1] || '\t' == _args[_end-1]) ) _end--;
 
         int16_t write = _start;
         bool insingle = false;
@@ -505,6 +500,13 @@ typedef struct CommandBase {
         _end = write;
     }
 
+    /**
+     * @brief Executes the command with the provided arguments.
+     * @param _args The command arguments.
+     * @param _len The length of the arguments.
+     * @param _waiting_option Indicates if the command is waiting for an option.
+     * @return The result of the command execution.
+     */
     pdi_err_t executeCommand(char *_args, int16_t _len, bool _waiting_option = false, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE){
         m_result = CMD_ERROR_UNSET;
         m_executing = true;
@@ -547,7 +549,7 @@ typedef struct CommandBase {
                                     char *argoptntrimmed = __strtrim(argoptn);
                                     int8_t validoptnindex = getOptionIndex(argoptntrimmed);
                                     if( validoptnindex != -1 ){
-                                        m_options[validoptnindex].optionval = __strtrim(_args+val_start_index);
+                                        m_options[validoptnindex].optionval = (_args+val_start_index);
                                         m_options[validoptnindex].optionvalsize = val_end_index - val_start_index;
                                         m_result = PDI_OK;
                                     }else{
@@ -555,7 +557,7 @@ typedef struct CommandBase {
                                         break;
                                     }
                                     // next option start index will start with last option value end index
-                                    optn_start_indx = optn_val_end_index+strlen(m_optionseparator);
+                                    optn_start_indx = optn_val_end_index+(m_optionseparator != nullptr ? strlen(m_optionseparator) : 1);
                                     // optn_start_indx += optn_start_indx != -1 ? (optn_val_end_index+strlen(m_optionseparator)) : 0;
                                     // the last option leaves this past the end, and the
                                     // loop condition only sees it after the search below
@@ -589,12 +591,12 @@ typedef struct CommandBase {
                                     int16_t val_end_index = optn_val_end_index;
                                     stripQuotes(_args, val_start_index, val_end_index);
 
-                                    m_options[option_indx].optionval = __strtrim(_args+val_start_index);
+                                    m_options[option_indx].optionval = (_args+val_start_index);
                                     m_options[option_indx++].optionvalsize = val_end_index - val_start_index;
                                     m_result = PDI_OK;
 
                                     // next option value start index will start with last option value end index
-                                    optn_val_start_index = optn_val_end_index+strlen(m_optionseparator);
+                                    optn_val_start_index = optn_val_end_index+(m_optionseparator != nullptr ? strlen(m_optionseparator) : 1);
                                 } while ( optn_val_start_index > 0 && optn_val_end_index > 0 && optn_val_start_index < cmd_max_len && option_indx < CMD_OPTION_MAX);
                             }
 

@@ -114,6 +114,22 @@ class Origin(object):
             conn.sendall(b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n")
             conn.sendall(b"N" * 3000)
 
+        elif path == "/spoofed.bin":
+            # a header whose value is itself a status line. the client must read
+            # the code from the first line only
+            body = b"S" * 512
+            conn.sendall(b"HTTP/1.1 200 OK\r\nX-Note: HTTP/9.9 404 nope\r\n"
+                         b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body))
+            conn.sendall(body)
+
+        elif path == "/barefeed.bin":
+            # line feeds with no carriage returns. a blank line then trims away
+            # to nothing, which is the shape that crashed the reader
+            body = b"B" * 512
+            conn.sendall(b"HTTP/1.1 200 OK\nContent-Length: %d\nConnection: close\n\n"
+                         % len(body))
+            conn.sendall(body)
+
         elif path == "/huge.bin":
             # declared far larger than any device filesystem, never sent
             self._head(conn, 200, 100 * 1024 * 1024)
@@ -129,6 +145,9 @@ class Origin(object):
             conn.sendall(body)
 
     def _head(self, conn, status, length):
+        # the Server value carries "HTTP/" on purpose: a reader that looks for
+        # the status line anywhere rather than at the front parses this instead
         text = {200: "OK", 404: "Not Found"}.get(status, "OK")
-        conn.sendall(("HTTP/1.1 %d %s\r\nContent-Length: %d\r\n"
+        conn.sendall(("HTTP/1.1 %d %s\r\nServer: SimpleHTTP/0.6 Python/3.12.3\r\n"
+                      "Content-Length: %d\r\n"
                       "Connection: close\r\n\r\n" % (status, text, length)).encode())

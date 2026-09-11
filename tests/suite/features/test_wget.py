@@ -270,6 +270,76 @@ def missing_url_leaves_nothing(t):
         cleanup(t, "h.bin")
 
 
+@test("a header that looks like a status line does not refuse the download",
+      needs=("wget",))
+def a_spoofed_status_header_is_ignored(t):
+    """
+    CV on hardware.
+
+    Every reply this origin sends carries a Server value containing "HTTP/",
+    so the whole suite covers the defect; this one adds the deliberate case,
+    a header whose value is a complete status line naming a different code.
+    A reader that scans for the status anywhere reports that code instead and
+    refuses a healthy transfer.
+    """
+    dest, out = fetch(t, "j.bin", "/spoofed.bin")
+    try:
+        text = outcome(out)
+        expect_in("saved", text, "a reply with a status-shaped header was refused")
+        expect_in("512", text, "the size reported is not the body's")
+        expect_not_in("404", text, "the status came from a header, not the status line")
+    finally:
+        cleanup(t, "j.bin")
+
+
+@test("a reply whose lines end in a bare feed is read", needs=("wget",))
+def a_bare_line_feed_reply_is_read(t):
+    """
+    CX on hardware, and the board is the only place the real cost shows.
+
+    A blank line with no carriage return trims away to nothing, and the reader
+    passed that to strlen. On the host a sanitizer names it; on a device it is
+    a read of address zero, so the failure to watch for is the board dropping
+    the transport rather than a wrong answer.
+    """
+    dest, out = fetch(t, "k.bin", "/barefeed.bin")
+    try:
+        expect_in("saved", outcome(out), "a reply with bare line feeds was not read")
+        expect_in("512", outcome(out), "the size reported is not the body's")
+
+        alive = t.run("echo wtalive")
+        expect_in("wtalive", alive, "the shell stopped answering after a bare-feed reply")
+    finally:
+        cleanup(t, "k.bin")
+
+
+@test("a url that carries no host is refused without crashing", needs=("wget",))
+def a_url_without_a_host_is_refused(t):
+    """
+    CY on hardware. A url ending in a colon sent the parser past the end of
+    its buffer, so what matters is that the shell is still there afterwards.
+    """
+    out = t.run("wget /%sl.bin http:" % W)
+    expect_not_in("saved", outcome(out), "a url with no host reported a saved file")
+
+    alive = t.run("echo wtparse")
+    expect_in("wtparse", alive, "the shell stopped answering after a malformed url")
+
+
+@test("a url padded with spaces is still fetched", needs=("wget",))
+def a_padded_url_is_fetched(t):
+    """CY's other half: the fix must not refuse a url with leading blanks."""
+    state = fixture(t)
+    dest = "/" + W + "m.bin"
+    t.run("rm %s" % dest)
+    url = url_for(t, "/small.txt")
+    try:
+        out = t.run('wget %s "   %s"' % (dest, url), timeout=90.0)
+        expect_in("saved", outcome(out), "a url with leading spaces was refused")
+    finally:
+        cleanup(t, "m.bin")
+
+
 @test("the shell still answers for itself after a download", needs=("wget",))
 def shell_is_not_left_behind(t):
     """
