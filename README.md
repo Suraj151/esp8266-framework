@@ -396,13 +396,13 @@ Generated headers are passed through `clang-format --style=Microsoft` when the f
 
 ### 2.4 Vendored externals
 
-Two bodies of external code live directly in the repo. [external/littlefs/](external/littlefs/) is the filesystem used by the storage interface on ESP8266 and ESP32, and by everything downstream of it — SFTP, shell history, the file commands. AVR builds have no storage and never reach it. [lwip/](lwip/) is a customised lwIP 1.4 used by the legacy NAPT path described below.
+[external/littlefs/](external/littlefs/) is the filesystem used by the storage interface on devices that have storage, and by everything downstream of it — SFTP, shell history, the file commands. Builds for a device without storage never reach it.
 
 #### 2.4.1 NAT and mesh
 
 Both are radio-level capabilities layered onto WiFi rather than regular services.
 
-**NAT on ESP8266** rewrites IP-header fields on packets in transit so that clients joining the device's access point reach the upstream network the station link is connected to. From ESP8266 core 2.6.x onward this runs on lwIP v2 (IPv4), selected in the IDE's Tools menu, and is the path in normal use. The older NAPT implementation uses the vendored lwIP 1.4: rename the core's `tools/sdk/lwip` aside, drop this repo's `lwip/` in its place, and pick the "lwIP 1.4 compile from source" variant. Which one is active is a compile-time choice. On the service side, `ENABLE_NAPT` makes the WiFi service schedule a one-shot NAPT enable once the station link is up.
+**NAT**, where the device supports it, rewrites IP-header fields on packets in transit so that clients joining the device's access point reach the upstream network the station link is connected to. It runs on the lwIP v2 (IPv4) variant supplied by the device core, selected in the IDE's Tools menu. On the service side, `ENABLE_NAPT` makes the WiFi service schedule a one-shot NAPT enable once the station link is up.
 
 **Mesh over ESPNOW**, on the ESP8266 port, wraps Espressif's peer-to-peer link-layer protocol into a small API so applications can build broadcasts and hop-distance topologies without touching the driver. It shares the radio with station mode and is configured from the application. Paired with `ENABLE_DYNAMIC_SUBNETTING` and `ENABLE_INTERNET_BASED_CONNECTIONS` on the WiFi service, it gives each node a notion of how many hops it sits from the hub.
 
