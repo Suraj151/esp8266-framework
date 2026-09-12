@@ -278,6 +278,8 @@ def interrupt_waiting_command(t):
     # CMD_ERROR_CANCELED — the interrupt reached the command rather than the
     # line editor, at the first of its prompts as well as the masked one
     expect_in("CmdErr : -3609", out, "the waiting command was aborted")
+
+    settle(t)
     expect_in(t.username, t.run("whoami"), "the shell came back to the prompt")
 
 
